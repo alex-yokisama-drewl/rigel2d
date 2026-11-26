@@ -130,7 +130,9 @@ see [runtime.md](runtime.md).
 ## A channel mapping **[proposed]**
 
 A mapping stores the channel's name and the identifier of the parameter it feeds. It may also
-name a source, and that field is empty in almost every puppet — see
+name a source, and that field is empty in almost every puppet. **Whether that is sufficient is
+`[open]`** — if trackers disagree on range or sensitivity for the same channel name, a mapping
+needs calibration too, and that is a change to this structure. See
 [performing.md](requirements/performing.md#channels-have-default-names-and-those-names-are-what-travels-proposed).
 
 **A channel is referenced by name, which is outside what [I3](invariants.md) binds rather than

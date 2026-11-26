@@ -197,6 +197,14 @@ else, an emote feed say, whose names do not collide in the first place.
 **A mapping names a channel, and may name a source.** The source half is optional and is the
 niche case; absent, the mapping takes the channel from whichever source supplies it.
 
+**Whether a name and a parameter are enough is `[open]`.** Everything above assumes a channel's
+name pins its *numbers* as well as its meaning — the same range, the same sensitivity, the same
+zero point — so that a mapping made against one tracker behaves on another. If that is false,
+a delivered mapping is dead weight on arrival and the mapping must carry a range or a
+normalisation, or the player must hold a per-machine calibration. That changes the format, so
+nothing should be built on the thin version until it is settled. Research is in flight; it will
+land in `docs/research/` and the answer belongs in this section.
+
 **Live shows which source each mapped channel is arriving from.** A collision is a thing the
 user should see rather than deduce: where two connected sources supply one name and the mapping
 does not say which is meant, Live reports it and the user resolves it by renaming one source's

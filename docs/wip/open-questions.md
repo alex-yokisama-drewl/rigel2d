@@ -31,6 +31,12 @@ subset that needs a decision from the project owner rather than from design work
 | Composition modes for deformations | `requirements/puppet.md`. Waits on evidence about which are wanted |
 | Randomness, and first run | `requirements/authoring.md` |
 
+## Waiting on research in flight
+
+| Question | Lives in |
+|---|---|
+| Whether a channel's name pins its numbers as well as its meaning, and so whether a stored mapping needs a range or a calibration to survive reaching a different tracker | `requirements/performing.md` — *Channels have default names*. Changes the format if it goes one way |
+
 ## Waiting on a signal, not a decision
 
 | | |
