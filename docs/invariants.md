@@ -111,10 +111,19 @@ frame one, for any blend, mask or composite combination the puppet uses.
 **Checked by:** test — *no first-use work after the first presented frame*,
 `docs/concerns/performance.md`.
 
-**CPU allocation in the frame loop is a budget, not an invariant.** It is counter-asserted in
-`docs/requirements/platform.md` and tightened once the language is known. Stated absolutely it
-would be a stack decision wearing an invariant's clothes: natural in a language without a
-garbage collector, contorted and hard to verify in one with.
+**CPU allocation in the frame loop is a budget, not an invariant**, and it stays one now for a
+better reason than the original. The original was that stating it absolutely would be a stack
+decision wearing an invariant's clothes — natural without a garbage collector, contorted and
+hard to verify with one. The stack removed that objection: zero is natural in Rust and a
+counting global allocator makes the count exact (`docs/stack.md`).
+
+It remains a budget because **this invariant's violation is a cliff and an allocation is a
+slope.** A mid-frame shader compile stalls for hundreds of milliseconds on some drivers, and one
+occurrence ruins a frame. An allocation in a language with no collector costs microseconds, is
+bad only in aggregate, and has no pause behind it. Invariants are for cliffs; budgets are for
+slopes, and the counter gate catches a regression either way. What promotion would have bought
+is agent visibility in `CLAUDE.md` and review severity, at the price of a rule admitting no
+justified exception.
 
 ## I6. A plugin never arrives inside a puppet, a scene or a source
 

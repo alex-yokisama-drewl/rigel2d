@@ -143,7 +143,7 @@ still a hitch on stream.
 | Resident bytes, player | 700 MB | | RAM and GPU memory are one pool on this machine, so they are budgeted as one number |
 | Resident bytes, editor | 2 GB | | With the reference puppet and its source artwork open, on an 8 GB machine |
 | GPU resource creation or pipeline compilation in the frame loop | None | | **Invariant — see `docs/invariants.md` I5.** A mid-frame texture or shader compile is a visible hitch, and on some drivers a stall of hundreds of milliseconds |
-| CPU allocation in the frame loop | None | | A budget rather than an invariant. The language is now chosen ([stack.md](../stack.md)) and makes zero natural, and a counting global allocator makes the counter exact rather than approximated — so this is now a candidate for promotion to an invariant, which is the project owner's call and not a design one. A pause from allocation or collection is exactly the stutter the percentile budgets exist to prevent |
+| CPU allocation in the frame loop | None | | A budget rather than an invariant, and settled as one — the reasoning is in [invariants.md](../invariants.md) under I5. The language is now chosen ([stack.md](../stack.md)), which makes zero natural and the counter exact rather than approximated, so the figure binds tightly even though it is not an invariant |
 | First-use work after the first presented frame | None | | The broader form of the row above, and how I5 is actually asserted: every render state a puppet can reach is prepared before it is first needed, or paid for during load |
 | Startup to first frame | 3 s cold, 1 s warm | | Cold means every derived cache empty, which is every beginner's first run |
 | Puppet load | 2 s | | Including validation and texture upload |
