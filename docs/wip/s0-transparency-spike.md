@@ -17,7 +17,7 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 7 — macOS, attempted at its tier
+**Current task:** 8 — the research file, and resolving what this spike gates
 **Blocked on:** nothing. Whether macOS can be attempted at all is a question for the owner.
 
 ---
@@ -446,14 +446,20 @@ divergence actually appears. What it does show is that rasterisation and format 
 exact across all three, so the tolerance question is about the evaluation maths and not about the
 render path.
 
-### 7. macOS: attempted at its tier — `todo`
+### 7. macOS: attempted at its tier — `done`
 
-Syphon client with its transparency setting, if a machine is reachable.
+**Not attempted: no Mac is reachable.** Recorded as an outcome rather than left silent, which is
+what the task asked for.
 
-**Done when:** either probed as above, or recorded as not attempted with the reason. `plan.md`
-asks only that it be attempted at its tier, and `platform.md` has macOS `[open]` and possibly
-dropped — so *not attempted* is a legitimate outcome and must be written down as one rather than
-left silent.
+`plan.md` requires only that macOS be attempted at its tier, and
+[platform.md](../requirements/platform.md) already carries macOS as `[open]` and possibly
+dropped. **Syphon alpha therefore remains unobserved**, as it was before this spike — the one
+platform whose claim still rests entirely on reading source and documentation.
+
+Worth noting against the day it is tried: the research observed that the macOS path has no
+premultiplied handling at all. Both measured platforms turned out to have a premultiplication
+assumption that had to be discovered, so arriving at macOS expecting none would be the wrong
+prior.
 
 ### 8. The research file, and resolving what this spike gates — `todo`
 

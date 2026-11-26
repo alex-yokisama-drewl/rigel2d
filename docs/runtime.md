@@ -22,6 +22,42 @@ from one.** That line is what keeps the two applications from diverging: Studio 
 in what they ask the user and in what they do with the result, not in how a puppet evaluates or
 draws.
 
+## The frame has one stated convention, and every consumer adapts to it **[decided]**
+
+The runtime renders in **one** colour and alpha convention, stated in the format and never
+varied per platform. Every output path converts from it at its own boundary, and **each
+conversion is established by measurement rather than assumed**.
+
+**Because two hosts were measured and neither assumed what the other did**
+([2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md)):
+
+| Route | Reads the buffer as | Needs to be sent |
+|---|---|---|
+| OBS on Linux, via `obs-vkcapture` | Linear light, already premultiplied | Premultiplied, linear |
+| OBS on Windows, via Game Capture | sRGB-encoded, straight alpha | Straight, sRGB-encoded |
+| A desktop compositor, for the editor's viewport | Encoded values, blended in encoded space | — |
+
+Fed what it expects, each route produced **identical** output. Fed the other's, each was wrong by
+an amount that looks like a plausible picture — artwork slightly too bright on one, semi-transparent
+edges too dark on the other. **Neither host documents its assumption, and neither reports a
+mismatch**; the only way to learn it is to push known values through and measure what comes back.
+
+What follows:
+
+- **The convention is the runtime's and is single.** A renderer that varies by platform is one
+  that cannot be reasoned about, and it would put the divergence this document exists to prevent
+  back in the middle of the frame loop.
+- **The conversion lives at the output boundary**, which is the application's, consistent with
+  *how the surface is presented* already sitting outside what the runtime owns.
+- **A new output route is not integrated until its conversion has been measured.** A route added
+  on the strength of its documentation is a route whose colour is wrong in a way no test covers,
+  and no amount of looking at it will find that — both hazards above were invisible by eye and
+  were caught only by asserting on pixel values written down in advance.
+- **This is the mechanism behind the guarantee in this document's opening**, that a rig cannot
+  look right while being authored and wrong while being performed. The viewport and the output
+  reach the screen through different hosts with different assumptions, so that guarantee is a
+  property of the conversions being right, not of the runtime alone.
+
 ## Loading never disturbs what is already there **[proposed]**
 
 A load produces a complete, validated puppet or it produces nothing. There is no partially
