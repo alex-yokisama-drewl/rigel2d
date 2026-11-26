@@ -18,7 +18,7 @@ settled, and a dated file lands in [research/](../research/).
 ## Status
 
 **Current task:** 6 — Windows, Game Capture
-**Blocked on:** task 6 — Game Capture shows nothing on the owner's machine, including for real games. Trying a GPU-pairing fix.
+**Blocked on:** task 6 — one confirming run with straight alpha, and whether *Allow Transparency* was ticked on the measured one.
 
 ---
 
@@ -331,6 +331,53 @@ hardware wgpu selects Vulkan by default, which is why the first run looked like 
 Neither offers `PreMultiplied` or `PostMultiplied`. This is the expected consequence of wgpu
 presenting through `CreateSwapChainForHwnd`, which is opaque-only on Windows; desktop
 transparency there needs DirectComposition or a layered window, and wgpu exposes neither.
+
+**Game Capture works, and the GPU-pairing theory was right.** Putting the sender on the NVIDIA
+GPU with `--adapter nvidia` made the capture appear immediately. Alpha is plainly visible: the
+scene behind shows fully through the transparent band and partially through the three
+semi-transparent ones.
+
+**Alpha reaches OBS intact. The compositing is wrong.** From a `Screenshot (Source)` of the
+captured frame, composited over black:
+
+| Probe | Sent (premultiplied) | OBS emitted |
+|---|---|---|
+| P1 | 128 | 92 |
+| P2 | 64 | 30 |
+| P3 | 192 | 169 |
+
+**The mechanism fits to within one unit on all three:** OBS multiplied by alpha a *second* time,
+in linear light — `encode(decode(premultiplied) × alpha)` predicts 93, 30, 169. For that model to
+fit, OBS must be holding our exact alpha values, so the transport is faultless and the error is
+in the blend. It is what OBS does when it believes a frame carries **straight** alpha while we
+are sending premultiplied.
+
+**It is not an artefact of the screenshot path.** The earlier preview screenshot, composited over
+a scene background, reads 94 at P1 where the same model predicts 95.5. OBS's ordinary
+compositing does this, so a semi-transparent puppet would render too dark on stream.
+
+**This is the failure `performing.md` predicted.** It names premultiplied-versus-straight as "the
+likeliest place for it to be quietly wrong", and it is wrong, quietly, on a real platform — and
+invisible to anyone judging by eye.
+
+**The two platforms disagree, which is the finding that outlives both routes.**
+
+| Route | What OBS assumes about the buffer | So the player must send |
+|---|---|---|
+| Linux, `obs-vkcapture` | Linear light, premultiplied | Linear, premultiplied |
+| Windows, Game Capture | Straight alpha | Straight alpha |
+
+Neither is documented. A renderer that satisfies one is wrong on the other, which is a second
+colour-correctness hazard under [runtime.md](../runtime.md)'s shared-runtime guarantee — the
+first being the sRGB shift in task 3. **Both are fixable by a plugin of our own**, which controls
+the import and could declare what it is sending.
+
+**Still to confirm:** a straight-alpha run should come out correct if the model holds, and
+whether *Allow Transparency* was ticked on the measured run, which selects the code path.
+
+---
+
+**Earlier, before the GPU pairing was found — kept because the failure mode matters.**
 
 **Game Capture captured nothing — and not only from us.** The window appears in OBS's list and
 the source renders empty, with `Allow Transparency` making no difference. **The owner reports the
