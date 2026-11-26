@@ -18,7 +18,7 @@ settled, and a dated file lands in [research/](../research/).
 ## Status
 
 **Current task:** 6 — Windows, Game Capture
-**Blocked on:** task 6 — a second Windows run on the DX12 backend. The first crashed on Vulkan.
+**Blocked on:** task 6 — one remaining Windows step: Game Capture against the DX12 window.
 
 ---
 
@@ -310,21 +310,47 @@ did not exist before this spike, because the behaviour was not known.
 *uniformity is not worth that* — and nothing here disturbs that. This costs the **Linux-first**
 variant only.
 
-### 6. Windows: Game Capture — `todo`
+### 6. Windows: Game Capture — `partial`
 
-Cross-compile the sender to `x86_64-pc-windows-gnu`, and build a self-asserting bundle: a script
-that configures an OBS scene collection, records, extracts the probe values and writes them to a
-file. The owner runs it in their own desktop session and returns the file.
+Run on an Optimus laptop: Intel HD Graphics 630 (driver 31.0.101.2140) and NVIDIA GeForce
+GTX 950M (DX12 driver 27.21.14.5167, Vulkan driver 451.67).
 
-Also answers the capability tension: Game Capture hooks the player's swapchain, which is OBS
-reaching into our process. `performing.md` flags as unresolved whether that is compatible with
-*the player requests no screen-capture or window-capture capability*, and says the spike should
-answer rather than assume.
+**Rendering works; the Vulkan backend does not.** DX12 and OpenGL both produced the test frame
+with every probe bit-exact. The **Vulkan** backend dies with `0xC0000005`, an access violation,
+in the offscreen path as well as the windowed one — so it is not a transparency fault. On this
+hardware wgpu selects Vulkan by default, which is why the first run looked like a total failure.
+**A build that does not pin its backend on Windows picks the one that crashes here.**
 
-**Done when:** the returned file's probe values are asserted against the reference table, and the
-capability question has an answer with its reasoning. **Needs the owner**, by construction — they
-run it. What would count as wrong: a bundle that needs them to judge anything, rather than to run
-one command and send back a file.
+**No backend on this machine offers an alpha-capable swapchain.**
+
+| Backend | Surface alpha modes |
+|---|---|
+| DX12 | `[Opaque]` |
+| Vulkan | `[Opaque, Inherit]` |
+
+Neither offers `PreMultiplied` or `PostMultiplied`. This is the expected consequence of wgpu
+presenting through `CreateSwapChainForHwnd`, which is opaque-only on Windows; desktop
+transparency there needs DirectComposition or a layered window, and wgpu exposes neither.
+
+**The distinction that keeps this from being fatal.** Two different things were being conflated:
+
+- **Desktop transparency** — the window blending over what is behind it. **Not available**
+  through a wgpu swapchain on Windows.
+- **Alpha in the rendered surface** — what a capture route reads. **Produced correctly**, proven
+  by the offscreen dumps.
+
+`Opaque` means the alpha channel is ignored *for desktop compositing*, not that it is discarded
+from the buffer. So Game Capture may still read correct alpha from a window that looks opaque on
+screen. **That is the one measurement still outstanding, and it decides the Windows story.**
+
+**Unplanned finding: the output is byte-identical across backends and platforms.** Windows DX12,
+Windows OpenGL and Linux Vulkan all produced the same PNG, MD5 `4ceef970…`. **This does not
+settle the cross-platform tolerance that [puppet.md](../requirements/puppet.md) leaves `[open]`**
+— the test frame is a flat-fill fragment shader with no interpolation, no trigonometry and no
+accumulation, which is the easiest case there is. Real deformation is where cross-platform
+divergence actually appears. What it does show is that rasterisation and format conversion are
+exact across all three, so the tolerance question is about the evaluation maths and not about the
+render path.
 
 ### 7. macOS: attempted at its tier — `todo`
 
