@@ -186,6 +186,20 @@ impl ApplicationHandler for App {
 
         self.pipeline = Some(crate::build_pipeline(&device, self.format(), self.straight));
         drop(surface);
+        // Place the test window exactly MARGIN inside the backdrop. Without this the window
+        // manager positions the two independently, the visible margin is whatever it happens to
+        // be, and anything deriving the test frame's position from the backdrop reads the wrong
+        // pixels. The Windows leg has no window coordinates to work from and locates the frame
+        // by finding the backdrop, so this is what makes that possible.
+        if let Some(b) = &backdrop_win {
+            if let Ok(bp) = b.outer_position() {
+                test_win.set_outer_position(winit::dpi::PhysicalPosition::new(
+                    bp.x + MARGIN as i32,
+                    bp.y + MARGIN as i32,
+                ));
+            }
+        }
+
         self.backdrop = backdrop_win
             .map(|w| self.configure(w, &device, wgpu::CompositeAlphaMode::Opaque));
         self.test = Some(self.configure(test_win, &device, alpha));

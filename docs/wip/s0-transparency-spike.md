@@ -18,7 +18,7 @@ settled, and a dated file lands in [research/](../research/).
 ## Status
 
 **Current task:** 6 — Windows, Game Capture
-**Blocked on:** nothing
+**Blocked on:** task 6 — the owner running the Windows bundle. Everything else on Linux is done.
 
 ---
 
@@ -379,6 +379,15 @@ invalid rather than as a transparency failure.
   scaffolding. The spike crate is standalone and not a member of anything.
 
 **Traps:**
+- **The two windows were never positioned relative to each other.** Only their sizes were set,
+  so the window manager placed each independently and the visible margin was whatever it happened
+  to be. On Linux this went unnoticed because the harness used the positions the sender reports;
+  it surfaced only when the Windows probe, which has no coordinates and locates the frame by
+  finding the backdrop, read a bounding box of the wrong shape. Its own aspect-ratio check caught
+  it. The sender now sets the test window's position explicitly.
+- **A stale screenshot read as a failing result.** Two consecutive probe runs returned byte-identical
+  numbers, which was the tell — a real capture of a changed scene cannot be identical. Worth
+  distrusting any measurement that repeats exactly.
 - **A capture route silently grabbed the wrong window.** The sender showed a backdrop and a test
   window; vkcapture captured the backdrop and returned a frame of flat magenta that was
   *internally consistent*. Only the harness's check on frame size caught it. `--solo` now
