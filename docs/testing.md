@@ -15,12 +15,19 @@ specific to this one:** the harness, the idioms, and what is deliberately not te
 | Acceptance | `cargo test`, workspace | `tests/acceptance/`, written from the requirements by `acceptance-planner` |
 | Structural UI | `egui_kittest`, headless | `tests/ui/` in `rigel-studio` and `rigel-live` |
 | Counters | The generated workloads against a committed baseline | `tests/counters/` in `rigel-runtime` |
+| Growth | The same counters on the stress workload, against the dimension that drives each | `tests/counters/`, beside the baseline gate |
 | Soak | Accelerated time, headless, synthetic input | `tests/soak/` in `rigel-runtime` |
 
 `.claude/test-cmd` holds `cargo test --workspace`. The counter gate runs as its own job: it
 compares against a committed baseline rather than passing or failing on its own terms, and
 [platform.md](requirements/platform.md#how-this-is-verified-proposed) explains why that half carries the
 whole frame budget.
+
+The growth row is the one that catches accidental quadratic behaviour in deformation
+composition and physics — the failure that makes a tool pleasant on small rigs and useless on
+real ones. It is asserted per dimension rather than as one figure, because
+[platform.md](requirements/platform.md) is explicit that the workload table does not scale
+uniformly.
 
 **No test requires a GPU.** This is a design constraint rather than a convenience —
 [runtime.md](runtime.md) describes the command stream the counters are read from, and wgpu's noop

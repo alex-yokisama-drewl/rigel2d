@@ -47,6 +47,11 @@ windowing assumption, and one spike settles both — see [stack.md](stack.md).
 | [scene.md](scene.md) | What does Live store about a sitting, and what does it deliberately not? |
 | [runtime.md](runtime.md) | What does the runtime own, where are its boundaries, and how is it measured? |
 
+**Studio's and Live's own designs are deliberately not written.** This pass covered the format,
+the runtime and the stack, in the build order [overview.md](overview.md) sets out. Live's output
+plumbing additionally waits on the spike named in [stack.md](stack.md), which is the same spike
+[requirements/performing.md](requirements/performing.md) requires for the OBS alpha path.
+
 ## Working on it
 
 | Doc | Answers |
