@@ -249,10 +249,20 @@ It does not license the opposite mistake: text still lives where a person can fi
 than being scattered through the interface code, because the user-facing string lint that
 enforces the strict vocabulary ([decisions.md](../decisions.md)) needs somewhere to look.
 
-## Deferred **[open]**
+## Behaviour under contention and over budget **[open]**
 
-Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether the
-player yields or holds when a game starves the GPU; whether it degrades, warns or refuses when
-a puppet exceeds the budget on a weak machine, and whether it may hold textures below their
-authored resolution; the tolerated deadline-miss rate and the stream length the soak run
-targets; and whether Windows code signing is funded.
+Three connected questions, none decided, and nothing may assume an answer to any of them:
+
+- Under contention, whether Live **yields** — dropping frames so the game wins — or **holds**,
+  so the stream stays smooth and the game suffers.
+- When a puppet exceeds the budget on a weak machine, whether Live **degrades, warns or
+  refuses**, and whether it may hold textures below their authored resolution. This interacts
+  with *no arbitrary dimension ceilings* in [puppet.md](puppet.md).
+- The tolerated deadline-miss rate and the stream length the soak run targets. Both figures in
+  the budget table above are guesses and are marked as such.
+
+## Windows code signing **[open]**
+
+A certificate costs money. Whether to fund one or ship unsigned with published checksums is
+undecided. macOS notarisation is `[open]` for the same reason, under *Support tiers* above.
+

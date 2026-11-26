@@ -251,11 +251,11 @@ and the control surface offers to locate it, skip it, or skip all like it. It ca
 asked during load, for the reason in
 [Nothing stops the puppet rendering](#nothing-stops-the-puppet-rendering-decided) above.
 
-## Deferred **[open]**
+## Editing a scene while streaming **[open]**
 
-Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether a scene
-can be edited while streaming; how a dormant scene entry is relocated in practice; and how a
-streamer learns something broke, above.
+Whether a scene can be changed while Live is performing it, and whether there is a locked state
+that prevents it, is undecided. Nothing may assume either answer.
 
-Off-machine sources are deferred rather than open — the position is above, under *A source can
-drive the puppet and nothing else*.
+Off-machine sources are **deferred rather than open** — the position is settled above, under
+*A source can drive the puppet and nothing else*.
+

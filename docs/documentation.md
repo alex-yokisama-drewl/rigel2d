@@ -135,6 +135,49 @@ A `[decided]` section states its rule and *why the rule is the way it is* — th
 with the rule or the next reader "fixes" it. It must not re-argue the alternatives; that is the
 decision log's job, and it links there.
 
+## Where an open question lives **[decided]**
+
+Same shape as the decision rule above, and it was missing — which is how three questions came to
+be settled in one section and still listed as open in another on the same day.
+
+**The `[open]`-tagged section is the question's home.** It holds the question, what turns on it,
+and what nothing may assume meanwhile. It sits with the context the question needs, and it
+survives the end of the cycle.
+
+**`wip/open-questions.md` is an agenda and carries no content.** It names each question in a
+line and points at the section that holds it, grouped by what the question blocks. It is deleted
+when the requirements are agreed, so anything that lives only there is lost.
+
+**Never write a second list of what is open.** `scripts/docs-check.sh` derives that list from the
+tags, in both forms — a heading tagged `[open]`, and an `[open]` inside an otherwise-settled
+section. A hand-written index of the same thing is a copy that nothing checks, and it drifts.
+There is no "Deferred" section at the foot of a requirements document; there was, and that is
+exactly what it did.
+
+## One home per statement **[decided]**
+
+**Every rule, decision, question and definition lives in exactly one document. Everywhere else
+links to it.** A reader who needs the full account follows the link; a reader who does not,
+does not.
+
+A **split** is not a copy, and is how most of this set works: a `[decided]` section states the
+rule in force, the decision log states what lost and why. Neither restates the other, and
+together they say something neither says alone. If you can delete one and lose nothing, it was
+a copy.
+
+**A copy is a defect unless it is in this table.** The test is not whether a copy seems useful —
+it always does. The table is closed, and extending it is an edit to this section, argued like
+any other change.
+
+| Copy | Source that governs | What keeps it honest |
+|---|---|---|
+| `CLAUDE.md` vocabulary table | [vocabulary.md](vocabulary.md) | Says on its face that the source governs; carries no definition the source lacks |
+| `CLAUDE.md` invariant lines | [invariants.md](invariants.md) | `scripts/docs-check.sh` fails when the numbering disagrees |
+
+Both entries share two properties, and any future entry needs them: **the copy names its source
+and says the source governs**, and **the copy is strictly thinner** — an orientation aid, never a
+second account. A summary that explains *why* has stopped summarising and become a rival.
+
 ## Updating **[decided]**
 
 - **A decision made in conversation is not made until it is written down.** Update the document

@@ -4,7 +4,7 @@ What Studio must do. What a puppet *is* belongs to [puppet.md](puppet.md); this 
 work of authoring one.
 
 **The editor is the larger of the two applications and this document is incomplete.** Sections
-tagged `[open]` are known gaps, not oversights.
+marked as open are known gaps, not oversights.
 
 ## The problem this application exists to solve **[decided]**
 
@@ -170,10 +170,10 @@ write ([puppet.md](puppet.md)), and an input protocol anything that can open a s
 ([performing.md](performing.md)). That remains the right answer for a great deal, and a plugin
 API never replaces it.
 
-## Deferred **[open]**
+## Rolling backups **[open]**
 
-Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether reuse
-of a part is a copy or a live reference; how the two sides of a symmetrical rig are kept in
-step; what form crash recovery takes; what happens to existing deformations when replacement
-art has different dimensions or a mesh is regenerated; and whether Studio keeps rolling backups
-of previous saves.
+Whether Studio keeps previous saves alongside the current one, and how many, is undecided. It
+interacts with the crash-recovery question above and with
+[I7](../invariants.md#i7-a-failed-save-never-damages-the-previous-file), which protects the
+previous file during a save but says nothing about keeping older ones.
+

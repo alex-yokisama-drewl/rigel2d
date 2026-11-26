@@ -113,12 +113,31 @@ auto="$(grep -rhoE '`(script|test)`' docs/concerns/ 2>/dev/null | wc -l | tr -d 
 note "verification mix — automated: $auto, judgment: $judg (the second should fall over time)"
 
 # ---------------------------------------------------------------- open questions
+# Two forms of the tag, and both must be listed. A heading-level [open] is hard to
+# miss when reading. An inline one, inside a section tagged [decided] or [proposed],
+# is easy to miss and is the reason this check exists at all: a hand-written index
+# used to compensate for it, and drifted.
+#
+# Files that *define* or *collect* the tag rather than use it are excluded, or they
+# drown the list.
 section "Open questions"
-if grep -rnE '^#+ .*\[open\]' docs/ >/dev/null 2>&1; then
-  grep -rnE '^#+ .*\[open\]' docs/ 2>/dev/null | sed 's/^/  /' | head -40
-  note "(informational — nothing should be built that assumes an answer to these)"
-else
+oq_excl='docs/documentation.md|docs/README.md|docs/requirements/README.md|docs/wip/open-questions.md|docs/decisions.md|docs/research/'
+
+oq_head="$(grep -rnE '^#+ .*\[open\]' docs/ 2>/dev/null | grep -vE "^($oq_excl)")"
+oq_line="$(grep -rnE '\[open\]' docs/ 2>/dev/null | grep -vE "^($oq_excl)" | grep -vE ':[0-9]+:#+ ')"
+
+if [ -n "$oq_head" ]; then
+  printf '  unsettled sections\n'
+  printf '%s\n' "$oq_head" | sed 's/^/    /'
+fi
+if [ -n "$oq_line" ]; then
+  printf '  unsettled points inside settled sections\n'
+  printf '%s\n' "$oq_line" | sed 's/^/    /'
+fi
+if [ -z "$oq_head" ] && [ -z "$oq_line" ]; then
   note "none"
+else
+  note "(informational — nothing should be built that assumes an answer to these)"
 fi
 
 printf '\n'
