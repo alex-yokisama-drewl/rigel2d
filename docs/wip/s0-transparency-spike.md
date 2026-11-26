@@ -17,8 +17,8 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 6 — Windows, Game Capture
-**Blocked on:** task 6 — one confirming run with straight alpha, and whether *Allow Transparency* was ticked on the measured one.
+**Current task:** 7 — macOS, attempted at its tier
+**Blocked on:** nothing. Whether macOS can be attempted at all is a question for the owner.
 
 ---
 
@@ -310,7 +310,7 @@ did not exist before this spike, because the behaviour was not known.
 *uniformity is not worth that* — and nothing here disturbs that. This costs the **Linux-first**
 variant only.
 
-### 6. Windows: Game Capture — `partial`
+### 6. Windows: Game Capture — `done`
 
 Run on an Optimus laptop: Intel HD Graphics 630 (driver 31.0.101.2140) and NVIDIA GeForce
 GTX 950M (DX12 driver 27.21.14.5167, Vulkan driver 451.67).
@@ -372,8 +372,33 @@ colour-correctness hazard under [runtime.md](../runtime.md)'s shared-runtime gua
 first being the sRGB shift in task 3. **Both are fixable by a plugin of our own**, which controls
 the import and could declare what it is sending.
 
-**Still to confirm:** a straight-alpha run should come out correct if the model holds, and
-whether *Allow Transparency* was ticked on the measured run, which selects the code path.
+**Confirmed by a second run, predicted before it was taken.** Sending **straight** alpha gives
+188, 137, 225 — the model's prediction exactly, on all three probes. *Allow Transparency* was
+ticked throughout, and unticking it removes transparency altogether, so the toggle behaves as
+documented and the measured path is the intended one.
+
+**Each host wants a different encoding of the same frame, and fed correctly both agree.**
+
+| Route | Treats the buffer as | Send it | Output |
+|---|---|---|---|
+| Linux, `obs-vkcapture` | Linear light, already premultiplied | Premultiplied, linear | 188, 137, 225 |
+| Windows, Game Capture | sRGB-encoded, straight alpha | Straight, sRGB-encoded | 188, 137, 225 |
+
+**This is the result that matters: the two platforms converge on identical output** once each is
+sent what it expects — and on the linear-light composite, which is the colorimetrically correct
+one. [runtime.md](../runtime.md)'s guarantee that the editor's viewport and the player's output
+cannot disagree is therefore achievable; what it costs is a **per-platform output adaptation**,
+small and precisely specified, which no document currently mentions.
+
+Two models, each fitted to three probes, each predicting the other platform's numbers before
+they were measured:
+
+- Linux: `result = encode(rgb)` — premultiplied assumed, values read as linear.
+- Windows: `result = encode(decode(rgb) × alpha)` — straight assumed, values read as encoded.
+
+**What this does to the plugin decision.** A plugin of our own removes the adaptation entirely by
+declaring what it sends, on every platform. That is now an argument from measurement rather than
+from preference.
 
 ---
 
