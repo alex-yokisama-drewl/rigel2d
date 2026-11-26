@@ -231,9 +231,13 @@ A puppet is data. No field in it is evaluated as a script, a command, or a forma
 path or URL inside one is resolved outside the container it arrived in.
 
 **Because:** puppets are traded between strangers — a rigger delivers to a streamer, and the
-community shares files. Opening one must not be able to harm the machine. This is a candidate
-invariant, and it is the assumption that a plugin API or in-puppet scripting would invalidate;
-see [authoring.md](authoring.md), which records the decision and its reasoning.
+community shares files. Opening one must not be able to harm the machine.
+
+This is a candidate invariant, and **a plugin API does not threaten it.** The sentence is about
+what a *file* supplies, not about what the application may load: a plugin the user installs
+deliberately is not something a puppet supplied. What would invalidate it is in-puppet
+scripting, or any route by which a plugin could arrive inside a shared file — which is why
+[authoring.md](authoring.md) rules that out permanently while deferring the API itself.
 
 ## The same puppet saves to the same bytes **[proposed]**
 

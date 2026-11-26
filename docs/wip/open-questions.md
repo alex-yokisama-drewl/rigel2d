@@ -67,16 +67,21 @@ default for a new scene is still `[open]`; ease to neutral is the working assump
 alpha is unobserved end to end on every candidate path. The spike is the trigger. Output behind
 a narrow interface is settled regardless.*
 
-## Blocking the extension story
+## The extension story
 
-Opened 2026-11-26 by the cross-version save decision, which was framed in terms of plugins —
-a machine missing one, and telling the user what to install.
+*Resolved 2026-11-26: plugins are intended; the API surface is deferred. Groundwork in scope now
+is only what cannot be retrofitted — marked extension data, stable identifiers, an enumerable
+operation set, and the permanent rule that a plugin never arrives inside a puppet, scene or
+source. In `docs/requirements/authoring.md`, superseding the no-plugin-API entry in
+`docs/decisions.md`.*
+
+Not blocking anything now, and **due before plugins ship rather than before the first release:**
 
 | Question | Why it matters |
 |---|---|
-| **Does Rigel2D load third-party code at all?** | `docs/decisions.md` says no plugin API, on the grounds that a sandbox for untrusted code is a large permanent security problem the open-seams approach does not have. Data-only extensions do not disturb the no-execution invariant; an installable plugin that renders or edits something is a different claim and reverses that entry |
-| If it does: what can a plugin do, and where does it run? | Decides whether "nothing a puppet, scene or source supplies is ever executed" survives as an invariant, and how much of the threat model is rewritten |
-| If it does not: who writes extension data, and how does a user obtain what reads it? | The warning on open promises to name what is missing. If extensions come only from separate tools, "what to install" means a different thing |
+| What can a plugin do, and where does it run? | The API surface. Deferred on purpose; revisit once the deformation model and the operation set have stopped moving |
+| Does *"never opens an outbound network connection"* mean the applications, or the applications plus everything they load? | The claim's whole justification was that it is checkable in one sentence and asserted in CI. A plugin is not our code, so the assertion's scope has to be restated or plugins constrained. Same shape as the no-screen-capture claim |
+| How does a user learn what would make an unrecognised extension work? | The warning on open names what is missing. Until plugins exist it cannot promise an install route, and the wording should not imply one |
 
 ## Blocking scope and the threat model
 

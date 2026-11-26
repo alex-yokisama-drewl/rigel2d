@@ -106,19 +106,47 @@ Opening the editor with no puppet shows a way to begin, not an empty workspace. 
 user can get from a PSD to a puppet that moves in the viewport without outside help; what form
 that takes — a bundled sample puppet, a guided path, in-context hints — is undecided.
 
-## What the editor deliberately does not do **[decided]**
+## Extensibility: plugins are intended, the API is deferred **[decided]**
 
-**No plugin API, and no scripting inside a puppet.** Extensibility comes from open seams
-instead: a file format third-party tools can read and write ([puppet.md](puppet.md)), and an
-input protocol anything that can open a socket can speak
-([performing.md](performing.md)). Extending the system means writing a program that produces a
-file or sends channels, not loading code into ours.
+**No scripting inside a puppet, ever.** No field in a puppet, a scene or a source is evaluated
+as code. That is permanent, and it is not what this section defers.
 
-**Because:** an API surface is a permanent maintenance cost and a compatibility promise, and it
-is scope against a project whose stated trade is depth over breadth. It is also what makes
-*nothing a puppet, scene or source supplies is ever executed* available as an invariant — and
-that single sentence is most of the threat model for software whose files are traded between
-strangers.
+**A plugin API is intended, and deliberately not designed yet.** Studio and Live expect to load
+third-party code eventually — a custom deformer, a node kind, an import format, an interface
+panel are all things open seams cannot reach, and a tool like this is better for having them.
+What is deferred is the API surface, because an API is a compatibility promise over internals,
+and this project's internals are the part it most wants freedom to change. The deformation model
+is precisely where a premature API would bite hardest.
+
+So the rule for now is **build so that plugins stay possible, and build nothing for them yet.**
+The test for whether a piece of groundwork belongs in the first release:
+
+> Is it impossible, or very expensive, to retrofit once files are in the wild and users have
+> habits?
+
+| In scope now, because retrofitting is painful | |
+|---|---|
+| Marked extension data in the format, preserved on save | Retrofitting means every file already written lacks the marker, and older builds have already destroyed what they did not recognise. See [puppet.md](puppet.md) |
+| A stable identifier on every entity | A plugin has to name what it acts on. Already `[decided]` for unrelated reasons, which is the sign it is the right shape |
+| An enumerable operation set | Already required so that undo can be exhaustive. The same shape is what a plugin API would drive, so the two reinforce each other rather than compete |
+| Installation is never a file | Below. A security line, not a convenience |
+
+**Out of scope now:** the API surface itself, any ABI or stability promise, a sandbox or
+capability model, and — the tempting one — abstraction layers with exactly one implementation
+behind them, written "for the plugins". That is the failure mode this deferral exists to avoid,
+and it costs more than the retrofit it is trying to prevent.
+
+**The line that holds whenever plugins arrive: a plugin never arrives inside a puppet, a scene
+or a source.** Installing one is an explicit act by the user, out of band from file sharing.
+This is what keeps *nothing a puppet, scene or source supplies is ever executed* true as an
+invariant — that sentence is about files, not about the application, and a plugin API does not
+touch it. A puppet able to carry a plugin would collapse the distinction, and most of the threat
+model with it, because puppets are traded between strangers and installed software is not.
+
+**Until plugins exist, extensibility is open seams:** a file format third-party tools read and
+write ([puppet.md](puppet.md)), and an input protocol anything that can open a socket can speak
+([performing.md](performing.md)). That remains the right answer for a great deal, and a plugin
+API never replaces it.
 
 ## Deferred **[open]**
 

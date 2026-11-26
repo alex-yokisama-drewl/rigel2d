@@ -196,3 +196,32 @@ structures and discarding the source. **This entry defines extension data withou
 whether the applications ever load third-party code** — that is still governed by *"No plugin
 API, and no scripting inside a puppet"* above, which the extension-data mechanism does not by
 itself disturb: data is never executed either way.
+
+## 2026-11-26 — Plugins are intended; the API is deferred (supersedes "No plugin API")
+
+**Decided:** Reverses the *"No plugin API"* half of the earlier entry and leaves the
+*"no scripting inside a puppet"* half untouched and permanent. Studio and Live will load
+third-party code eventually. The API surface is not designed now, and nothing is built for it
+now beyond what would be impossible to retrofit.
+**Because:** the earlier entry argued the case on security, and that argument does not survive
+contact with the distinction it missed: the threat is code arriving *in a traded file*, not code
+a user deliberately installs. Puppets are shared between strangers; plugins are not. The
+argument that does survive is the one the old entry made almost in passing — an API is a
+permanent compatibility promise over internals — and that is a reason to defer, not to refuse.
+This project's deformation model is the part it most wants freedom to reconsider, and it is
+exactly what a premature API would freeze. Tools of this kind are better for having plugins;
+Blender, Krita and OBS all added theirs after the internals settled.
+**Rejected:** holding the line at "build it in or not at all", which is defensible for a focused
+tool and is what the superseded entry chose — it loses because it answers "can we afford the
+API?" with "never" when the real answer is "not yet". Also rejected: designing the API now so it
+is ready. An API with no plugins written against it is a guess, and the guess becomes a promise
+the moment anything ships.
+**Consequences:** the groundwork that *is* in scope now is narrow and listed in
+`docs/requirements/authoring.md` — marked extension data, stable identifiers, an enumerable
+operation set, and the rule that a plugin never arrives inside a file. The standing temptation
+is abstraction layers with one implementation behind them, written "for the plugins"; that costs
+more than the retrofit it avoids. **Two existing claims need revisiting before plugins ship, not
+before then:** *"the applications never open an outbound network connection, asserted in CI"*
+is an assertion over our own code and a plugin is not our code, so either the claim narrows to
+the applications themselves or plugins are constrained from networking; and the security
+checklist's *"the player requests no screen-capture capability"* has the same shape.
