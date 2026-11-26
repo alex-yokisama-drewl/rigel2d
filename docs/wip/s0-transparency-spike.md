@@ -17,7 +17,7 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 5 — costing our own Linux-first plugin
+**Current task:** 6 — Windows, Game Capture
 **Blocked on:** nothing
 
 ---
@@ -257,14 +257,58 @@ author no longer invests beyond their own use cases.
 practice. The format table says it should. Settling it needs either a newer PipeWire or a
 purpose-built producer, and neither is worth doing before the owner has chosen a route.
 
-### 5. Our own Linux-first plugin: shape and cost — `todo`
+### 5. Our own Linux-first plugin: shape and cost — `done`
 
-Not a plugin. What one would carry: the `libobs` texture-import call, the frame transport, the
-build and distribution burden, and the coupling to OBS releases that `performing.md` names as the
-recurring cost rather than the code.
+Costed against the two reference implementations built in tasks 3 and 4, and against the libobs
+headers installed on this machine. No plugin was written.
 
-**Done when:** the owner can weigh option 2 against options 1 and 3 from this section alone,
-including what breaks when OBS next changes its plugin ABI.
+**The plugin is the small half, and that inverts the usual objection.** Line counts of working
+code that does this job:
+
+| | Lines |
+|---|---|
+| `obs-vkcapture`, receiver half (`vkcapture.c` + `wlcursor.c`) | 1,541 |
+| `obs-vkcapture`, sender half (Vulkan layer, GL injection, ELF hacks) | 4,182 |
+| `obs-pwvideo`, receiver including its own PipeWire transport | 2,925 |
+
+**Most of vkcapture's sender does work we would never need.** It intercepts *other people's*
+swapchains — a Vulkan layer, `dlsym` interception, ELF patching — because it captures
+applications that know nothing about it. Our player exports its own texture deliberately, so our
+sender is "allocate a dmabuf, render into it, hand over the fd, format and modifier". The 4,182
+figure is not our sender's cost; it is the cost of not controlling the application.
+
+Nor does writing a plugin add the sender to our bill:
+[performing.md](../requirements/performing.md) already records that the sender is per-platform
+whichever route is chosen, so that work exists under every option in the table.
+
+**What we would actually write:** an `obs_source_info` implementing `get_name`, `create`,
+`destroy`, `get_width`, `get_height`, `get_defaults`, `update`, `get_properties` and
+`video_render`, plus a transport receiver and one call to
+`gs_texture_create_from_dmabuf`. On the evidence above, order of a thousand to fifteen hundred
+lines of C for Linux, less than vkcapture's receiver because we need no Wayland cursor capture.
+
+**The per-platform import calls are confirmed in the installed headers**, not inferred:
+`gs_texture_create_from_dmabuf` (Linux), `gs_texture_open_shared` and `gs_texture_open_nt_shared`
+(Windows), `gs_texture_create_from_iosurface` (macOS). So one plugin with a thin per-platform
+import layer is real, and extending from Linux to the others later is open.
+
+**The recurring cost, measured.** `OBS_DECLARE_MODULE()` bakes `LIBOBS_API_VER` into the module
+at compile time and exports it as `obs_module_ver()`; this machine's libobs is 32.2.0 and
+declares major versions to increment on breaking API changes. So **a plugin needs rebuilding and
+re-releasing per OBS major version**, which has been roughly annual. On top of that, per the
+research: the Windows plugin folder layout changed in OBS 33, Windows wants signing and macOS
+notarisation.
+
+**The argument the research could not make.** Task 3 found that the problem on the vkcapture path
+is not alpha but colour: OBS treats the imported dmabuf as linear light and encodes once on
+output, so the player must render in linear light to compensate. **A plugin of our own controls
+that import**, and could declare the colour space correctly rather than having the renderer
+compensate for someone else's assumption. That is a real engineering argument for option 2 that
+did not exist before this spike, because the behaviour was not known.
+
+**What it does not change.** `performing.md` rejects writing our own for every platform —
+*uniformity is not worth that* — and nothing here disturbs that. This costs the **Linux-first**
+variant only.
 
 ### 6. Windows: Game Capture — `todo`
 
