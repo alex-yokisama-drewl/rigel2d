@@ -167,7 +167,7 @@ extension it belongs to, and the validator requires that marker.
 
 | Rule | |
 |---|---|
-| Extension data is namespaced and declares its origin | An identifier for the extension, and something human-readable to show a user who does not have it |
+| Extension data is namespaced and declares its origin and version | An identifier for the extension, the version it expects, and something human-readable to show a user who does not have it. **A puppet declares; it never installs** — see [invariants.md](../invariants.md) I6 |
 | Extension data is data | It is structured values — never a script, a command, a path or a URL to resolve. The no-execution rule covers it without exception |
 | Unmarked data that the core format does not define is **invalid**, not an extension | Otherwise a typo and an extension are indistinguishable, and the validator can reject neither |
 | Preserved data round-trips byte-stably | It takes part in canonical serialisation below, so carrying someone's extension through a save does not make the file churn |

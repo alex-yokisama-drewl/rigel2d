@@ -58,6 +58,18 @@ and once against a fixed synthetic CPU and GPU load standing in for a game and a
 contended figure is the one that reflects reality; the solo figure is the one that localises a
 regression.
 
+### Budgets are per puppet **[decided]**
+
+Every figure below is stated against **one** puppet. A scene holding several costs roughly its
+share for each, and that is the expected and acceptable outcome — the same bargain as opening
+more browser tabs. Live is benchmarked on one puppet of average size rendering smoothly; it does
+not promise a fixed ceiling across a whole scene, and it does not degrade a puppet to stay
+inside one.
+
+**Because:** a whole-scene budget would make the common case pay for the rare one, and the
+number it produced would be arbitrary. Per-puppet costs are the ones a user can reason about
+and act on.
+
 ### The reference puppet and the stress puppet **[proposed]**
 
 A budget needs a defined workload, and on integrated graphics the dominant costs are fill rate,
@@ -130,7 +142,8 @@ still a hitch on stream.
 | CPU per frame | 4 ms | 6 ms | Per frame rather than as a share of the machine, so that it binds |
 | Resident bytes, player | 700 MB | | RAM and GPU memory are one pool on this machine, so they are budgeted as one number |
 | Resident bytes, editor | 2 GB | | With the reference puppet and its source artwork open, on an 8 GB machine |
-| Allocation or GPU resource creation in the frame loop | None | | A pause from allocation or collection is exactly the stutter the percentile budgets exist to prevent |
+| GPU resource creation or pipeline compilation in the frame loop | None | | **Invariant — see `docs/invariants.md` I5.** A mid-frame texture or shader compile is a visible hitch, and on some drivers a stall of hundreds of milliseconds |
+| CPU allocation in the frame loop | None | | A budget rather than an invariant, deliberately: whether zero is natural or contorted depends on the language, which is not yet chosen. Tighten once it is. A pause from allocation or collection is exactly the stutter the percentile budgets exist to prevent |
 | First-use work after the first presented frame | None | | Every render state a puppet can reach is prepared before it is first needed, or paid for during load |
 | Startup to first frame | 3 s cold, 1 s warm | | Cold means every derived cache empty, which is every beginner's first run |
 | Puppet load | 2 s | | Including validation and texture upload |

@@ -119,23 +119,21 @@ regressions — are recorded in `docs/requirements/platform.md`.*
 
 ---
 
-# Proposed invariants, awaiting approval
+# Invariants — approved and written
 
-`docs/invariants.md` is empty. These restate requirements in the form "what must never break".
-They are the strongest claim the project makes, so they are proposed rather than written.
+*Approved 2026-11-26 and written into `docs/invariants.md`, with the matching one-line half in
+`CLAUDE.md`. Three of the five proposed entries were reworded before approval and two were
+added:*
 
-**Most of what they restate is `[proposed]`, not `[decided]`** — nothing executed, stable
-identifiers and no allocation in the frame loop all are. Approving an invariant therefore
-settles the requirement behind it at the same time, which is a larger step than it looks.
-
-1. **Nothing a puppet, scene or source supplies is ever executed.** Unblocked — the plugin API
-   is ruled out (`docs/decisions.md`).
-2. **The render surface shows only the puppet**, on every path including every failure path.
-3. **Every reference is by stable identifier**, never by name, index or file position.
-4. **A failed load never replaces what is displayed.**
-5. **No allocation or GPU resource creation happens in the frame loop.**
-
----
+- *I1 was scoped to Rigel2D's own code. It cannot bind plugins — a plugin can store code in a
+  puppet's extension data and execute it itself. That residual risk is accepted as the cost of
+  allowing plugins, and is recorded in `docs/invariants.md`.*
+- *I2 was reworded off "the puppet", since a scene holds several.*
+- *I3 was scoped to stored data, because the frame loop must resolve to handles instead.*
+- *I5 was split: GPU resource creation is the invariant, CPU allocation stays a budget in
+  `platform.md` until the language is chosen.*
+- *Added: I6, a plugin never arrives inside a file. I7, a failed save never damages the
+  previous file.*
 
 # Concern checklist entries — approved and moved
 

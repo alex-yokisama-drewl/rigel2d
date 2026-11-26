@@ -69,4 +69,10 @@ verifies the numbering corresponds.
 
 <!-- Format: In. <the rule> — <why, in a clause> -->
 
-*None yet.*
+- **I1.** **Rigel2D never executes anything a puppet, scene or source supplies** — files are traded between strangers, so this is most of the threat model. Binds our code, not plugins.
+- **I2.** **Nothing but rendered puppet content ever reaches the render surface** — it is what the stream shows, on every failure path.
+- **I3.** **Every reference in a stored puppet or scene is by stable identifier** — never name, index or position. In memory, resolved handles are required instead.
+- **I4.** **A load that fails never replaces what is already displayed** — binds the replace path; loading an additional puppet is additive.
+- **I5.** **No GPU resource creation or pipeline compilation in the frame loop** — a mid-frame texture or shader is a visible hitch. CPU allocation is a budget, not this.
+- **I6.** **A plugin never arrives inside a puppet, a scene or a source** — installing is always explicit. A file may declare what it needs, never install it.
+- **I7.** **A failed save never damages the previous file** — losing the puppet is worse than a bad frame.
