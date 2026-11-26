@@ -17,7 +17,7 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 1 — the test frame and the sender
+**Current task:** 2 — does the window composite correctly at all on X11
 **Blocked on:** nothing
 
 ---
@@ -141,17 +141,19 @@ What the user caught that automation did not. **Each becomes a checklist entry i
 
 One commit each. Status: `todo` / `awaiting approval` / `done`.
 
-### 1. The test frame and the sender — `todo`
+### 1. The test frame and the sender — `done`
 
-A throwaway Rust binary rendering a known half-transparent frame with wgpu into a
-decoration-free window. The frame carries flat regions at stated alpha values and stated
-colours, chosen so that premultiplied and straight interpretations give different numbers — that
-difference is the whole instrument. A committed reference table states the expected value at each
-probe coordinate under each interpretation.
+`spike/alpha-sender/` renders the frame and scores it against `spike/alpha-sender/REFERENCE.md`,
+which was written first. `--dump <png>` runs offscreen with no window; `--straight` emits the
+other interpretation.
 
-**Done when:** the binary runs, the reference table is committed, and the expected values are
-derived and written down *before* any route is tested. Deriving them afterwards would let a wrong
-result look right.
+Both variants reproduce the table exactly on Intel ARL via Vulkan — every probe, no rounding
+anywhere, which is what the exactly-representable 8-bit values were chosen to achieve. The
+`RGB > A` test independently reports `false` for premultiplied and `true` for straight, so the
+instrument discriminates by two unrelated means rather than one.
+
+**What this licenses:** a route whose numbers disagree with the table is the route's fault, not
+the sender's. That was the point of doing it before touching OBS.
 
 ### 2. Linux: does the window composite correctly at all — `todo`
 
@@ -232,12 +234,36 @@ Filled as work proceeds; routed to the project documentation at finish. Leave a 
 than deleting it.
 
 **Built:**
+`spike/alpha-sender/` — throwaway instrument for the spike: the test frame, the reference table
+derived before any route was tried, and a probe report that scores a frame against it. Offscreen
+dump only so far; no window yet.
 
 **Decisions made:**
 
 **Contradicts docs:**
+- `CLAUDE.md` says the compiler is "the one `rust-toolchain.toml` pins". **There is no such
+  file.** The surrounding text does say the commands are unverified because nothing is built, but
+  naming a file that does not exist reads as a statement of fact rather than an intention. S1
+  creates it; until then the sentence is wrong.
+- `CLAUDE.md` gives `cargo build --workspace` as the install step. **There is no workspace**, and
+  by `plan.md`'s own design there will not be one until S1 — S0 deliberately carries its own
+  scaffolding. The spike crate is standalone and not a member of anything.
 
 **Traps:**
+- **wgpu 30's API differs from every older version enough to make guesses worthless.**
+  `PipelineLayoutDescriptor` has `immediate_size` where it had `push_constant_ranges`;
+  `multiview` became `multiview_mask` and is now required on `RenderPassDescriptor` too;
+  `PollType::Wait` is a struct variant needing `submission_index` and `timeout`;
+  `get_mapped_range` returns a `Result`; `InstanceDescriptor` has no `Default`, though
+  `Instance::default()` exists. Reading the vendored source under
+  `~/.cargo/registry/src/*/wgpu-30*/src/api/` settled all of it in one pass, where compiling and
+  fixing one error at a time would have taken several. **Do that first in S5.**
+- This is first-hand support for `stack.md`'s own warning that wgpu's major versions move fast.
+  It is evidence for that note, not a contradiction of it.
+- **An sRGB surface format would have falsified every number silently** — about 188 where the
+  table says 128, which looks like a plausible result rather than a bug. The sender pins
+  `Bgra8Unorm`. `REFERENCE.md` records it as the first thing to re-check if a route lands close
+  to the table but not equal.
 
 **Assumptions:**
 

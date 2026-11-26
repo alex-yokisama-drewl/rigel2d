@@ -1,0 +1,14 @@
+[package]
+name = "alpha-sender"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Throwaway scaffolding for S0, the transparency spike. Deliberately not a workspace member:
+# docs/wip/plan.md says S0 carries its own scaffolding rather than waiting for S1 to formalise a
+# workspace that may not survive the spike's result.
+
+[dependencies]
+wgpu = "30"
+pollster = "0.4"
+png = "0.17"
