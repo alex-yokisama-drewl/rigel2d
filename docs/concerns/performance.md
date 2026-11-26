@@ -86,3 +86,13 @@ Universal entries reference them.
 - **Edit cost, undo step size and bytes written per save are independent of total puppet size** — `judgment`
   → `test`.
   Seeded at planning, 2026-11-26.
+
+### Texture lifetime, copy, paste and symmetry
+
+- **An operation that only re-references artwork creates no texture, uploads nothing, and retains no pixels in its undo step** — `judgment`
+  → `test`: copy, each paste mode, mirrored paste. Assert textures created, bytes uploaded, payload bytes written and pixel bytes retained for undo are all zero. A build that copies pixels per paste silently defeats the sharing these operations exist for.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **A texture nothing draws is neither decoded, uploaded, nor counted against resident texture memory** — `judgment`
+  → `test`: load a puppet carrying an unreferenced texture of declared size; assert it round-trips byte-identically and appears in no upload count or residency figure. Otherwise a file carrying unused artwork inflates the player's memory budget with art nobody can see.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.

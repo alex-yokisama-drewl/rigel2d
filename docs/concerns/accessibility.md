@@ -209,3 +209,13 @@ unaffected by whether the element can be focused.
   Linux, and confirm names, roles and announcements arrive. **Stays `judgment` permanently** —
   nothing automated reaches the adapter. Every catch becomes an entry.
   Seeded at planning, 2026-11-26.
+
+### Texture lifetime, copy, paste and symmetry
+
+- **An operation that changes several entities at once raises one announcement naming what changed, not one per entity** — `judgment`
+  → `test`: paste, mirror and a delete that collects a texture. Assert a single live-region message carrying the catalogue text and the counts. A message per binding floods the region and conveys less than silence.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **After a compound operation, focus is on a named element that exists, and undo returns it there** — `judgment`
+  → `test`: run paste, mirror and delete and their undos; assert focus is on a present node with a non-empty accessible name. Focus dropped to the window root, or onto a node the operation removed, is the usual failure.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.

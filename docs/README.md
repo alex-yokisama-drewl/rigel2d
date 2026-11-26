@@ -34,6 +34,7 @@ windowing assumption, and one spike settles both — see [stack.md](stack.md).
 | [requirements/puppet.md](requirements/puppet.md) | What is a puppet, and what must its file guarantee? |
 | [requirements/puppet-acceptance.md](requirements/puppet-acceptance.md) | How would we know the puppet requirements were met? Criteria, written before any implementation |
 | [requirements/authoring.md](requirements/authoring.md) | What must the editor do, and what must it feel like? |
+| [requirements/authoring-acceptance.md](requirements/authoring-acceptance.md) | How would we know the editor's copy, paste and mirror operations were right? Criteria for those operations only, written before any implementation |
 | [requirements/performing.md](requirements/performing.md) | What must the player do, from tracking input to streaming output? |
 | [requirements/platform.md](requirements/platform.md) | What must it run on, and to what frame budget? |
 

@@ -105,3 +105,17 @@ Record the threat model, the roles, and anything exempt here on the first planni
 - **Signing keys and release tokens are unreachable from pull-request jobs** — `judgment`
   → `script` once releases exist.
   Seeded at planning, 2026-11-26.
+
+### Texture lifetime, copy, paste and symmetry
+
+- **Load limits bind every entry in a file, referenced or not and parsed or only carried** — `judgment`
+  → `test`: an oversized texture that no part references, and an authoring-only entry whose declared size and actual size disagree, each refused on Studio's path and on the player's carry-without-parsing path. Data nothing renders is where a limit evasion would be put, because it has no visible effect until it has been allocated.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **Data moved between puppets is renumbered, and no reference crosses by numeric coincidence** — `judgment`
+  → `test`: two fixtures whose identifier spaces overlap; copy a part whose mask names a part that was not copied. Assert the reference is dropped or the paste refused, never resolved against whatever holds that number in the destination. Identifiers are unique within a puppet and nothing more, so overlap is the normal case.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **Finiteness is judged at the precision the runtime evaluates in, and after an operation rather than only at parse** — `judgment`
+  → `test`: a literal finite as a 64-bit value and infinite once narrowed; and a mirror whose reflection of a finite coordinate about a distant axis overflows. The first makes two tools disagree about whether one file is valid; the second produces an unloadable puppet from a legal one.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.

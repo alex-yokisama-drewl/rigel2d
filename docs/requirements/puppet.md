@@ -13,13 +13,24 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
 - a **node tree** of parts, mesh groups and composites, which fixes draw order and nesting. A
   **part is a leaf**: parts draw, and mesh groups and composites contain. Keeping each kind to
   one job is what makes the tree's shape say where deformation and compositing can happen, and
-  it is why a cascade from a texture reaches the parts drawing it and stops. Art that wants to
+  it is why a cascade reaches the parts under a deleted group and stops there. Art that wants to
   sit under a shared transform goes in a mesh group, which is what one is for;
-- **textures**, referenced by parts;
+- **textures**, referenced by parts. A part's reference carries a **texture flip** per axis, so two parts
+  may share one drawing with one of them reversed — the ordinary case for a pair of eyes;
 - **parameters**, each a one- or two-dimensional axis with keypoints along it. A parameter
   **declares its axis range** — a minimum and a maximum per dimension — and carries **exactly
   one neutral keypoint**. The validity rule that keypoints are within range presupposes the
-  first, and easing to neutral in [performing.md](performing.md) presupposes the second;
+  first, and easing to neutral in [performing.md](performing.md) presupposes the second. It
+  also **declares axis polarity per dimension** — bilateral, unipolar, or **unknown** — which a
+  mirror reads to know whether reversing that axis has a meaning, and which it never writes.
+  *Unknown* is a declared value, not a missing one, because the alternative is to guess, and a
+  guess is wrong for every head-turn parameter it touches and invisible once made. Its route in
+  is **a writer that is not ours** — the format is one third-party tools generate
+  ([below](#the-file-is-readable-and-writable-by-tools-that-are-not-ours-decided)), and a
+  generator with no notion of polarity needs a way to say so honestly rather than pick. Studio's
+  own paths do not produce it: a merge takes a puppet that already declares polarity, and
+  importing artwork creates no parameters. **The value is therefore dormant in anything Studio
+  writes**, which is the expected state and not a sign it is unused;
 - **bindings**, each mapping a parameter to something that changes — a node transform, or
   per-vertex offsets on a mesh — with values stored at keypoints and interpolated between;
 - **physics**, which drives parameters from simulated motion rather than from input;
@@ -32,6 +43,8 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   data although they are edited in Live rather than Studio, and **Live writes them into the
   puppet file** by saving it, so that a delivered puppet reacts for whoever receives it — see
   [performing.md](performing.md#channel-mappings-are-puppet-data-and-live-writes-them-decided).
+- **mirror axes**, one left–right and one top–bottom, which a mirror reflects across. Authoring-only
+  data, defaulting to the puppet's centre, and the only piece in this list the player never reads.
 
 Inochi2d's model is the starting point and its vocabulary of pieces is largely right. This
 project departs from it deliberately in several places recorded below — textures as entities
@@ -140,6 +153,54 @@ the puppet loads. So:
   parts exported at an identical 920×780 with stored sizes from 0.03 MB to 1.16 MB — mostly
   transparent padding, each paying 2.74 MB resident regardless. Cropping is most of the
   available win and requires nothing clever.
+
+### A texture's life is bound to the parts that reference it **[decided]**
+
+**Nothing in Studio deletes a texture.** No operation takes a texture as its subject. A texture
+arrives by import and leaves when nothing draws it, and the rigger never has to think about the
+difference between the drawing and the part that uses it.
+
+**Because:** every route to a texture runs through a part. Art is imported, which makes both at
+once; a part is copied, which shares the texture; art is re-imported, which replaces what a part
+draws. There is no workflow in which a rigger has a texture and no part for it, so an operation
+to remove one is an operation to create exactly the problem it then has to solve. Removing it
+also removes the cascade *from* a texture, which was the only cascade that could reach a
+puppet's root.
+
+- **A texture is collected the moment no part references it**, whatever edit caused that: the
+  last part referencing it was deleted, a re-import repointed the only part that drew it, a
+  paste was undone. **Not on save**, and not on deletion alone. A deletion-only rule leaks —
+  re-importing art repoints a part without deleting one, so iterating on artwork would
+  accumulate dead textures, and once saved they become indistinguishable from the arrivals
+  below.
+- **A texture that was unreferenced when the file was loaded is never collected.** Both halves of
+  that sentence carry weight. Because collection is immediate, an orphan can no longer be
+  *created* and then saved, so this case only ever means a file written by a third-party tool or
+  one whose references live in extension data this build cannot read.
+- **Collection belongs to the operation that caused it** — the same undo step, named in the same
+  result. Undo restores the payload byte-identically under its original identifier, and a
+  collected identifier is retired like any other ([Every entity has a stable
+  identity](#every-entity-has-a-stable-identity-proposed)). Deduplication by content hash must
+  drop a collected texture too, or a later import matches a payload that is no longer there.
+- **Where the puppet carries material this build cannot read, a collecting edit reports it and
+  asks.** The protection above covers a texture an extension *solely* references; it does not
+  cover one referenced by both a part and an extension, which is not unreferenced at load and so
+  is collected when that part goes. That case cannot be detected, only disclosed — so in a puppet
+  carrying anything opaque, an edit that would collect says so and the rigger confirms. This is
+  the same *report, then confirm* shape [deletion](#deletion-is-report-then-a-confirmed-cascade-decided)
+  already uses, rather than a second mechanism.
+- **Artwork nothing draws can be removed deliberately.** One command, over unreferenced textures
+  only, reporting what it will take and how large it is, and undoable. It is the exception to the
+  first rule in this section and it is narrow on purpose: it cannot cascade, because nothing
+  references what it removes, and the identifiers it frees are retired like any other. Without it a
+  rigger who receives a puppet carrying unused artwork
+  has no way to remove it, which is a delivery-size problem and a privacy one — a puppet
+  redelivered to a client would carry another client's drafts under the sender's name, on every
+  save.
+- **An unreferenced texture is valid, and costs nothing to hold.** The validity rules take no
+  view on whether a texture is drawn. It is never decoded, never uploaded and never counted
+  against resident texture memory, so a file carrying unused artwork cannot inflate the frame
+  budget — only the file.
 
 ## The file is readable and writable by tools that are not ours **[decided]**
 
@@ -265,18 +326,21 @@ code, and the same validator gates loading and saving.
 |---|---|
 | Identifiers are unique | |
 | The tree is acyclic, with one root | |
-| Every texture, parameter and node reference resolves | A reference naming nothing is a malformed file. **Distinct from a texture whose payload is present but unreadable**, which loads with a visible placeholder ([authoring.md](authoring.md)) rather than failing the puppet |
+| Every texture, parameter and node reference resolves | A reference naming nothing is a malformed file. **Distinct from a texture whose payload is present but unreadable**, which loads with a visible placeholder ([authoring.md](authoring.md)) rather than failing the puppet  **A texture that nothing references is valid**, and there is deliberately no rule against one — a validator that invented one would reject files this format permits and the editor is required to preserve |
 | Keypoints are ordered and within range | The range is the one the parameter declares |
+| Each of a parameter's axes declares an **axis polarity** | Bilateral, unipolar or unknown, per dimension. An unfamiliar value follows the enumerated-values row below. A **missing** polarity is invalid in a file whose declared version this build knows — *unknown* is how a file says nobody has decided, and it is a value that must be written rather than an absence that may be inferred. The distinction is what stops a guessed polarity from being indistinguishable from a declared one |
 | Every parameter has exactly one neutral keypoint | None and more than one are both invalid. *Easing to neutral* ([performing.md](performing.md)) has no meaning without it, and a rule stated and never checked is a hope |
 | No part has children | A part is a leaf ([What a puppet is](#what-a-puppet-is-proposed)). Mesh groups and composites are the kinds that contain |
 | A binding's stale mark agrees with its value counts: counts that match the mesh topology it applies to and no mark, or counts that mismatch and the mark | Staleness is the flagged outcome of [artwork changing under a rig](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) — a state the rigger resolves, not a malformed file. **The derived state is authoritative and the mark must agree with it**, so a mismatch that is unmarked is invalid, and so is a match that is marked. A file from a stranger can lie; a derivation cannot. The mark stays useful as the cheap thing a loader reads first |
-| Every number is finite | NaN and infinity are rejected, not clamped silently. **This rule does not carry the version gate the row below does**, and the difference matters: it applies to every value this build interprets as a number, in a file of any declared version, so a later version's NaN in a node transform is still rejected rather than preserved into the frame loop. What it does not reach is material preserved opaquely — in data whose shape we do not know there is nowhere to look for a number, and almost any eight bytes read as one are a NaN |
+| Every number is finite | NaN and infinity are rejected, not clamped silently. **Finiteness is judged at the precision the runtime evaluates in**, not only at the precision the file was parsed in: a literal that is finite as a 64-bit value and infinite once narrowed is rejected, or two tools reading one file disagree about whether it is valid. **This rule does not carry the version gate the row below does**, and the difference matters: it applies to every value this build interprets as a number, in a file of any declared version, so a later version's NaN in a node transform is still rejected rather than preserved into the frame loop. What it does not reach is material preserved opaquely — in data whose shape we do not know there is nowhere to look for a number, and almost any eight bytes read as one are a NaN |
 | Enumerated values are known, or explicitly marked as extensions | In a file whose declared version this build knows. A later version's unfamiliar value is preserved, under the [version gate](#unrecognised-data-is-marked-as-such-by-whoever-wrote-it-decided) |
 
 Every size and count the loader trusts has a **load limit**, declared in one place, checked
 **before allocating** — decompressed payload size, texture dimensions, vertex and node and parameter
-counts, tree depth, string length, total load memory. Exceeding one fails the load with a
-readable error in bounded time and memory. These limits are a defence against a corrupt or
+counts, tree depth, string length, total load memory. **They bind every entry in the file** — one nothing
+references, and one this build only carries without parsing — because data nothing renders is exactly where
+a limit evasion would be put, and it would have no visible effect until it had already been allocated.
+Exceeding one fails the load with a readable error in bounded time and memory. These limits are a defence against a corrupt or
 hostile file and are multiples of the stress puppet in
 [platform.md](platform.md#the-reference-puppet-and-the-stress-puppet-proposed); they are **not** authoring
 limits, and they must not reappear as a choice presented to the person rigging.
@@ -344,6 +408,7 @@ them why the part looks unposed.
 |---|---|
 | Art re-exported and re-imported after an edit | Matched to existing parts by stored import provenance rather than by name alone. Art that no longer appears leaves its part in place, flagged as having lost its source |
 | Replacement art has different dimensions | Remapped. Deformations are offsets in the texture's coordinate space, so a dimension change is a defined scaling of that space |
+| Replacement art matches one of several parts sharing a texture | **Split.** The matched part gets a new texture entity; every other part keeps the original, with its pixels, its deformations and its evaluated geometry unchanged. The result names both halves — which part changed and which did not |
 | A mesh is regenerated or edited by hand | Retained and flagged. Topology changed, so there is no correspondence to carry offsets across and any remap would be a guess at the rigger's intent |
 
 Deleting a rigger's deformation work because a texture changed size is the worst thing this
@@ -362,17 +427,22 @@ What follows, as constraints rather than design:
   identifier where the format provides one — together with a **content hash of the imported
   pixels**. Matching prefers the source identifier, falls back to the content hash, then to the
   name. No path, username or machine name is stored, and nothing in it is ever resolved
-  ([I1](../invariants.md)).
+  ([I1](../invariants.md)). **A part created by copying carries none**, because a copy has no source
+  document — which is also what makes *matches one of several parts sharing a texture*, above, well
+  defined rather than ambiguous between two parts claiming the same layer.
 
-Deletion is **report, then a confirmed cascade.** Deleting a texture that parts use, or a
-parameter that bindings reference, first reports everything affected; the user confirms; the
-dependent entities go with it. What is refused is the *quiet* cascade, not the cascade — a
+### Deletion is report, then a confirmed cascade **[decided]**
+
+Deleting a **node** that holds a subtree, or a **parameter** that bindings reference, first
+reports everything affected; the user confirms; the dependent entities go with it. **A texture
+is not among the things that can be deleted** — see [A texture's life is bound to the parts that
+reference it](#a-textures-life-is-bound-to-the-parts-that-reference-it-decided). What is refused is the *quiet* cascade, not the cascade — a
 dangling reference is a malformed file, and one validator gates save, so a report alone cannot
 be the end of it. The operation is undoable like any other ([authoring.md](authoring.md)), which
 is what makes a confirmed cascade acceptable rather than dangerous.
 
 **The cascade is transitive, and it walks dependents rather than referents.** One level does not
-satisfy the validator: deleting a texture removes the parts drawing it, and a **binding** that
+satisfy the validator: deleting a mesh group removes the parts beneath it, and a **binding** that
 deformed one of those parts cannot exist without it either — so stopping after the first level
 leaves exactly the dangling reference the cascade exists to avoid. The set is closed — but in
 one direction only.
@@ -380,16 +450,16 @@ one direction only.
 **The direction is what stops it taking the puppet.** The closure follows *what depends on the
 deleted entity*, never *what the deleted entity reaches*. Containment is a stored reference like
 any other, so a closure that walked every reference would go from a part to the mesh group
-holding it and from there to the root: deleting one texture would delete everything. **A
+holding it and from there to the root: deleting one part would delete everything. **A
 container is not a dependent of what it contains** — a mesh group with one fewer child is still
 a mesh group, and no closure walks upward into the root. The root can still be reached the other
 way, by a constitutive chain running down to it in a puppet small enough that the root is also a
 part; that case is refused rather than excepted, below.
 
 **Downward, containment is constitutive: removing a node removes the subtree under it.** A child
-cannot exist without a parent to hang from, so the closure continues down. Deleting a texture
-reaches the parts drawing it, and a **mesh group** whose every child is such a part goes with
-them only if it is itself a dependent — it is not, so it survives empty, by the rule above.
+cannot exist without a parent to hang from, so the closure continues down. A **mesh group** whose
+every child was deleted individually goes with them only if it is itself a dependent — it is not,
+so it survives empty, by the rule above.
 Where the closure does run down is from a node deleted directly, or reached as a dependent: its
 children go, and theirs.
 
@@ -400,9 +470,9 @@ either happens.
 
 The report names the whole set before anything changes.
 
-- Deleting a **texture** takes the **parts** that reference it. A part draws a mesh with a
-  texture; a part with no texture is not a part. The closure then continues from each of those
-  parts.
+- Deleting a **node** takes the subtree under it, and the **bindings** on every node in that
+  subtree. Textures the deleted parts were the last to reference are collected in the same step,
+  and the report names them.
 - Deleting a **parameter** removes what cannot exist without it: its **bindings**, the **channel
   mappings** that feed it, and the **physics** that drives it. An **animation** that drove it
   **survives**, driving the rest. The nodes those bindings drove survive untouched too — a node
@@ -417,17 +487,32 @@ chosen on what it costs the rigger rather than on validity.
 | **Constitutive** — the dependent cannot exist without it | The dependent is removed, and the closure continues through it | A **part** without its **texture**; a **binding** or a **channel mapping** without its **parameter**; **physics** without the parameter it drives |
 | **Incidental** — the dependent is whole without it | The reference drops and the dependent stays. The closure stops here, because nothing was removed | A part that was **masked** by a removed part, which survives unmasked; an **animation** driving several parameters, one of them deleted, which survives driving the rest |
 
+**A part without its texture stays declared constitutive although nothing can now delete a
+texture.** The declaration is what the closure is computed from, and the kind is still exercised
+from the other end — by a re-import split, and by the collection rule. A kind that stops being
+reachable from the interface does not stop being a kind.
+
 **Which kind each reference is belongs to the format**, declared per reference kind rather than
 decided per deletion. That is what keeps the rule checkable, and what stops a new entity kind
 arriving with no stated answer.
 
-**A cascade whose result would not validate is refused, and says why.** The set is computed, the
-result is validated, and only then is anything offered to the user. This is the general form of
-a problem that first appears at the smallest size: in a single-part puppet the part *is* the
-root, so deleting its texture would take the root and leave a tree the validity rules reject —
-and that is a beginner's first import, not a corner. Stating it as *refuse what would not
-validate* rather than as an exception for the root means it also catches the same shape for
-entity kinds nobody has thought of yet.
+**No edit produces a puppet that would not load.** The result is computed, validated against the
+integrity rules *and* the load limits, and only then is anything offered to the user or allowed
+to replace what is on screen. A refusal says which rule would break.
+
+This is stated over **every** edit rather than over deletion alone, because deletion is not the
+only operation that can reach an invalid result. A paste can carry a near-limit puppet past a
+load limit, so that Studio would write a file it then refuses to open. A mirror computes a
+reflection, and a reflection of a finite coordinate about a distant axis can overflow to
+infinity, which *Every number is finite* rejects — so it is refused, never silently clamped. A
+mirror that would move a keypoint outside its parameter's declared range is refused on the same
+ground.
+
+The smallest case is still the generating one: in a single-part puppet the part *is* the root, so
+deleting it would leave a tree the validity rules reject — and that is a beginner's first import,
+not a corner. Stating it as *refuse what would not validate* rather than as an exception for the
+root means it also catches the same shape for entity kinds and operations nobody has thought of
+yet.
 
 **The incidental case is the one that justifies the whole distinction.** Destroying a part
 because the part masking it was deleted, or destroying an animation because one of the

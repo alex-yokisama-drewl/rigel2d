@@ -43,6 +43,57 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-26 — Studio has no operation that deletes a texture
+
+**Decided:** A texture is not a thing the rigger deletes. It arrives by import and is collected
+the moment no part references it, whatever edit caused that. One narrow exception exists — a
+command over unreferenced textures only, so that artwork inherited in a received file can be
+removed. This supersedes the confirmed cascade *from* a texture, which this project previously
+specified in full and wrote acceptance criteria for.
+**Because:** every route to a texture runs through a part, so there is no state in which a rigger
+holds a texture with no part for it. An operation to delete one therefore only creates the problem
+it then has to solve, and the cascade it needed was the only one that could reach a puppet's root
+— a single-part puppet is a beginner's first import, and deleting its texture would have taken the
+whole tree. Collection also makes an orphaned texture impossible to produce rather than something
+the editor must be careful not to leave behind.
+**Rejected:** the confirmed cascade from a texture, which is what this document's own earlier
+position was and what a reader will assume was considered. It is correct and it is machinery
+serving an operation nobody needs. Also rejected: refusing deletion when a texture is in use,
+which leaves the rigger stuck with no route forward; and sweeping unreferenced textures at save
+time, which cannot see a reference held inside extension data this build cannot parse, and so
+would destroy data the format promises to carry untouched.
+**Consequences:** the part-without-its-texture reference kind stays declared constitutive although
+nothing can reach it as an operation any more, because the closure is computed from the
+declaration and a re-import split still exercises it. Collection cannot see a reference held by an
+extension, so a texture referenced by both a part and an extension is lost when that part goes;
+this is disclosed rather than solved — an edit that would collect, in a puppet carrying anything
+opaque, says so and the rigger confirms. And *refuse what would not validate* had to be
+generalised from deletion to every edit, since deletion is no longer the only operation that can
+reach an invalid result.
+
+## 2026-11-26 — A mirror rewrites bindings and never writes a parameter
+
+**Decided:** Mirroring a binding reflects that binding's own stored values and, where the
+parameter's axis is bilateral, reverses which keypoint holds which value. The parameter is read —
+for its axis polarity — and never modified. Pasting rigging likewise creates bindings, never
+parameters.
+**Because:** the alternative reading is the one everybody arrives at, and it is wrong in a way
+that looks right. "Flip the rigged eye" sounds like reversing an axis; an axis belongs to a
+parameter; parameters are shared by many nodes; so the operation appears to have to reach every
+node bound to it, and the feature appears to conflict with the ordinary rig in which one parameter
+drives many nodes. It does not, because what is stored per node is the binding. Three separate
+readers of this design reached the wrong conclusion independently before it was written down,
+which is the evidence that it needed to be.
+**Rejected:** reversing the parameter's axis, which would silently re-mean every other binding on
+it and every channel mapping Live wrote into it. Also rejected: treating "copy the rigging" as
+copying parameters, which is what makes the feature look as though it conflicts with shared
+parameters in the first place.
+**Consequences:** axis polarity has to be stored per parameter axis from the first version of the
+format, because without it a mirror must ask the rigger which axes to reverse on every use. A
+parameter whose polarity is unknown — from a third-party tool — reverses nothing and is named in
+the result rather than guessed at.
+
+
 ## 2026-11-26 — A puppet is one file, with no separate project or export
 
 **Decided:** No editing project distinct from a runtime form of the same thing. One file, always re-editable. It

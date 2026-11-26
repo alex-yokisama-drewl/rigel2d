@@ -67,7 +67,7 @@ different points.
 | [puppet.md](../requirements/puppet.md) | **Done** — [puppet-acceptance.md](../requirements/puppet-acceptance.md) | Its `[open]` on the compatibility promise is a signal from the owner and changes no criterion |
 | [platform.md](../requirements/platform.md) | With S6 | The counter half can be commissioned now; the soak length and the tolerated deadline-miss rate are `[open]` |
 | [performing.md](../requirements/performing.md) | After S0 | The spike resolves the `[open]` that decides the output path |
-| [authoring.md](../requirements/authoring.md) | Next cycle | Studio is not in this phase |
+| [authoring.md](../requirements/authoring.md) | **Partly done** — the operations settled on 2026-11-26 are in [authoring-acceptance.md](../requirements/authoring-acceptance.md); the rest is next cycle | Studio is not in this phase |
 
 The planner's most useful output is the gaps it finds in the requirements. Those route back into
 `docs/requirements/` before the subsystem they affect starts.
