@@ -134,9 +134,12 @@ behaviour every puppet can perform without carrying authored content for it.
 
 The input port is the application's only network surface and it is treated as untrusted.
 
-- **It binds to loopback by default.** Reaching it from another machine — which phone-based
-  tracking needs — is an explicit opt-in made in the running application, with a visible
-  indication that it is on.
+- **It binds to loopback, and the first release does nothing else.** Off-machine sources —
+  which phone-based tracking needs — are **not rejected, only deferred**; the design must not
+  preclude them. When they arrive the shape is already settled: an explicit opt-in made in the
+  running application, never on by default, with a visible indication while it is on. Whether
+  that indicator is sufficient on its own, or wants an address allow-list or a pairing step, is
+  decided then and not now.
 - **A scene never enables off-machine listening.** Scenes are files that strangers share, and
   "open my port to the network" must not be able to arrive inside one.
 - **A source may set channel values and trigger animations. It may do nothing else** — not load
@@ -162,8 +165,10 @@ missing output device falls back rather than failing the load.
 
 ## Deferred **[open]**
 
-Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether sources
-must be reachable from another machine in the first release, which phone-based tracking needs;
-whether OpenSeeFace's protocol is our native one or sits behind a protocol of our own, which
-decides whether the port is reachable from a web page; and whether a scene can be edited while
-live.
+Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether
+OpenSeeFace's protocol is our native one or sits behind a protocol of our own, which decides
+whether the port is reachable from a web page; and whether a scene can be edited while
+streaming.
+
+Off-machine sources are deferred rather than open — the position is above, under *A source can
+drive the puppet and nothing else*.

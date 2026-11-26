@@ -106,6 +106,25 @@ Opening the editor with no puppet shows a way to begin, not an empty workspace. 
 user can get from a PSD to a puppet that moves in the viewport without outside help; what form
 that takes — a bundled sample puppet, a guided path, in-context hints — is undecided.
 
+## Mouse and keyboard are the whole interaction model **[decided]**
+
+Every operation in Studio is **convenient** with a mouse and a keyboard. Not merely possible —
+convenient, meaning no operation depends on precision, pressure, hover or a gesture that a mouse
+cannot comfortably produce.
+
+A pen tablet is not a target device. Tablets still work, because the operating system presents
+one as a pointer, but nothing is designed for pressure, tilt, hover or barrel buttons, and no
+interaction assumes them.
+
+**Because:** this is the audience requirement, not a simplification. Beginners and smaller
+streamers are the people this project is for, and a tool whose rigging workflow is merely
+tolerable without a tablet quietly excludes them. Holding the baseline at mouse and keyboard
+also keeps one interaction model to design, document and test rather than two that drift.
+
+**Tablet-specific interaction is a candidate for the plugin API** once it exists — it is the
+first concrete example of the "build it in or not at all" problem that deferring the API keeps
+open rather than closing. See below.
+
 ## Extensibility: plugins are intended, the API is deferred **[decided]**
 
 **No scripting inside a puppet, ever.** No field in a puppet, a scene or a source is evaluated

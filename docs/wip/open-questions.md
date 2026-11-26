@@ -55,13 +55,12 @@ in force.*
 | Question | Why it matters |
 |---|---|
 | How does a streamer learn something broke, when the render surface must stay clean and the control surface may be behind a full-screen game? | A sound, an OS notification, a tray state. Without an answer, a live failure is silent |
-| Must sources be reachable from another machine in the first release? Phone-based tracking needs it | If yes: is a visible indicator enough, or is an address allow-list or a pairing step wanted? |
 | Is OpenSeeFace's protocol our native protocol, or one source implementation behind a protocol of our own? | Decides whether the port is reachable from a web page, which decides whether it needs origin checks |
 | Can a scene be edited while live? Is there a locked state? | |
 
 *Resolved 2026-11-26: what the puppet does when its source drops is a scene setting, choosing
-among hold, ease to neutral, and idle animation — in `docs/requirements/performing.md`. The
-default for a new scene is still `[open]`; ease to neutral is the working assumption.*
+among hold, ease to neutral, and idle animation, defaulting to ease to neutral — in
+`docs/requirements/performing.md`.*
 
 *Deferred 2026-11-26, deliberately: the Linux OBS plugin choice waits on the spike, because
 alpha is unobserved end to end on every candidate path. The spike is the trigger. Output behind
@@ -85,15 +84,25 @@ Not blocking anything now, and **due before plugins ship rather than before the 
 
 ## Blocking scope and the threat model
 
-| Question | Why it matters |
-|---|---|
-| Is a pen tablet a target input device for Studio — pressure, hover, no right-click? | Artists often work on one, and it changes the interaction model |
+*Answered 2026-11-26: a pen tablet is not a target device. Every operation in Studio must be
+**convenient** with mouse and keyboard, not merely possible — the audience requirement, since a
+workflow that is only tolerable without a tablet excludes the people this project is for.
+Tablet-specific interaction becomes a candidate for the plugin API once that exists. In
+`docs/requirements/authoring.md`.*
+
+*Answered 2026-11-26: off-machine sources are deferred, not rejected — the first release binds
+to loopback and does nothing else, and the design must not preclude adding them. The shape is
+settled for when they arrive (explicit in-app opt-in, never on by default, visible while on);
+whether the indicator alone suffices or an allow-list or pairing step is wanted is decided then.
+In `docs/requirements/performing.md`, which also resolves a contradiction — that section was
+`[decided]` while its own Deferred list and this document both called it open.*
 
 *Answered 2026-11-26: the project is **Rigel2D**; the applications are **Studio** and **Live**,
 in `docs/vocabulary.md` and `CLAUDE.md`. UI text is English only — no localisation in scope.*
 
-*Answered 2026-11-26, now in `docs/decisions.md`: no plugin API and no in-puppet scripting; no
-outbound network connection ever; the interface uses the project's strict vocabulary.*
+*Answered 2026-11-26, now in `docs/decisions.md`: no in-puppet scripting, ever; no outbound
+network connection; the interface uses the project's strict vocabulary. The no-plugin-API half
+of that entry has since been superseded — see "The extension story" above.*
 
 ## Blocking the speed verification strategy
 
