@@ -18,9 +18,17 @@ path that nothing in the documentation anticipated.
 
 A test frame of six vertical bands at fixed alphas, with every expected value **written down
 before any route was built** ([the reference table](../../spike/alpha-sender/REFERENCE.md)).
-The alphas are 0, 64, 128, 192 and 255 so that no value lands on a rounding boundary, and the
-colours are chosen so that premultiplied and straight interpretations give different numbers at
-every probe. Nothing here was judged by eye; each result is named pixels compared as integers.
+The alphas are 0, 64, 128, 192 and 255 so that no value lands on a rounding boundary. Nothing
+here was judged by eye; each result is named pixels compared as integers.
+
+**The instrument has a blind spot, and it bounds what follows.** Every band is full-intensity
+white, red or green, so in premultiplied form the stored colour equals the alpha at each probe,
+and in straight form every channel is 0 or 255, where the transfer function is the identity. The
+opaque and fully-transparent bands discriminate nothing by design. **So no probe has a colour
+that is neither 0, 255, nor equal to its own alpha**, and neither platform's measurements
+identify its behaviour on their own — what pins each is the pair of runs taken together. A band
+of mid-intensity grey at an unequal alpha would break both degeneracies at once, and should be
+added before anything is measured on a second machine or on macOS.
 
 That discipline earned itself twice. Both colour faults below are invisible to a person looking
 at the output — one reads as *slightly bright artwork*, the other as *slightly dark edges* — and
@@ -32,19 +40,37 @@ both would have passed a human gate.
 |---|---|---|---|
 | Linux, `obs-vkcapture` | Bit-exact | sRGB-encoded on output | Linear light, already premultiplied |
 | Windows, OBS Game Capture | Bit-exact | Alpha applied a second time | sRGB-encoded, straight alpha |
-| Linux, X11 compositor (Mutter) | Bit-exact | Correct | Encoded values, blended in encoded space |
+| Linux, X11 compositor (Mutter) | Honoured — a desktop capture carries no alpha of its own to compare | As predicted, but **not** the same answer as OBS | Encoded values, blended in encoded space |
 | Linux, PipeWire + `obs-pwvideo` | Unmeasured | Unmeasured | Sender will not build — see below |
 | macOS, Syphon | Not attempted | Not attempted | No Mac was reachable |
 
-Two models, each fitted to one platform's probes and then used to predict the other's before
-those were taken. Both predictions held to within one 8-bit unit:
+Two fitted behaviours, each established on one run and then used to predict a **different run on
+the same platform** before it was taken — the Linux double-encode, and the Windows straight-alpha
+run. Both predictions held to within one 8-bit unit.
 
 - **Linux:** `result = encode(rgb)` — premultiplied assumed, stored values read as linear.
 - **Windows:** `result = encode(decode(rgb) × alpha)` — straight assumed, values read as encoded.
 
-**Fed what each expects, the two produce identical output**, and on the linear-light composite,
-which is the colorimetrically correct one. So the divergence is fixable by conversion at the
-output boundary, and that is what [runtime.md](../runtime.md) now requires.
+The pixels establish *what transform was applied*, not which component applied it: separating
+OBS's compositing from its screenshot export rests on a single preview capture over a background
+whose colour was not recorded. **The decision does not depend on resolving that** — sending
+straight alpha is correct whether the extra multiply happens in the composite or only at export.
+
+Neither predicts the other platform, and neither is claimed to. What makes each more than a
+three-point fit is the second run on its own platform, where a rival with no alpha term fits the
+first run equally well and the second excludes it.
+
+**Fed what each expects, the two capture routes produce identical output** — and that is an
+identity rather than a coincidence of three probes: Linux stores `L·a` and emits `E(L·a)`,
+Windows stores `E(L)` and emits `E(D(E(L))·a) = E(L·a)`, equal for every `L` and `a`. So the
+divergence between them is fixable by conversion at the output boundary, which is what
+[runtime.md](../runtime.md) now requires.
+
+**The desktop compositor is not one of them.** It blends our window over a background we neither
+control nor see, in encoded space where OBS works in linear, so no stored value satisfies both:
+white at half alpha reaches the desktop as 128 and the stream as 188 over black, 192 and 205 over
+mid-grey. The consequence — that anything meant to match the stream composites inside the frame
+rather than leaving it to the host — is a requirement in `runtime.md`, not a conversion.
 
 ## The findings that outlive the routes
 
@@ -53,7 +79,10 @@ question the spike was commissioned to answer has a clean yes, and the risk was 
 entirely.
 
 **Each host silently assumes an encoding, and they disagree.** A renderer correct for one is
-wrong for the other, by an amount that looks like a plausible picture rather than a fault.
+wrong for the other, by an amount that reads as a plausible picture rather than a fault — which
+is not the same as a small one. A half-transparent white measured 92 where it should have been
+188, a factor of two in luminance, and the mismatch also shifts opaque mid-tones, so it is not
+confined to edges.
 Neither host reports a mismatch, and the transports carry no colour-space tag that would settle
 it. The remedy that looks obvious on Linux — request an sRGB surface — makes it worse in exactly
 the predictable way, applying the encode twice.

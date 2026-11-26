@@ -101,3 +101,31 @@ transparency and still blend wrongly, and those three would catch it where P4 al
 the 8-bit encoded values directly, which is what compositors conventionally do. One blending in
 linear light would give different figures that are not wrong, merely different — so a near miss
 on P1–P3 with P4 exact should be read as a colour-space question, not as a transparency failure.
+
+## The band this frame is missing, to add before the next measurement
+
+**Deliberately not added now.** The measurements already recorded were taken against the frame
+above, and changing its geometry would break the correspondence between the committed instrument
+and the committed results. This is the specification for whoever measures next — a second
+machine, a second GPU generation, or macOS.
+
+**The blind spot.** Every band above is full-intensity white, red or green. In premultiplied form
+that makes the stored colour *equal to the alpha* at every probe; in straight form every channel
+is 0 or 255, where the sRGB transfer function is the identity. The opaque and fully-transparent
+bands discriminate nothing by design. So **no probe has a colour that is neither 0, nor 255, nor
+equal to its own alpha** — and a behaviour with no alpha term at all fits one platform's
+premultiplied run as well as the real one does. Only the second run on that platform excludes it.
+
+**One band closes it.** Grey at **colour 153, alpha 85**:
+
+| | Stored |
+|---|---|
+| Premultiplied | `51,51,51,85` |
+| Straight | `153,153,153,85` |
+
+Both forms put the colour strictly between 0 and 255, neither equals its alpha, and the two
+differ from each other — so the band discriminates on its own. `153 × 85 = 13005 = 255 × 51`, so
+the premultiplied store is exact and inherits the no-rounding property the other bands have.
+
+Adding it means a seven-band frame. Keep the row stride 256-byte aligned: **896 × 256**, seven
+bands of 128, probes at `x = 64 + 128 i`, since `896 × 4 = 3584 = 256 × 14`.

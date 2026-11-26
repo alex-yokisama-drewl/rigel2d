@@ -30,9 +30,9 @@ measurement rather than assumed**.
 
 **Which convention it is, is `[open]`.** The rule above binds whatever it turns out to be, and
 nothing should be built assuming a particular one. It cannot sensibly be chosen before the
-plugin in [performing.md](requirements/performing.md) has a format, and it does not need to be:
-every route measured so far is reachable from any single convention by a conversion at the
-boundary.
+plugin in [performing.md](requirements/performing.md) has a format, and both **capture** routes
+are reachable from any single convention by a conversion at the boundary — which is not true of
+the third row below, for the reason given under it.
 
 **Because two hosts were measured and neither assumed what the other did**
 ([2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md)):
@@ -43,10 +43,22 @@ boundary.
 | OBS on Windows, via Game Capture | sRGB-encoded, straight alpha |
 | An X11 compositor, for the editor's viewport | Encoded values, blended in encoded space |
 
-Fed what it expects, each produced output matching the others. Fed another's, each was wrong by
-an amount that looks like a plausible picture — artwork slightly too bright on one,
-semi-transparent edges too dark on the other. **Neither host documents its assumption, and
-neither reports a mismatch.**
+**The two capture routes agree once each is fed what it expects**, and not by coincidence of
+three measurements: Linux stores `L·a` and emits `E(L·a)`, Windows stores `E(L)` and emits
+`E(D(E(L))·a) = E(L·a)`. Equal for every `L` and `a`.
+
+Fed the other's convention, each is wrong by an amount that reads as a plausible picture rather
+than a fault — and the size of it is easy to understate. A half-transparent white measured 92
+where it should have been 188, a factor of two in luminance, and feeding either route the other's
+convention also shifts **opaque** mid-tones, so it is not confined to edges. **Neither host
+documents its assumption, and neither reports a mismatch.**
+
+**The compositor row is the exception, and it cannot be converted away.** A capture route is
+handed our buffer and composites it itself; a desktop compositor blends our window over a
+background we neither control nor see, and it does so in *encoded* space where OBS works in
+linear. White at half alpha over black reaches the desktop as 128 and the stream as 188; over
+mid-grey, 192 and 205. No single stored value satisfies both, for the structural reason that one
+expression is linear in the encoded background and the other is not.
 
 What follows:
 
@@ -63,10 +75,16 @@ What follows:
   on the strength of its documentation is a route whose colour is wrong in a way no test covers:
   both hazards above were invisible by eye and were caught only by asserting on pixel values
   written down in advance.
+- **Anything that must match the output composites inside the frame.** Studio's viewport, and
+  any preview meant to show what the stream will show, draws the puppet against its own
+  background in our own code rather than letting the host compositor do it. A window left
+  transparent for the desktop to fill in is showing a *different* composite from the one going to
+  the stream, by the measured amounts above. This is a constraint on Studio's viewport and on
+  Live's own window, and neither is designed yet.
 - **This is the mechanism behind the guarantee in this document's opening**, that a rig cannot
   look right while authored and wrong while performed. The viewport and the output reach the
   screen through different hosts with different assumptions, so that guarantee holds only if the
-  conversions are right.
+  conversions are right and the comparison is made where we control the blend.
 
 **The evidence is narrow and the rule is not.** One Windows machine, one Linux compositor, no
 Mac. The rule is written to bind regardless, because its value is in forbidding the assumption,
