@@ -17,7 +17,7 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 8 — the research file, and resolving what this spike gates
+**Current task:** all tasks done. Resume at **C. Finish, step 2** in the `feature` skill — review is already done (step 1); what remains is routing the handoff below, moving `plan.md` on, deleting this file in that same commit, and opening the PR
 **Blocked on:** nothing. Whether macOS can be attempted at all is a question for the owner.
 
 ---
@@ -461,7 +461,7 @@ premultiplied handling at all. Both measured platforms turned out to have a prem
 assumption that had to be discovered, so arriving at macOS expecting none would be the wrong
 prior.
 
-### 8. The research file, and resolving what this spike gates — `todo`
+### 8. The research file, and resolving what this spike gates — `done`
 
 A dated file in `docs/research/` carrying the measurements. Then resolve
 `performing.md`'s `[open]` to what the evidence supports, answer the Game Capture tension in the
@@ -494,6 +494,15 @@ trusting any probe inside it, so a result taken under an overlapping window is r
 invalid rather than as a transparency failure.
 
 **Decisions made:**
+- **Our own OBS plugin for Linux, built to extend** — the owner's call on the evidence. Already
+  routed: `decisions.md` carries the entry, `performing.md` the rule. Nothing to do.
+- **The frame has one convention and every consumer converts from it** — already routed to
+  `runtime.md` as `[proposed]`, with *which* convention left `[open]`. Nothing to do.
+- **`obs-vkcapture` is tested before `obs-pwvideo`**, inverting the research's ordering, so that a
+  known-good result makes a later failure interpretable. Local to the spike; needs no home.
+- **The Windows leg is a bundle the owner runs, not an SSH session.** Local to the spike, but the
+  reasoning generalises: a GUI-and-GPU measurement cannot be taken from a non-interactive session.
+  Route only if a later cycle needs it.
 
 **Contradicts docs:**
 - `CLAUDE.md` says the compiler is "the one `rust-toolchain.toml` pins". **There is no such
@@ -557,6 +566,10 @@ hardware whose Windows Vulkan driver is legacy and no longer updated. Nothing ab
 general should be concluded from it until a second backend, and ideally a second machine, agree.
 
 **Deferred:**
+- **The instrument's missing band**, specified at the foot of `spike/alpha-sender/REFERENCE.md`.
+  Deliberately not added, because changing the frame's geometry would break the correspondence
+  between the committed instrument and the committed measurements. Whoever measures a second
+  machine or macOS adds it first.
 Route B's alpha measurement. The sending half does not build on the target platform, so measuring
 it would require a newer PipeWire or a purpose-built producer — not worth doing before a route is
 chosen. Everything else about the route is settled in task 4.
