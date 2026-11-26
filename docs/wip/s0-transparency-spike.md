@@ -133,7 +133,16 @@ branch ends so nobody re-proposes them.
 What the user caught that automation did not. **Each becomes a checklist entry in
 `docs/concerns/` before the phase closes** — `finish-cycle` harvests this section.
 
-- *(none yet)*
+- **The harness left OBS in an unclean-exit state, and left `obs-websocket` enabled.** The owner
+  saw OBS report it had stopped unexpectedly. Two separate faults behind one symptom: the harness
+  stopped OBS with SIGTERM, which OBS treats as a crash and answers with a Safe Mode prompt on
+  next launch — and Safe Mode disables third-party plugins, so the capture plugin would have
+  silently vanished and the next run would have reported the input kind as merely unavailable.
+  Separately, the restore path for `obs-websocket` only ran when the harness itself had flipped
+  the setting, so a setting enabled once by hand stayed enabled for good.
+  **Dimension: `ops`.** The check that would have caught both: *a harness that changes a
+  user's application state restores it unconditionally from a recorded prior state, and verifies
+  the process it started is actually gone rather than trusting the unit to be retired.*
 
 ---
 

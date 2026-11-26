@@ -87,10 +87,37 @@ def launch(unit, cmd, env_overrides=None):
 
 
 def stop(unit):
+    """Shut a unit down cleanly, then make sure it is actually gone.
+
+    OBS treats SIGTERM as an unclean exit and offers Safe Mode on next launch — which disables
+    third-party plugins, so the capture plugin silently vanishes and the next run reports the
+    input kind as simply unavailable. SIGINT is the clean quit. `systemctl stop` with --collect
+    has also been seen to retire the unit while leaving the process behind, so this verifies
+    rather than assumes.
+    """
+    subprocess.run(
+        ["systemctl", "--user", "kill", "--signal=SIGINT", unit],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    for _ in range(20):
+        active = subprocess.run(
+            ["systemctl", "--user", "is-active", unit],
+            capture_output=True, text=True,
+        ).stdout.strip()
+        if active != "active":
+            break
+        time.sleep(0.5)
     subprocess.run(
         ["systemctl", "--user", "stop", unit],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
+    # Verify: a retired unit does not guarantee a dead process.
+    leftover = subprocess.run(
+        ["pgrep", "-f", f"--multi --disable-missing-files-check"],
+        capture_output=True, text=True,
+    ).stdout.split()
+    for pid in leftover:
+        subprocess.run(["kill", "-INT", pid], stderr=subprocess.DEVNULL)
 
 
 class Obs:
@@ -143,21 +170,29 @@ class Obs:
 
 
 def enable_websocket():
-    """Turn the bundled server on, returning the previous config so it can be restored."""
+    """Turn the bundled server on, always recording the prior state to a file.
+
+    The backup is written unconditionally, even when the server is already enabled. An earlier
+    version only wrote one when it had to flip the setting, which meant that a run finding the
+    server already on recorded nothing and restored nothing — so a setting enabled once by hand
+    stayed enabled for good. A restore path that only runs in some cases is not a restore path.
+    """
     cfg = json.load(open(WS_CONFIG))
-    before = dict(cfg)
+    if not os.path.exists(WS_CONFIG + ".rigel-backup"):
+        shutil.copy(WS_CONFIG, WS_CONFIG + ".rigel-backup")
     if not cfg.get("server_enabled"):
         cfg["server_enabled"] = True
-        shutil.copy(WS_CONFIG, WS_CONFIG + ".rigel-backup")
         json.dump(cfg, open(WS_CONFIG, "w"), indent=2)
-        print(f"enabled obs-websocket (backup at {WS_CONFIG}.rigel-backup)")
-    return before, cfg["server_port"], cfg["server_password"]
+        print("enabled obs-websocket for this run")
+    return cfg["server_port"], cfg["server_password"]
 
 
-def restore_websocket(before):
-    if os.path.exists(WS_CONFIG + ".rigel-backup"):
-        json.dump(before, open(WS_CONFIG, "w"), indent=2)
-        os.remove(WS_CONFIG + ".rigel-backup")
+def restore_websocket():
+    """Put the config back exactly as it was found, from the backup on disk."""
+    backup = WS_CONFIG + ".rigel-backup"
+    if os.path.exists(backup):
+        shutil.copy(backup, WS_CONFIG)
+        os.remove(backup)
         print("restored obs-websocket config")
 
 
@@ -175,7 +210,7 @@ def main():
     if not os.path.exists(SENDER):
         sys.exit(f"build first: {SENDER} missing")
 
-    before, port, password = enable_websocket()
+    port, password = enable_websocket()
     obs_proc = sender = None
     out = os.path.join(tempfile.mkdtemp(), "obs-source.png")
 
@@ -254,7 +289,7 @@ def main():
             stop(sender)
         if obs_proc and not args.keep_obs:
             stop(obs_proc)
-        restore_websocket(before)
+        restore_websocket()
 
 
 def report(rgba, w, h):
