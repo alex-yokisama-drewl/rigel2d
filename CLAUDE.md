@@ -52,9 +52,13 @@ incompatible.
 | **Binding** | Maps a parameter to a node transform or to per-vertex offsets. Edited in Studio |
 | **Channel mapping** | Maps a channel to a parameter. Puppet data, edited in Live |
 | **Deformation** | Per-vertex mesh offsets. Not a transform, which moves a whole node |
+| **Identifier** | The stable value every stored reference names an entity by. Never a name, an index or a file offset |
+| **Handle** | What an identifier resolves to at load, for the frame loop. Never written to a file |
+| **Extension data** | Marked, namespaced values the core format does not define. Preserved untouched, never executed |
 | **Scene** | Live's saved document: a background, which puppets and images, and where each sits. Deliberately thin |
 | **Source** | A feed of input over a port, supplying channels. A face tracker is one kind |
 | **Channel** | One named value from a source. Bound *to* a parameter |
+| **Runtime** | The library that evaluates and renders a puppet, embedded in both applications |
 | **Rigel2D** | The project and toolkit as a whole, not either application |
 | **Studio** / **Live** | The two applications — the one that builds puppets, the one that performs them |
 | **The editor** / **the player** | Descriptive terms for Studio and Live. Still sanctioned |

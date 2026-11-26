@@ -221,14 +221,14 @@ code, and the same validator gates loading and saving.
 | The tree is acyclic, with one root | |
 | Every texture, parameter and node reference resolves | A reference naming nothing is a malformed file. **Distinct from a texture whose payload is present but unreadable**, which loads with a visible placeholder ([authoring.md](authoring.md)) rather than failing the puppet |
 | Keypoints are ordered and within range | |
-| Binding value counts match the mesh topology they apply to | |
+| Binding value counts match the mesh topology they apply to, or the binding is marked stale | Staleness is the flagged outcome of [artwork changing under a rig](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) — a state the rigger resolves, not a malformed file |
 | Every number is finite | NaN and infinity are rejected, not clamped silently |
 | Enumerated values are known, or explicitly marked as extensions | |
 
-Every size and count the loader trusts has a ceiling, declared in one place, checked **before
-allocating** — decompressed payload size, texture dimensions, vertex and node and parameter
+Every size and count the loader trusts has a **load limit**, declared in one place, checked
+**before allocating** — decompressed payload size, texture dimensions, vertex and node and parameter
 counts, tree depth, string length, total load memory. Exceeding one fails the load with a
-readable error in bounded time and memory. These ceilings are a defence against a corrupt or
+readable error in bounded time and memory. These limits are a defence against a corrupt or
 hostile file and are generous multiples of the stress puppet in
 [platform.md](platform.md#the-reference-puppet-and-the-stress-puppet); they are **not** authoring
 limits, and they must not reappear as a choice presented to the person rigging.
@@ -259,20 +259,35 @@ itself changed.
 of an open format — and it means a delivered puppet carries nothing about the machine that made
 it.
 
-## Adding artwork: the cases that are not obvious **[open]**
+## Adding artwork: when the art and the rig disagree **[proposed]**
 
-"Adding artwork preserves configuration" is settled. What is not settled is the behaviour when
-the artwork and the rig disagree, and these are the cases where a wrong guess destroys work:
+"Adding artwork preserves configuration" is settled. This is the behaviour when returning
+artwork no longer matches the rig built on it — the cases where a wrong answer destroys work.
 
-| Case | Question |
+**Remap where a remap is defined; otherwise retain and flag.** Nothing is discarded and nothing
+is silently reinterpreted. A deformation whose mesh moved under it is kept exactly as authored,
+marked as no longer matching, and reported; the rigger resolves it at their own pace. The puppet
+stays loadable and editable throughout — a stale deformation is a flagged state, not a
+validation failure.
+
+| Case | Behaviour |
 |---|---|
-| Art is re-exported and re-imported after an edit | How are returning pieces matched to existing parts? What happens to a part whose art no longer appears? |
-| Replacement art has different dimensions | What happens to a mesh and its deformations, which are tied to the texture's coordinate space? |
-| A mesh is regenerated or edited by hand | What happens to deformations tied to its old topology? |
+| Art re-exported and re-imported after an edit | Matched to existing parts by stored import provenance rather than by name alone. Art that no longer appears leaves its part in place, flagged as having lost its source |
+| Replacement art has different dimensions | Remapped. Deformations are offsets in the texture's coordinate space, so a dimension change is a defined scaling of that space |
+| A mesh is regenerated or edited by hand | Retained and flagged. Topology changed, so there is no correspondence to carry offsets across and any remap would be a guess at the rigger's intent |
 
-The rule that holds across all three regardless of the answers: **nothing is lost silently.**
-Either the data is remapped, or it is retained and flagged. Deleting a rigger's deformation work
-because a texture changed size is the worst thing this application could do.
+Deleting a rigger's deformation work because a texture changed size is the worst thing this
+application could do, which is why the fallback is retention rather than a best-effort remap.
+
+What follows, as constraints rather than design:
+
+- **A deformation can outlive the mesh it was authored against.** A binding carries enough to
+  tell whether it still matches, and a mismatch is a flag rather than the malformed-file case
+  below.
+- **Stale deformation data round-trips**, like any other data a build carries but does not act
+  on.
+- **Import provenance is stored per part** — the originating PSD layer, which
+  [One file](#one-file) already requires.
 
 Deletion has the same character: deleting a texture that parts use, or a parameter that bindings
 reference, reports what it affects rather than cascading quietly.

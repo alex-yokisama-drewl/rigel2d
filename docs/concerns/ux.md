@@ -116,8 +116,8 @@ every cycle. Each entry carries its provenance. See README.md.
 - **Every operation is reachable and comfortable with mouse and keyboard alone** — `judgment`
   No operation depends on pressure, tilt, hover or precision a mouse cannot comfortably produce. Cross-reference `accessibility.md` once that dimension is swept — keyboard-only is a stronger claim than this one and is not yet made.
   Seeded at planning, 2026-11-26.
-- **Viewport handles are not covered by chrome at the minimum window size** — `judgment`
-  → `test`: bounding-box intersection between every handle and every panel and floating element, including handles at the viewport edge. This is the generating case from `README.md`.
+- **Viewport gizmos are not covered by chrome at the minimum window size** — `judgment`
+  → `test`: bounding-box intersection between every gizmo and every panel and floating element, including gizmos at the viewport edge. This is the generating case from `README.md`.
   Seeded at planning, 2026-11-26.
 - **The longest plausible node, parameter and channel names do not overflow the tree or binding lists** — `judgment`
   → `test`.

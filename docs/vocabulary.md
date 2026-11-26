@@ -41,8 +41,11 @@ NOT. The negative half is usually the useful half.
 | **Composite** | A node that renders its children to a buffer so blending and masking apply to the group | |
 | **Parameter** | A named one- or two-dimensional axis belonging to a puppet, with keypoints along it. The puppet's own controls | **Not an input channel.** A channel is bound *to* a parameter; they are different things and conflating them is the error this entry exists to prevent |
 | **Keypoint** | A position on a parameter's axis at which binding values are stored. Values between keypoints are interpolated | Not a keyframe, which is on a timeline |
+| **Neutral keypoint** | The keypoint on a parameter's axis that is its authored resting value. *Easing to neutral* means every parameter returning to its own ([performing.md](requirements/performing.md)) | Not zero, which is merely a number on the axis. Not the rest pose, which is geometry rather than a parameter position |
 | **Binding** | A mapping from a parameter to something that changes with it — a node transform, or per-vertex offsets | |
 | **Deformation** | Per-vertex offsets applied to a mesh | Not a transform, which moves a whole node |
+| **Rest pose** | A puppet's geometry with no deformation applied: the meshes as authored. What deformations are offsets *from* | Not the neutral keypoint, above. One is geometry, the other a position on an axis, and editing at the wrong one is the trap [authoring.md](requirements/authoring.md) names |
+| **Stale** | Of a binding or a deformation: authored data kept although the mesh it applies to no longer matches it. A flagged state the rigger resolves at their own pace | **Not invalid.** A stale binding loads, renders and saves; a malformed one does not ([puppet.md](requirements/puppet.md)) |
 | **Animation** | Parameter values driven over time, on a timeline | |
 | **Physics** | Simulated motion that drives parameters, rather than input driving them | |
 | **Scene** | Live's saved document: a background, which puppets and images, and where each sits | Not a puppet, and deliberately thin. It holds placement, not behaviour — a scene references puppets, never contains one |
@@ -50,15 +53,22 @@ NOT. The negative half is usually the useful half.
 | **Channel** | One named value arriving from a source | Not a parameter. See above |
 | **Mask** | A part that restricts where another part draws | Not a composite, which groups children for blending |
 | **Chain deformer** | A sequence of linked joints deforming geometry along it, a permanent part of a rig. For hair, tails, ropes | Not a skeleton, and it does not generalise into one |
+| **Identifier** | The stable value every entity in a puppet or scene carries and every stored reference names it by. Unique within a puppet, unchanged by rename, reorder or save, never reused after a deletion ([I3](invariants.md)) | Not a name, which is for people and changes. Not a position in an array, and not an offset in the file |
+| **Handle** | What an identifier resolves to once, at load: the in-memory reference the frame loop uses, because nothing in it may resolve by name | **Never written to a file.** The stored form and the in-memory form are deliberately different things, which is the whole of [I3](invariants.md) |
+| **Extension data** | Structured values in a puppet, scene or source that the core format does not define, carrying a marker naming the extension they belong to and the version it expects. Preserved untouched by a build that does not understand them | Never a script, a command, a path or a URL ([I1](invariants.md)). Unmarked data the core format does not define is **invalid**, not an extension |
+| **Import provenance** | What a part records about where its artwork came from, so re-exported art is matched back to it rather than to its name | Not the artwork, and not a path the loader resolves — see [I1](invariants.md) |
+| **Load limit** | A maximum the loader enforces on a file **before allocating**: payload bytes, texture dimensions, entity counts, tree depth, string length. A defence against a corrupt or hostile file | **Not a ceiling**, which is a counter's committed maximum in CI. Not an authoring limit either — it is a generous multiple of the stress puppet and never appears as a choice to the person rigging |
 | **Channel mapping** | A puppet's assignment of a channel to one of its parameters | **Not a binding.** Both belong to the puppet, and the pair is the whole chain: a mapping feeds a parameter from a channel, a binding takes that parameter to geometry. Studio edits bindings, Live edits mappings |
 | **Render surface** | The surface the player draws the puppet on, containing nothing else | Not the control surface |
 | **Control surface** | The player's interface. Never captured, never part of the output | Not the render surface |
+| **Gizmo** | An on-canvas manipulator in Studio's viewport — a draggable point, an axis, a bounding box | **Not a handle**, which is a resolved reference and has nothing to do with the interface |
 | **Frame time** | Wall clock from the start of a frame's CPU work to that frame's presentation | Not frame rate. Pacing is what matters, and an average hides it |
 | **Deadline miss** | A frame whose frame time exceeded the output interval | |
 | **Steady state** | Everything from the first presented frame onward. No warm-up is excluded | |
 | **Reference puppet** | The generated workload the budgets are stated against, at the corpus median | Not a typical puppet, and not a limit — larger puppets must work |
 | **Stress puppet** | The same, scaled past the largest rig measured, for growth testing | |
 | **Counter** | A per-frame or per-operation quantity the runtime reports headlessly, asserted in CI against a committed ceiling | Not a timing. Counters are exact; timings are not |
+| **Runtime** | The library that evaluates and renders a puppet, embedded in both applications so that Studio's viewport and Live's output are one code path | Not either application. Not the frame loop alone, which is one part of it |
 | **Rigel2D** | The project and the toolkit as a whole — the format, the runtime and both applications | Not either application on its own, and not the repository when the repository is what is meant |
 | **Studio** | The application that builds puppets. *Rigel2D Studio* where the full name is wanted | Inochi Creator's counterpart |
 | **Live** | The application that performs a puppet. *Rigel2D Live* where the full name is wanted | Inochi Session's counterpart. **See the caution below** |

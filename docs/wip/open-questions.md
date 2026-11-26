@@ -17,10 +17,7 @@ subset that needs a decision from the project owner rather than from design work
 |---|---|
 | How a streamer learns something broke, when the render surface stays clean and the control surface may be behind a game | `requirements/performing.md` — *How a streamer learns something broke* |
 | Whether a scene can be edited while streaming, and whether there is a locked state | `requirements/performing.md` — *Editing a scene while streaming* |
-| What happens to existing deformations when replacement art has different dimensions, or a mesh is regenerated | `requirements/puppet.md` — *Adding artwork: the cases that are not obvious* |
 | Whether Studio keeps rolling backups, and how many | `requirements/authoring.md` — *Rolling backups* |
-| Whether reuse of a part is a copy or a live reference | `requirements/authoring.md`, inline under *Bringing artwork in* |
-| How the two sides of a symmetrical rig are kept in step | `requirements/authoring.md`, inline |
 | What form crash recovery takes — a prompt, an autosave journal, or both | `requirements/authoring.md`, inline |
 | Whether Live yields or holds under contention; whether it degrades, warns or refuses over budget; the deadline-miss rate and soak length | `requirements/platform.md` — *Behaviour under contention and over budget* |
 | Whether Windows code signing is funded, and whether macOS notarisation follows | `requirements/platform.md` — *Windows code signing* |

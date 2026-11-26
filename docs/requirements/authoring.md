@@ -22,8 +22,11 @@ out.**
 - **Merging into an existing puppet accepts more than one thing at a time** — several images, a
   PSD, or another puppet. Inochi Creator's one-at-a-time merge is a specific friction worth
   naming: the work it makes tedious is routine.
-- Merging another puppet implies that parts of a rig can be reused across puppets. Whether that
-  reuse is a copy or a live reference is `[open]`.
+- **Merging another puppet copies what it takes.** Parts arrive with fresh identifiers and no
+  tie to the puppet they came from, so the result stays self-contained. A live reference would
+  mean a stored reference resolving outside the file it arrived in, which
+  [One file](puppet.md#one-file) and [I1](../invariants.md) both rule out. The cost is that
+  updating shared artwork means merging it again wherever it was used.
 
 ## Editing the tree **[decided]**
 
@@ -34,8 +37,12 @@ out.**
   one side of a character to the other is routine work and must be one action, not a manual
   re-authoring.
 
-How symmetry is expressed — a one-off mirror operation, or a persistent link that keeps two
-sides in step — is `[open]`.
+**Symmetry is an operation, not stored structure.** Mirroring produces independent geometry
+that is edited on its own thereafter; nothing in a puppet records that two subtrees are each
+other's mirror. A persistent link would be puppet data needing its own identity, its own
+validation and a defined behaviour when the two sides are deliberately made to differ — and
+riggers make them differ routinely, so the link would be fighting the common case. The cost is
+that changing one side means mirroring again.
 
 ## Meshing **[proposed]**
 

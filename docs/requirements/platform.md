@@ -121,7 +121,7 @@ commissioned rig, obtained by asking a rigger directly, would be worth more than
 corpus, because it is the only way to learn whether these samples are the ceiling of commercial
 work or the floor.
 
-Both workloads are produced by a **committed generator** taking declared parameters, not
+Both workloads are produced by a **committed generator** taking the declared dimensions above, not
 authored by hand — necessarily, because authoring one needs an editor and the editor is built
 after the runtime that these budgets constrain. A generated puppet also doubles as the
 conformance fixture proving a third party can write a valid puppet without our code
@@ -257,7 +257,8 @@ Three connected questions, none decided, and nothing may assume an answer to any
   so the stream stays smooth and the game suffers.
 - When a puppet exceeds the budget on a weak machine, whether Live **degrades, warns or
   refuses**, and whether it may hold textures below their authored resolution. This interacts
-  with *no arbitrary dimension ceilings* in [puppet.md](puppet.md).
+  with *no arbitrary dimension ceilings* in [puppet.md](puppet.md). Distinct from a **load
+  limit**, which is a defence against a hostile file rather than a cap on authoring.
 - The tolerated deadline-miss rate and the stream length the soak run targets. Both figures in
   the budget table above are guesses and are marked as such.
 
