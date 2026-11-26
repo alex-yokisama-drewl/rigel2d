@@ -25,6 +25,16 @@ const BACKDROP: wgpu::Color = wgpu::Color {
 /// is actually where we think it is before trusting any probe inside it.
 const MARGIN: u32 = 40;
 
+/// Print and flush immediately. A buffered line is lost when the process aborts, which is
+/// exactly the case this spike most needs to see.
+fn report(label: &str, value: &str) {
+    use std::io::Write;
+    println!("[{label}] {value}");
+    let _ = std::io::stdout().flush();
+    eprintln!("[{label}] {value}");
+    let _ = std::io::stderr().flush();
+}
+
 struct Surface {
     window: Arc<Window>,
     surface: wgpu::Surface<'static>,
@@ -35,6 +45,7 @@ pub struct App {
     straight: bool,
     srgb: bool,
     solo: bool,
+    chosen_format: Option<wgpu::TextureFormat>,
     instance: wgpu::Instance,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
@@ -45,12 +56,17 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(straight: bool, srgb: bool, solo: bool) -> Self {
+    pub fn new(backends: wgpu::Backends, straight: bool, srgb: bool, solo: bool) -> Self {
         Self {
             straight,
             srgb,
             solo,
-            instance: wgpu::Instance::default(),
+            chosen_format: None,
+            instance: {
+                let mut d = wgpu::InstanceDescriptor::new_without_display_handle();
+                d.backends = backends;
+                wgpu::Instance::new(d)
+            },
             device: None,
             queue: None,
             pipeline: None,
@@ -98,7 +114,7 @@ impl App {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             // Linear, never sRGB. REFERENCE.md explains why every number depends on it.
-            format: self.format(),
+            format: self.chosen_format.unwrap_or_else(|| self.format()),
             // Auto, which resolves to Srgb for this format. That is what a real application
             // gets, so it is what the spike must measure. The format itself is linear, so the
             // shader's values reach the surface unencoded; the colour space only tells the
@@ -157,11 +173,24 @@ impl ApplicationHandler for App {
         .expect("no adapter");
 
         let caps = surface.get_capabilities(&adapter);
-        eprintln!("adapter: {}", adapter.get_info().name);
-        eprintln!("surface alpha modes offered: {:?}", caps.alpha_modes);
+        let info = adapter.get_info();
+
+        // Everything the platform offers, printed before anything can fail. On Windows the
+        // interesting failure is a surface that cannot carry alpha at all, and a crash with no
+        // output is indistinguishable from a crash for some other reason.
+        report("adapter", &format!("{} ({:?}, {:?})", info.name, info.device_type, info.backend));
+        report("surface formats", &format!("{:?}", caps.formats));
+        report("surface alpha modes", &format!("{:?}", caps.alpha_modes));
+        report("surface present modes", &format!("{:?}", caps.present_modes));
+
+        if caps.alpha_modes.is_empty() || caps.formats.is_empty() {
+            report("FATAL", "the surface offers no formats or no alpha modes; cannot continue");
+            event_loop.exit();
+            return;
+        }
 
         // Which alpha modes the surface offers is itself a finding: if PreMultiplied is absent,
-        // the platform cannot carry our frames as the dmabuf contract specifies.
+        // the platform cannot carry premultiplied frames through the swapchain at all.
         let want = if self.straight {
             wgpu::CompositeAlphaMode::PostMultiplied
         } else {
@@ -170,13 +199,36 @@ impl ApplicationHandler for App {
         let alpha = if caps.alpha_modes.contains(&want) {
             want
         } else {
-            eprintln!(
-                "WARNING: {:?} not offered; falling back to {:?}. Scores below are suspect.",
-                want, caps.alpha_modes[0]
+            report(
+                "WARNING",
+                &format!(
+                    "{:?} is not offered; falling back to {:?}. A transparent window is then \
+                     impossible through the swapchain, and that is the result, not a bug.",
+                    want, caps.alpha_modes[0]
+                ),
             );
             caps.alpha_modes[0]
         };
-        eprintln!("using alpha mode: {alpha:?}");
+        report("using alpha mode", &format!("{alpha:?}"));
+
+        // Configuring with an unsupported format is a validation failure that aborts the
+        // process, which is what a bare crash with no message looks like from outside.
+        let wanted_format = self.format();
+        let format = if caps.formats.contains(&wanted_format) {
+            wanted_format
+        } else {
+            report(
+                "WARNING",
+                &format!(
+                    "{:?} is not offered; falling back to {:?}. Every number in REFERENCE.md \
+                     assumes a linear format, so scores against it are suspect.",
+                    wanted_format, caps.formats[0]
+                ),
+            );
+            caps.formats[0]
+        };
+        report("using format", &format!("{format:?}"));
+        self.chosen_format = Some(format);
 
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("alpha-sender window"),
@@ -184,7 +236,7 @@ impl ApplicationHandler for App {
         }))
         .expect("device");
 
-        self.pipeline = Some(crate::build_pipeline(&device, self.format(), self.straight));
+        self.pipeline = Some(crate::build_pipeline(&device, format, self.straight));
         drop(surface);
         // Place the test window exactly MARGIN inside the backdrop. Without this the window
         // manager positions the two independently, the visible margin is whatever it happens to
@@ -306,9 +358,9 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn run(straight: bool, srgb: bool, solo: bool) {
+pub fn run(backends: wgpu::Backends, straight: bool, srgb: bool, solo: bool) {
     let event_loop = EventLoop::new().expect("event loop");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let mut app = App::new(straight, srgb, solo);
+    let mut app = App::new(backends, straight, srgb, solo);
     event_loop.run_app(&mut app).expect("run");
 }

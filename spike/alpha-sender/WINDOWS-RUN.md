@@ -20,7 +20,11 @@ This answers three things at once, which is why it is worth one session rather t
 
 **1.** Unzip anywhere and open the folder.
 
-**2.** Run `alpha-sender.exe --window` (a `run.bat` is included; double-click it).
+**2.** Double-click **`1-check.bat`** first. It renders the test frame offscreen with no window
+at all and prints whether the pixels came out right. If that fails, rendering is broken and
+nothing about windows or OBS is worth trying — send the log and stop.
+
+**3.** Double-click **`2-show-window.bat`**.
 
 Two windows appear: a **magenta rectangle** with a strip of **six colour bands** inside it. The
 magenta is a backdrop the program draws itself, so the colour behind the bands is known rather
@@ -30,12 +34,12 @@ them.
 If the bands look washed out or the magenta is missing, take the screenshot anyway. That is a
 result, not a failure, and the numbers will say which.
 
-**3.** Take a **full-screen screenshot** with both windows visible, and save it as a **PNG**.
+**4.** Take a **full-screen screenshot** with both windows visible, and save it as a **PNG**.
 
 `PrtScn`, or `Win+Shift+S` then save. Any tool is fine as long as it is a PNG and not a JPEG —
 JPEG compression would alter the very pixel values being measured. Call it `screen.png`.
 
-**4.** In OBS, add a **Game Capture** source:
+**5.** In OBS, add a **Game Capture** source:
 
 - Sources panel → **+** → **Game Capture**
 - Mode: **Capture specific window**
@@ -43,12 +47,19 @@ JPEG compression would alter the very pixel values being measured. Call it `scre
 - Tick **Allow Transparency**
 - OK
 
-**5.** Right-click that source → **Screenshot (Source)**.
+**6.** Right-click that source → **Screenshot (Source)**.
 
 OBS writes a PNG carrying the alpha channel. It goes to the folder in
 *Settings → Output → Recording → Recording Path*. Call it `obs-source.png`.
 
-**6.** Send back `screen.png`, `obs-source.png`, and the OBS version from *Help → About*.
+**7.** Send back `screen.png`, `obs-source.png`, **`alpha-sender-log.txt`**, and the OBS version
+from *Help → About*.
+
+**If the windows vanish after a second or two**, that is a result and not your mistake. The log
+will carry a `[WARNING]` or `[PANIC]` line saying why. Then run **`3-show-window-vulkan.bat`**:
+Windows defaults to the DX12 backend, whose swapchains cannot present premultiplied alpha on an
+ordinary window, and Vulkan may be able to. If step 2 fails and step 3 works, that difference is
+itself the finding.
 
 ---
 
@@ -57,9 +68,9 @@ OBS writes a PNG carrying the alpha channel. It goes to the folder in
 | | |
 |---|---|
 | Saving either image as **JPEG** | It re-encodes the pixel values that are the measurement |
-| Selecting **`alpha-sender backdrop`** in step 4 | Captures the wrong window. Detected on this side — the frame would be 848×336 instead of 768×256 — so it is recoverable, not fatal |
+| Selecting **`alpha-sender backdrop`** in step 5 | Captures the wrong window. Detected on this side — the frame would be 848×336 instead of 768×256 — so it is recoverable, not fatal |
 | **Screenshot (Output)** instead of **Screenshot (Source)** | Output is the whole composited scene over the canvas background; Source is the frame as OBS received it, which is what the premultiplied-versus-straight question is about |
-| Moving the windows between step 2 and step 3 | Harmless. The backdrop is located by its colour, and display scaling is derived from its measured size |
+| Moving the windows between step 3 and step 4 | Harmless. The backdrop is located by its colour, and display scaling is derived from its measured size |
 
 ## What happens next
 

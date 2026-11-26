@@ -7,6 +7,24 @@
 
 mod window;
 
+/// `--backend vulkan|dx12|gl|metal` — on Windows the default is DX12, whose swapchains cannot
+/// present premultiplied alpha on an ordinary window; Vulkan may offer it. Which backend carries
+/// alpha is part of what this spike is measuring, so it must be selectable.
+fn backend_from(args: &[String]) -> wgpu::Backends {
+    let pick = args
+        .iter()
+        .position(|a| a == "--backend")
+        .and_then(|i| args.get(i + 1))
+        .map(|s| s.to_ascii_lowercase());
+    match pick.as_deref() {
+        Some("vulkan") => wgpu::Backends::VULKAN,
+        Some("dx12") => wgpu::Backends::DX12,
+        Some("gl") => wgpu::Backends::GL,
+        Some("metal") => wgpu::Backends::METAL,
+        _ => wgpu::Backends::all(),
+    }
+}
+
 pub const WIDTH: u32 = 768;
 pub const HEIGHT: u32 = 256;
 const BAND: u32 = 128;
@@ -42,6 +60,16 @@ const EXPECT_STRAIGHT: [Option<[u8; 4]>; 6] = [
 ];
 
 fn main() {
+    // A panic that aborts with no message is indistinguishable from any other failure, and on
+    // Windows the console closes with it. This guarantees a line survives.
+    std::panic::set_hook(Box::new(|info| {
+        use std::io::Write;
+        println!("[PANIC] {info}");
+        let _ = std::io::stdout().flush();
+        eprintln!("[PANIC] {info}");
+        let _ = std::io::stderr().flush();
+    }));
+
     let args: Vec<String> = std::env::args().collect();
     let straight = args.iter().any(|a| a == "--straight");
 
@@ -53,6 +81,7 @@ fn main() {
 
     if args.iter().any(|a| a == "--window") {
         window::run(
+            backend_from(&args),
             straight,
             args.iter().any(|a| a == "--srgb"),
             args.iter().any(|a| a == "--solo"),
@@ -68,6 +97,7 @@ fn main() {
                  \n\
                  --dump      render offscreen with no window, write the PNG, print the probes\n\
                  --window    show the test frame over an opaque backdrop, for the compositor test\n\
+                 --backend B pick vulkan, dx12, gl or metal instead of the default\n\
                  --straight  emit straight alpha instead of premultiplied\n\
                  \n\
                  The windowed and OBS-facing modes arrive with their own tasks; the dump exists\n\
