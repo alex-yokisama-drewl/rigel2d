@@ -85,6 +85,9 @@ Consequences that follow:
 - **The same applies to a puppet changing on disk.** If the editor saves while the player is
   live, the player validates the new file and keeps the last good puppet if the new one is
   invalid.
+- **A missing output device falls back rather than failing.** Output configuration is application
+  configuration rather than scene content, so this is not a scene-load concern — but a device that
+  has gone away since last launch must not stop Live starting or stop the puppet rendering.
 - **One broken item never blocks a scene.** A missing puppet, a channel mapping that resolves to nothing, or an
   absent channel loads as a dormant entry, flagged in the control surface; the rest of the scene renders. A dormant
   entry survives the next save, because the user may yet restore what is missing.
