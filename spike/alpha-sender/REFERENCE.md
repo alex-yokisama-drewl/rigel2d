@@ -65,3 +65,39 @@ route's numbers are close to the table but not equal.
 probe as `Pn x,y → R,G,B,A` with its verdict against this table. Running that before any route is
 wired up is what makes a later failure attributable: if the dump is already wrong, no OBS route
 is at fault yet.
+
+## What the compositor must show (task 2)
+
+The dump above measures what the sender *produces*. This measures what a real compositor does
+with it — `stack.md`'s half of the spike, and independent of OBS.
+
+The test window is transparent and undecorated, over an **opaque magenta backdrop**,
+`255,0,255`, which the sender also owns so the background is known rather than whatever happened
+to be on the desktop. Magenta appears nowhere in the test frame, so any leak is obvious on sight.
+
+**The backdrop's channels are 0 or 255, and that is deliberate.** Compositing is
+`result = src + dst × (1 − a)`, and with `dst` at 0 or 255 every expected value below is an exact
+integer — `255 × k/255 = k`. A backdrop of, say, 200 would put rounding into the one measurement
+that is supposed to have none.
+
+| Probe | A | Source (premultiplied) | Over magenta, if alpha works | If alpha is ignored |
+|---|---|---|---|---|
+| P0 | 255 | `255,255,255` | `255,255,255` | `255,255,255` |
+| P1 | 128 | `128,128,128` | `255,128,255` | `128,128,128` |
+| P2 | 64 | `64,0,0` | `255,0,191` | `64,0,0` |
+| P3 | 192 | `0,192,0` | `63,192,63` | `0,192,0` |
+| P4 | 0 | `0,0,0` | `255,0,255` — the backdrop, exactly | `0,0,0` — black |
+| P5 | 255 | `0,0,0` | `0,0,0` | `0,0,0` |
+
+**P4 is the instrument here**, as P1 was for the dump. A fully transparent pixel must show the
+backdrop. If it comes back black, the alpha channel never reached the compositor and the window
+is simply opaque — which is the failure `stack.md` warns about when it quotes winit calling
+transparency "more of a hint for the system".
+
+P1, P2 and P3 then separate *alpha works* from *alpha blends correctly*: a compositor could honour
+transparency and still blend wrongly, and those three would catch it where P4 alone would not.
+
+**One caveat this cannot settle from the numbers alone.** The table assumes the compositor blends
+the 8-bit encoded values directly, which is what compositors conventionally do. One blending in
+linear light would give different figures that are not wrong, merely different — so a near miss
+on P1–P3 with P4 exact should be read as a colour-space question, not as a transparency failure.

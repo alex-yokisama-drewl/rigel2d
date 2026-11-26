@@ -1,0 +1,275 @@
+//! The windowed path: a transparent, undecorated window over an opaque backdrop this process
+//! also owns, so the colour behind the test frame is known rather than whatever was on screen.
+//!
+//! Expected composite values are in `REFERENCE.md`, "What the compositor must show".
+
+use std::sync::Arc;
+
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::window::{Window, WindowId};
+
+use crate::{HEIGHT, WIDTH};
+
+/// Opaque backdrop colour. Channels are 0 or 255 so every expected composite is an exact
+/// integer — see `REFERENCE.md`.
+const BACKDROP: wgpu::Color = wgpu::Color {
+    r: 1.0,
+    g: 0.0,
+    b: 1.0,
+    a: 1.0,
+};
+
+/// Margin of backdrop visible around the test window, so a screenshot can confirm the backdrop
+/// is actually where we think it is before trusting any probe inside it.
+const MARGIN: u32 = 40;
+
+struct Surface {
+    window: Arc<Window>,
+    surface: wgpu::Surface<'static>,
+    config: wgpu::SurfaceConfiguration,
+}
+
+pub struct App {
+    straight: bool,
+    instance: wgpu::Instance,
+    device: Option<wgpu::Device>,
+    queue: Option<wgpu::Queue>,
+    pipeline: Option<wgpu::RenderPipeline>,
+    backdrop: Option<Surface>,
+    test: Option<Surface>,
+    reported: bool,
+}
+
+impl App {
+    pub fn new(straight: bool) -> Self {
+        Self {
+            straight,
+            instance: wgpu::Instance::default(),
+            device: None,
+            queue: None,
+            pipeline: None,
+            backdrop: None,
+            test: None,
+            reported: false,
+        }
+    }
+
+    fn make(
+        &self,
+        event_loop: &ActiveEventLoop,
+        title: &str,
+        w: u32,
+        h: u32,
+        transparent: bool,
+    ) -> Arc<Window> {
+        let attrs = Window::default_attributes()
+            .with_title(title)
+            .with_inner_size(winit::dpi::PhysicalSize::new(w, h))
+            .with_decorations(false)
+            .with_resizable(false)
+            .with_transparent(transparent);
+        Arc::new(event_loop.create_window(attrs).expect("create window"))
+    }
+
+    fn configure(&self, window: Arc<Window>, device: &wgpu::Device, alpha: wgpu::CompositeAlphaMode) -> Surface {
+        let surface = self
+            .instance
+            .create_surface(window.clone())
+            .expect("create surface");
+        let size = window.inner_size();
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            // Linear, never sRGB. REFERENCE.md explains why every number depends on it.
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            // Auto, which resolves to Srgb for this format. That is what a real application
+            // gets, so it is what the spike must measure. The format itself is linear, so the
+            // shader's values reach the surface unencoded; the colour space only tells the
+            // compositor how to read them. Recorded because it is a wgpu 30 knob that did not
+            // exist before and sits directly on top of what this spike measures.
+            color_space: wgpu::SurfaceColorSpace::Auto,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            desired_maximum_frame_latency: 2,
+            alpha_mode: alpha,
+            view_formats: vec![],
+        };
+        surface.configure(device, &config);
+        Surface {
+            window,
+            surface,
+            config,
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.device.is_some() {
+            return;
+        }
+
+        // Backdrop first so the test window stacks above it.
+        let backdrop_win = self.make(
+            event_loop,
+            "alpha-sender backdrop",
+            WIDTH + MARGIN * 2,
+            HEIGHT + MARGIN * 2,
+            false,
+        );
+        let test_win = self.make(event_loop, "alpha-sender test", WIDTH, HEIGHT, true);
+
+        let surface = self
+            .instance
+            .create_surface(test_win.clone())
+            .expect("probe surface");
+        let adapter = pollster::block_on(self.instance.request_adapter(
+            &wgpu::RequestAdapterOptions {
+                compatible_surface: Some(&surface),
+                ..Default::default()
+            },
+        ))
+        .expect("no adapter");
+
+        let caps = surface.get_capabilities(&adapter);
+        eprintln!("adapter: {}", adapter.get_info().name);
+        eprintln!("surface alpha modes offered: {:?}", caps.alpha_modes);
+
+        // Which alpha modes the surface offers is itself a finding: if PreMultiplied is absent,
+        // the platform cannot carry our frames as the dmabuf contract specifies.
+        let want = if self.straight {
+            wgpu::CompositeAlphaMode::PostMultiplied
+        } else {
+            wgpu::CompositeAlphaMode::PreMultiplied
+        };
+        let alpha = if caps.alpha_modes.contains(&want) {
+            want
+        } else {
+            eprintln!(
+                "WARNING: {:?} not offered; falling back to {:?}. Scores below are suspect.",
+                want, caps.alpha_modes[0]
+            );
+            caps.alpha_modes[0]
+        };
+        eprintln!("using alpha mode: {alpha:?}");
+
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: Some("alpha-sender window"),
+            ..Default::default()
+        }))
+        .expect("device");
+
+        self.pipeline = Some(crate::build_pipeline(
+            &device,
+            wgpu::TextureFormat::Bgra8Unorm,
+            self.straight,
+        ));
+        drop(surface);
+        self.backdrop = Some(self.configure(backdrop_win, &device, wgpu::CompositeAlphaMode::Opaque));
+        self.test = Some(self.configure(test_win, &device, alpha));
+        self.device = Some(device);
+        self.queue = Some(queue);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        id: WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::RedrawRequested => {
+                let (Some(device), Some(queue), Some(pipeline)) =
+                    (&self.device, &self.queue, &self.pipeline)
+                else {
+                    return;
+                };
+
+                for (s, is_test) in [
+                    (self.backdrop.as_ref(), false),
+                    (self.test.as_ref(), true),
+                ] {
+                    let Some(s) = s else { continue };
+                    if s.window.id() != id {
+                        continue;
+                    }
+                    let frame = match s.surface.get_current_texture() {
+                        wgpu::CurrentSurfaceTexture::Success(f)
+                        | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
+                        other => {
+                            eprintln!("surface texture unavailable: {other:?}");
+                            return;
+                        }
+                    };
+                    let view = frame.texture.create_view(&Default::default());
+                    let mut enc = device.create_command_encoder(&Default::default());
+                    {
+                        let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                depth_slice: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(if is_test {
+                                        wgpu::Color::TRANSPARENT
+                                    } else {
+                                        BACKDROP
+                                    }),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                            multiview_mask: None,
+                        });
+                        if is_test {
+                            pass.set_pipeline(pipeline);
+                            pass.draw(0..3, 0..1);
+                        }
+                    }
+                    queue.submit([enc.finish()]);
+                    // wgpu 30 moved presentation onto the queue; `SurfaceTexture::present` is
+                    // gone and a frame that is merely dropped is discarded, not shown.
+                    queue.present(frame);
+                    let _ = s.config.width;
+                }
+
+                // Report geometry once both windows have drawn, so a harness can probe absolute
+                // screen coordinates rather than guessing where the WM put us.
+                if !self.reported {
+                    if let (Some(b), Some(t)) = (&self.backdrop, &self.test) {
+                        if let (Ok(bp), Ok(tp)) = (b.window.outer_position(), t.window.outer_position())
+                        {
+                            println!("BACKDROP_AT {} {}", bp.x, bp.y);
+                            println!("TEST_AT {} {}", tp.x, tp.y);
+                            println!("READY");
+                            self.reported = true;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(b) = &self.backdrop {
+            b.window.request_redraw();
+        }
+        if let Some(t) = &self.test {
+            t.window.request_redraw();
+        }
+    }
+}
+
+pub fn run(straight: bool) {
+    let event_loop = EventLoop::new().expect("event loop");
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let mut app = App::new(straight);
+    event_loop.run_app(&mut app).expect("run");
+}

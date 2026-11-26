@@ -17,7 +17,7 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 2 — does the window composite correctly at all on X11
+**Current task:** 3 — Linux route A, `obs-vkcapture`
 **Blocked on:** nothing
 
 ---
@@ -155,14 +155,25 @@ instrument discriminates by two unrelated means rather than one.
 **What this licenses:** a route whose numbers disagree with the table is the route's fault, not
 the sender's. That was the point of doing it before touching OBS.
 
-### 2. Linux: does the window composite correctly at all — `todo`
+### 2. Linux: does the window composite correctly at all — `done`
 
-Point 1 of `stack.md`'s exposure list, independent of OBS. The transparent decoration-free window
-against a real X11 compositor, with its output captured and probed against the reference table.
+**Transparency works on Linux/X11 under Mutter, exactly as predicted.** Run it with
+`python3 spike/alpha-sender/compositor-test.py`.
 
-**Done when:** the compositor's output at each probe matches one interpretation and it is stated
-which. If transparency does not work here, every OBS route below is moot and the stack choice
-reopens immediately — so this runs before any of them.
+Every probe matched the composited column of `REFERENCE.md` on the nose, P4 included — fully
+transparent pixels show the magenta backdrop rather than black, so the alpha channel reaches the
+compositor. P1–P3 matching exactly also settles the caveat that table raised: **Mutter blends in
+encoded 8-bit space**, not linear light, so no colour-space correction is needed anywhere.
+
+**This is the first time transparency has been observed working anywhere in this project.**
+`stack.md` records that every claim about it was drawn from reading source and documentation.
+For Linux/X11 that is no longer true. Windows and macOS remain unobserved.
+
+**The surface offers only `[PreMultiplied, Inherit]`.** `PostMultiplied` is not available, so
+straight alpha cannot be requested from the surface on this platform at all — a route needing it
+would have to convert in the shader. Premultiplied being the one offered is what the PipeWire
+dmabuf contract wants, so this is favourable, but it means `--window --straight` cannot measure
+what its name suggests and says so rather than reporting a misleading pass.
 
 ### 3. Linux route A: `obs-vkcapture` — `todo`
 
@@ -238,6 +249,11 @@ than deleting it.
 derived before any route was tried, and a probe report that scores a frame against it. Offscreen
 dump only so far; no window yet.
 
+`spike/alpha-sender/compositor-test.py` — runs the windowed mode, screenshots the real screen and
+probes the composited result. It confirms the backdrop is where the sender reported before
+trusting any probe inside it, so a result taken under an overlapping window is reported as
+invalid rather than as a transparency failure.
+
 **Decisions made:**
 
 **Contradicts docs:**
@@ -250,6 +266,13 @@ dump only so far; no window yet.
   scaffolding. The spike crate is standalone and not a member of anything.
 
 **Traps:**
+- **wgpu 30 added `SurfaceConfiguration::color_space`, and its default `Auto` resolves to
+  `Srgb`.** It sits directly on top of what this spike measures. With a linear `Bgra8Unorm`
+  format the shader's values still reach the surface unencoded — the colour space only tells the
+  compositor how to read them — but anyone assuming the old two-field model will miss it.
+- **`SurfaceTexture::present` is gone in wgpu 30**; presentation moved to `Queue::present`, and a
+  frame that is merely dropped is *discarded* rather than shown. A port that drops the call
+  compiles and renders nothing, with no error.
 - **wgpu 30's API differs from every older version enough to make guesses worthless.**
   `PipelineLayoutDescriptor` has `immediate_size` where it had `push_constant_ranges`;
   `multiview` became `multiview_mask` and is now required on `RenderPassDescriptor` too;

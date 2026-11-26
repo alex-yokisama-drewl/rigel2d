@@ -5,8 +5,10 @@
 //!
 //! Throwaway scaffolding. See `docs/wip/s0-transparency-spike.md`.
 
-const WIDTH: u32 = 768;
-const HEIGHT: u32 = 256;
+mod window;
+
+pub const WIDTH: u32 = 768;
+pub const HEIGHT: u32 = 256;
 const BAND: u32 = 128;
 
 /// Probes, as `REFERENCE.md` fixes them. `x = 64 + 128 i`, `y = 128`.
@@ -49,13 +51,19 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .cloned();
 
+    if args.iter().any(|a| a == "--window") {
+        window::run(straight);
+        return;
+    }
+
     match out {
         Some(path) => pollster::block_on(dump(&path, straight)),
         None => {
             eprintln!(
-                "usage: alpha-sender --dump <path.png> [--straight]\n\
+                "usage: alpha-sender (--dump <path.png> | --window) [--straight]\n\
                  \n\
                  --dump      render offscreen with no window, write the PNG, print the probes\n\
+                 --window    show the test frame over an opaque backdrop, for the compositor test\n\
                  --straight  emit straight alpha instead of premultiplied\n\
                  \n\
                  The windowed and OBS-facing modes arrive with their own tasks; the dump exists\n\
@@ -64,6 +72,57 @@ fn main() {
             std::process::exit(2);
         }
     }
+}
+
+
+/// Builds the test-frame pipeline. Shared by the offscreen dump and the windowed path so the two
+/// cannot drift: a difference between them would be indistinguishable from a compositor fault.
+pub fn build_pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    straight: bool,
+) -> wgpu::RenderPipeline {
+    let source = include_str!("shader.wgsl")
+        .replace("PREMULTIPLY_FACTOR", if straight { "1.0" } else { "a" });
+
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("test frame"),
+        source: wgpu::ShaderSource::Wgsl(source.into()),
+    });
+
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
+        bind_group_layouts: &[],
+        immediate_size: 0,
+    });
+
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("test frame"),
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: &module,
+            entry_point: Some("vs"),
+            compilation_options: Default::default(),
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &module,
+            entry_point: Some("fs"),
+            compilation_options: Default::default(),
+            // No blending: the frame is written, not composited. Blending here would mix the
+            // bands with the clear colour and every probe would be wrong in a plausible way.
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: Default::default(),
+        depth_stencil: None,
+        multisample: Default::default(),
+        multiview_mask: None,
+        cache: None,
+    })
 }
 
 async fn dump(path: &str, straight: bool) {
@@ -106,49 +165,7 @@ async fn dump(path: &str, straight: bool) {
         view_formats: &[],
     });
 
-    let source = include_str!("shader.wgsl").replace(
-        "PREMULTIPLY_FACTOR",
-        if straight { "1.0" } else { "a" },
-    );
-
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("test frame"),
-        source: wgpu::ShaderSource::Wgsl(source.into()),
-    });
-
-    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: None,
-        bind_group_layouts: &[],
-        immediate_size: 0,
-    });
-
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("test frame"),
-        layout: Some(&layout),
-        vertex: wgpu::VertexState {
-            module: &module,
-            entry_point: Some("vs"),
-            compilation_options: Default::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &module,
-            entry_point: Some("fs"),
-            compilation_options: Default::default(),
-            // No blending: the frame is written, not composited. Blending here would mix the
-            // bands with the clear colour and every probe would be wrong in a plausible way.
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: None,
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: Default::default(),
-        depth_stencil: None,
-        multisample: Default::default(),
-        multiview_mask: None,
-        cache: None,
-    });
+    let pipeline = build_pipeline(&device, format, straight);
 
     // Row stride is already 256-aligned at this width; REFERENCE.md explains the choice.
     let bytes_per_row = WIDTH * 4;
