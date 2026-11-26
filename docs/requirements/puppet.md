@@ -20,7 +20,7 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
 - **channel mappings**, each feeding one parameter from a named input channel. These are puppet
   data although they are edited in Live rather than Studio, so that a delivered puppet reacts
   for whoever receives it — see
-  [performing.md](performing.md#channel-mappings-are-puppet-data-and-live-writes-them).
+  [performing.md](performing.md#channel-mappings-are-puppet-data-and-live-writes-them-decided).
 
 Inochi2d's model is the starting point and its vocabulary of pieces is largely right. This
 project departs from it deliberately in several places recorded below — textures as entities
@@ -210,7 +210,7 @@ release because they cannot be added afterwards.
 
 ## A puppet that fails its integrity rules is rejected, not repaired **[proposed]**
 
-Because third-party tools write puppets ([above](#the-file-is-readable-and-writable-by-tools-that-are-not-ours)),
+Because third-party tools write puppets ([above](#the-file-is-readable-and-writable-by-tools-that-are-not-ours-decided)),
 files arrive from anywhere and may be malformed, hostile, or simply buggy. Validity is defined
 precisely enough that a validator can be written against the specification and run without our
 code, and the same validator gates loading and saving.
@@ -230,7 +230,7 @@ Every size and count the loader trusts has a **load limit**, declared in one pla
 counts, tree depth, string length, total load memory. Exceeding one fails the load with a
 readable error in bounded time and memory. These limits are a defence against a corrupt or
 hostile file and are generous multiples of the stress puppet in
-[platform.md](platform.md#the-reference-puppet-and-the-stress-puppet); they are **not** authoring
+[platform.md](platform.md#the-reference-puppet-and-the-stress-puppet-proposed); they are **not** authoring
 limits, and they must not reappear as a choice presented to the person rigging.
 
 A load never silently repairs a file and then writes the repair back.
@@ -287,7 +287,7 @@ What follows, as constraints rather than design:
 - **Stale deformation data round-trips**, like any other data a build carries but does not act
   on.
 - **Import provenance is stored per part** — the originating PSD layer, which
-  [One file](#one-file) already requires.
+  [One file](#one-file-decided) already requires.
 
 Deletion has the same character: deleting a texture that parts use, or a parameter that bindings
 reference, reports what it affects rather than cascading quietly.
@@ -341,7 +341,7 @@ cells, so gutters are needed, which is more padding; every artwork change repack
 and maximum texture dimensions force multiple pages above a threshold anyway.
 
 So the runtime binds per texture until the per-frame counters in
-[platform.md](platform.md#how-this-is-verified) show that binds matter. **This is exactly the
+[platform.md](platform.md#how-this-is-verified-proposed) show that binds matter. **This is exactly the
 kind of question the counters exist to settle**, and settling it by measurement later costs
 nothing, because the file format does not depend on the answer.
 

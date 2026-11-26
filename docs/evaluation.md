@@ -4,7 +4,7 @@ In what order a puppet is evaluated, and what composes with what. This is the co
 viewport and Live's output both honour, and the reason a rig that looks right while being
 authored looks right while being performed.
 
-[requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later)
+[requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed)
 commits to the order being specified rather than emergent. This document is that specification.
 
 ## The order **[proposed]**
@@ -49,7 +49,7 @@ alternative and why it lost.
 
 **Animations are the deliberate exception.** A playing animation overrides whatever drives a
 parameter, blending in and out over a duration the animation declares, because
-[performing.md](requirements/performing.md#what-the-puppet-does-when-its-source-drops-is-a-scene-setting)
+[performing.md](requirements/performing.md#what-the-puppet-does-when-its-source-drops-is-a-scene-setting-decided)
 requires every transition into and out of a fallback behaviour to be continuous. Where two
 animations target one parameter, the later-started one wins; it is stated here so that it is
 not discovered.
@@ -83,7 +83,7 @@ sitting on top of something they cannot see or predict. This is the one most lik
 **The honest observation worth recording:** summation is commutative, so the evaluation order
 this document specifies does not currently change any result. That is not a reason to leave it
 unspecified. It becomes load-bearing the moment a second composition mode exists, which
-[requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later)
+[requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed)
 defers rather than rules out — and by then there would be files in the wild whose appearance
 depends on an order nobody wrote down. Specifying it now costs nothing and cannot be done later.
 

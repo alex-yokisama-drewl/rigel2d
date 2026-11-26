@@ -186,6 +186,11 @@ second account. A summary that explains *why* has stopped summarising and become
   index does not exist, because nothing will find it.
 - **Renaming or deleting means fixing every inbound link.**
   `grep -rn '](oldname.md)' docs/ CLAUDE.md`
+- **A link to a heading includes that heading's status tag**, because the tag is part of the
+  heading text and therefore part of the anchor — `#one-file-decided`, not `#one-file`. The
+  consequence is that **promoting a `[proposed]` to `[decided]` breaks every link into that
+  section.** `scripts/docs-check.sh` fails on it, so the breakage is loud and arrives with the
+  promotion rather than silently afterwards. Fix the inbound links in the same change.
 - **Changing an invariant means updating [invariants.md](invariants.md) *and* CLAUDE.md.** They
   are one list in two halves and must never disagree.
 - Vocabulary is defined once, in [vocabulary.md](vocabulary.md). CLAUDE.md summarises it; no

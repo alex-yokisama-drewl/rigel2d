@@ -40,7 +40,7 @@ minor number and nothing a reader needs to interpret.
 | Minor is lower or equal | Open normally |
 
 This is the whole of [the compatibility
-rule](requirements/puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest)
+rule](requirements/puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest-decided)
 expressed as two numbers. A build must be able to render and save a structure it has no code
 for, so *can I render this* and *can I save this* are one question here and not two.
 
@@ -106,7 +106,7 @@ that churns in version control for no reason:
 - file names UTF-8, with no platform path separators.
 
 The last two are also how a machine's identity leaks into a delivered file, which
-[the requirement](requirements/puppet.md#the-same-puppet-saves-to-the-same-bytes) rules out for
+[the requirement](requirements/puppet.md#the-same-puppet-saves-to-the-same-bytes-proposed) rules out for
 its own reasons.
 
 ## Textures **[proposed]**
@@ -160,7 +160,7 @@ Every size and count the loader trusts is limited, in one place, checked **befor
 The limits are generous multiples of the stress puppet and are not authoring limits — the
 distinction, and the reason it matters, is in
 [vocabulary.md](vocabulary.md) and
-[requirements/puppet.md](requirements/puppet.md#a-puppet-that-fails-its-integrity-rules-is-rejected-not-repaired).
+[requirements/puppet.md](requirements/puppet.md#a-puppet-that-fails-its-integrity-rules-is-rejected-not-repaired-proposed).
 
 The archive makes one of these sharper than it would otherwise be: **a zip entry declares its
 decompressed size, and that declaration is attacker-controlled.** The limit is enforced against
@@ -173,7 +173,7 @@ trusts the header has a decompression bomb.
   today. Another mode is a format addition under a higher minor version, and it does not disturb
   [evaluation order](evaluation.md).
 - **Composition modes.** Settled as deferred in
-  [requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later).
+  [requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed).
   [evaluation.md](evaluation.md) says what the single mode is and why the deferral is currently free.
 - **Named mapping profiles**, for a puppet carrying two channel-mapping setups. Named in
   [requirements/performing.md](requirements/performing.md) as the answer if it is ever wanted.

@@ -25,7 +25,7 @@ out.**
 - **Merging another puppet copies what it takes.** Parts arrive with fresh identifiers and no
   tie to the puppet they came from, so the result stays self-contained. A live reference would
   mean a stored reference resolving outside the file it arrived in, which
-  [One file](puppet.md#one-file) and [I1](../invariants.md) both rule out. The cost is that
+  [One file](puppet.md#one-file-decided) and [I1](../invariants.md) both rule out. The cost is that
   updating shared artwork means merging it again wherever it was used.
 
 ## Editing the tree **[decided]**
@@ -94,7 +94,7 @@ follows from that, and none of it is optional.
 - A puppet that will not load says where and why, in terms a person can act on rather than a
   parser's own words. A puppet with a missing texture shows a visible placeholder and says so.
 - When a puppet is partly not understood — which the format permits, see
-  [puppet.md](puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest) — **the
+  [puppet.md](puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest-decided) — **the
   person is told what is unrecognised and what it belongs to.** Nothing is ignored: unrecognised
   data is carried through to the next save untouched.
 

@@ -193,7 +193,7 @@ loop is closed.
 **Live does not need to understand the whole puppet format to do this.** It loads what it
 renders and what it maps, and carries everything else through untouched — the same rule that
 lets any build open a file carrying data it does not recognise
-([puppet.md](puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest)). The
+([puppet.md](puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest-decided)). The
 mechanism was built for format versions and extensions; Live writing mappings is the same
 problem and gets the same answer for free.
 
@@ -239,7 +239,7 @@ a kill mid-stream cannot corrupt a scene. After a crash, relaunching restores th
 resumes with no setup.
 
 A scene refers to a puppet by an **absolute path together with the puppet's own identifier**
-([puppet.md](puppet.md#every-entity-has-a-stable-identity)), so that editing a puppet does not
+([puppet.md](puppet.md#every-entity-has-a-stable-identity-proposed)), so that editing a puppet does not
 break the scene that uses it. Absolute rather than relative, because a scene lives in a
 directory Live manages while puppets live wherever the user keeps them, and a relative path
 between those two is long and snaps the moment anything is reorganised.

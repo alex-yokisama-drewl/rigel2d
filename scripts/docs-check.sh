@@ -57,6 +57,53 @@ fi
 rm -f /tmp/.docs-check-links.$$
 [ "$broken" -eq 0 ] && note "every relative link resolves"
 
+# ---------------------------------------------------------------- anchor resolution
+# A link to a heading that does not exist lands the reader at the top of the right
+# file, which is the kind of defect nobody reports and nobody notices. Checked here
+# because the status tag is part of the heading text and therefore part of the
+# anchor: promoting a [proposed] to [decided] changes every anchor into that
+# section. That is a real cost, and the point of this check is that it is paid
+# loudly, at the moment of promotion, rather than silently afterwards.
+section "Anchors"
+slug() {
+  printf '%s\n' "$1" \
+  | sed -E 's/`([^`]*)`/\1/g; s/\[([^]]*)\]\([^)]*\)/\1/g; s/\*+//g' \
+  | tr '[:upper:]' '[:lower:]' \
+  | sed -E 's/[^a-z0-9 _-]+//g; s/ +/-/g; s/^-+//; s/-+$//'
+}
+
+anchors_of() {
+  grep -E '^#+ ' "$1" 2>/dev/null | sed -E 's/^#+ +//' | while IFS= read -r h; do slug "$h"; done
+}
+
+bad_anchor=0
+while IFS= read -r src; do
+  base="$(dirname "$src")"
+  sed 's/`[^`]*`//g' "$src" 2>/dev/null \
+  | grep -oE '\]\([^)]*#[^)]*\)' \
+  | sed -E 's/^\]\(//; s/\)$//' \
+  | while IFS= read -r target; do
+      case "$target" in http*|mailto:*) continue ;; esac
+      frag="${target#*#}"
+      path="${target%%#*}"
+      [ -z "$frag" ] && continue
+      if [ -z "$path" ]; then tgt="$src"; else tgt="$base/$path"; fi
+      [ -e "$tgt" ] || continue   # already reported by the link check above
+      case "$tgt" in *.md) ;; *) continue ;; esac
+      anchors_of "$tgt" | grep -xF "$frag" >/dev/null && continue
+      printf 'ANCHOR\t%s\t%s\n' "$src" "$target"
+    done
+done < <(find docs -name '*.md'; ls CLAUDE.md 2>/dev/null) > /tmp/.docs-check-anch.$$ 2>/dev/null
+
+if [ -s /tmp/.docs-check-anch.$$ ]; then
+  while IFS=$'\t' read -r _ src target; do
+    problem "no such heading: $src → $target"
+    bad_anchor=1
+  done < /tmp/.docs-check-anch.$$
+fi
+rm -f /tmp/.docs-check-anch.$$
+[ "$bad_anchor" -eq 0 ] && note "every heading link resolves"
+
 # ---------------------------------------------------------------- work in flight
 section "Work in flight"
 branch="$(git branch --show-current 2>/dev/null || echo '')"

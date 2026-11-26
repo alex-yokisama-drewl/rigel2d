@@ -55,7 +55,7 @@ preserve-what-you-do-not-understand rule the same mechanism rather than two.
 
 ## Counters are the requirement **[proposed]**
 
-[platform.md](requirements/platform.md#how-this-is-verified) explains why: there is no reference
+[platform.md](requirements/platform.md#how-this-is-verified-proposed) explains why: there is no reference
 machine for routine testing, so wall-clock figures are targets that nothing checks day to day
 and the counters carry the budget on their own. That makes headless counting a constraint on
 the runtime's design rather than an instrumentation detail added later.
@@ -67,7 +67,7 @@ graphics API directly from the evaluation pass and counting through the API, tie
 to a backend that hosted CI cannot run.
 
 Counted quantities are listed in
-[platform.md](requirements/platform.md#how-this-is-verified) and not repeated here. Two carry
+[platform.md](requirements/platform.md#how-this-is-verified-proposed) and not repeated here. Two carry
 rules rather than merely numbers:
 
 - **Name resolutions must be zero.** Identifiers resolve to handles once, at load and at source
@@ -87,7 +87,7 @@ load.
 
 One bind per distinct texture, until the counters show that binds matter. This is already
 settled in
-[requirements/puppet.md](requirements/puppet.md#how-textures-are-stored-is-not-how-they-reach-the-gpu)
+[requirements/puppet.md](requirements/puppet.md#how-textures-are-stored-is-not-how-they-reach-the-gpu-proposed)
 and is repeated here only to name where the question gets answered: it is a runtime decision,
 invisible in the file, and the file format does not depend on the answer — so settling it later
 by measurement costs nothing.

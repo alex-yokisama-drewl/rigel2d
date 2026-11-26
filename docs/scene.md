@@ -1,7 +1,7 @@
 # The scene file
 
 What Live stores about a sitting, and what it deliberately does not. The requirements are in
-[requirements/performing.md](requirements/performing.md#what-a-scene-is-and-what-it-is-not); this
+[requirements/performing.md](requirements/performing.md#what-a-scene-is-and-what-it-is-not-decided); this
 is the shape.
 
 A scene is thin on purpose, and most of this document is about keeping it that way.
@@ -14,7 +14,7 @@ and images. Nothing else.
 Each item carries an absolute path, the referenced puppet's own identifier, and a placement. The
 identifier is what survives the puppet being edited; the path is what finds it. Both are needed
 and neither is sufficient —
-[performing.md](requirements/performing.md#a-scene-survives-being-interrupted) carries why the
+[performing.md](requirements/performing.md#a-scene-survives-being-interrupted-proposed) carries why the
 path is absolute rather than relative, and what that costs.
 
 **An image item is a puppet with one part, assembled in memory on load.** It is never written to
@@ -44,7 +44,7 @@ surviving the next save because the user may yet restore what is missing.
 The rest of the scene renders. Nothing about this is a modal, a prompt or a blocking question
 during load — by the time anyone could answer one, the scene is already up, which is the point.
 The mechanism by which a dormant item is pointed at a moved file is `[open]` in
-[performing.md](requirements/performing.md#a-scene-survives-being-interrupted); what is settled
+[performing.md](requirements/performing.md#a-scene-survives-being-interrupted-proposed); what is settled
 is that it happens in the control surface, at the user's pace, while the scene renders.
 
 ## Where scenes live **[proposed]**
@@ -56,7 +56,7 @@ anything it names is opened.
 
 ## Versioning **[proposed]**
 
-The same two-number scheme as [the puppet file](format.md#the-version-is-readable-on-its-own),
+The same two-number scheme as [the puppet file](format.md#the-version-is-readable-on-its-own-proposed),
 for the same reasons, and the same rule about preserving marked extension data through a save.
 A scene is a file strangers share, so it gets the identical treatment; nothing here is relaxed
 because the file is small.
