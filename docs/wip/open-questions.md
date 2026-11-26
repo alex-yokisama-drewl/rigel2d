@@ -30,7 +30,6 @@ subset that needs a decision from the project owner rather than from design work
 | How a dormant scene entry is relocated in practice | `requirements/performing.md`. Shape settled, mechanism open |
 | Composition modes for deformations | `requirements/puppet.md`. Waits on evidence about which are wanted |
 | Randomness, and first run | `requirements/authoring.md` |
-| The stack, and everything that follows it — harness, visual verification, what is not tested | `stack.md`, `testing.md`. This is `tech-design`'s work |
 
 ## Waiting on a signal, not a decision
 
@@ -57,5 +56,7 @@ because the API surface is deliberately undesigned.
 
 ## Dimensions not yet swept
 
-`accessibility` and `ops` were held back deliberately: both depend on the stack. Sweep them once
-`tech-design` has chosen one.
+`accessibility` and `ops` were held back deliberately, pending the stack. **The stack is now
+chosen ([stack.md](../stack.md)), so both are unblocked** and should be swept before the phase
+plan is written. The accessibility sweep has a specific thing to bite on: the custom-canvas
+registration convention in [testing.md](../testing.md) is what its entries would verify.

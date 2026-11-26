@@ -297,3 +297,50 @@ reportable authoring error into a silent behaviour nobody can see in the file.
 refused rather than resolved, so the error message has to be good enough to act on. Anyone who
 genuinely wants a blend of two drivers has to express it as physics reading the other value,
 which is the one backward read the evaluation pass allows.
+
+## 2026-11-26 — Rust, wgpu and egui
+
+**Decided:** Rust as the language, wgpu as the GPU abstraction, egui through `egui-wgpu` as the
+UI toolkit, on winit. Evidence in `research/2026-11-26-stack.md`; the rows and their reasons are
+in `stack.md`.
+**Because:** three constraints did the deciding, and each eliminated candidates outright. I5
+needs an abstraction that creates pipelines when asked — wgpu calls `vkCreateGraphicsPipelines`
+inside `create_render_pipeline`, and bgfx calls it inside `submit()` on a cache miss, with no way
+to force it earlier. The 8 ms 99th-percentile budget needs no collector in the frame loop. And
+the project asserts on accessible names and roles as well as geometry, which among the Rust
+toolkits only egui's AccessKit-based harness supplies headlessly.
+**Rejected:** bgfx, structurally, on I5. Tauri and Electron, on three independent failures — the
+implementation decides when pipelines compile, a JavaScript frame loop cannot hold a
+zero-allocation budget, and Linux transparency is a recurring compositor bug surface on a tier
+that blocks a release. Dear ImGui in any language, which has no accessibility concept at all and
+would make that gap permanent. D, which is what the incumbent uses and is therefore the one a
+reader will ask about: its collector against this budget, and in practice D here means Dear
+ImGui. **Qt was not rejected on capability** — it has the strongest answer to structural UI
+assertions of any native option and the most mature transparency story — but loses on MoltenVK
+against a no-Mac-to-test-on constraint and on being a far heavier dependency for a project with
+no server, no networking and no localisation. **Slint is the named fallback, not a rejection:**
+its testing API is better than egui's, and it loses on wgpu interop pinned to one major version
+behind unstable feature flags, on carrying a second renderer in the editor, and on GPLv3
+constraining the deferred plugin story.
+**Consequences:** nothing here was observed — the verdict rests on documented behaviour and on
+reading library source, and transparency in particular has not been seen working anywhere. The
+exposures and the spikes that settle them are in `stack.md`, and the transparency one is the
+same spike `requirements/performing.md` already requires for the OBS alpha path.
+
+## 2026-11-26 — The render surface is a window the UI toolkit does not own
+
+**Decided:** Live's render surface is a bare winit window with a wgpu surface and no widget
+toolkit linked into its draw path. The control surface, and all of Studio, are egui on a separate
+window sharing the same wgpu device.
+**Because:** it converts I2 from a rule someone must remember into a thing that cannot happen —
+no error, dialog, tooltip or debug output can reach the render surface, because the toolkit has
+no access to that window. It also keeps egui out of the player's frame budget: egui lays out
+every frame, its own documentation puts that at 1–2 ms, and the player's solo CPU budget is 4 ms.
+**Rejected:** one window with the render surface as a region inside the toolkit's layout. This is
+the obvious shape, it is what most applications do, and it is what a newcomer will refactor
+toward because two windows look like an accident. It loses both ways at once: I2 becomes a thing
+enforced by care on every failure path, and the toolkit's per-frame layout lands inside the frame
+loop that the budget binds.
+**Consequences:** two windows to place, move and remember the geometry of, and a user who can
+lose one behind the other. Studio's viewport is a paint callback into the shared device rather
+than a window of its own, so the split costs nothing there.

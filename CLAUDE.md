@@ -29,8 +29,8 @@ attempted is project configuration, not an agent's judgment call.
 
 | | |
 |---|---|
-| Install | Not yet — no stack chosen (`docs/stack.md` is `[open]`) |
-| Run locally | Not yet |
+| Install | `rustup toolchain install stable && cargo build --workspace` — unverified, nothing is built yet |
+| Run locally | `cargo run -p rigel-studio`, `cargo run -p rigel-live` — same caveat |
 | Tests | `scripts/test-record.sh` (reads `.claude/test-cmd`) |
 | Documentation check | `scripts/docs-check.sh` |
 

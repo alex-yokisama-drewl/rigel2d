@@ -31,7 +31,7 @@ This is [I4](invariants.md), and the design that satisfies it is that **loading 
 are separate steps with a complete puppet between them**. The caller loads — which may fail, at
 any point, for any reason — and only then installs. An install cannot fail.
 
-Three consequences that are easy to miss:
+Consequences that are easy to miss:
 
 - **The peak cost of a reload is two puppets resident**, because the new one is complete before
   the old one is released. The resident-bytes budget in
@@ -112,17 +112,32 @@ deeper in.
 Clamping and the finite check happen here too, once, before stage 2 of the evaluation pass. See
 [evaluation.md](evaluation.md#1-input-proposed).
 
-## What the stack decides **[open]**
+## What the stack settled **[proposed]**
 
-Three parts of this document are shaped by a choice not yet made, and nothing should be built
-that assumes an answer:
+The choice is in [stack.md](stack.md), and what it is still exposed to is there too. Three
+points in this document were waiting on it and are now answered.
 
-- **Whether zero CPU allocation in the frame loop is natural or contorted**, which
-  [platform.md](requirements/platform.md) already flags as the reason that figure is a budget
-  rather than an invariant.
-- **Whether the command stream is counted through a null backend the graphics abstraction
-  provides, or through our own stream above it.** Either satisfies the requirement above; which
-  one it is changes where the boundary sits and how much of the render stage is ours.
-- **How structural UI assertions are written.** `scripts/ui-assertions.md` is written for a
-  browser and a DOM, which is a hidden stack constraint rather than a neutral one —
-  [testing.md](testing.md) resolves it once the toolkit is chosen.
+**Counting above the abstraction is forced, not chosen.** wgpu has a noop backend, but its own
+documentation says render and compute passes are not executed and textures store no texels — so
+draw calls, offscreen passes and shaded pixels cannot be recovered from it, and the same holds
+for every candidate's null device
+([research/2026-11-26-stack.md](research/2026-11-26-stack.md)). The command stream above the
+backend is therefore the only place these counters can come from. The noop backend stays useful
+as the *device* for headless runs, so the load path and the resource-creation counter exercise
+real code without a GPU.
+
+**Zero CPU allocation in the frame loop is natural, and exactly countable.** A counting global
+allocator makes the per-frame heap-allocation counter exact rather than approximated, which is a
+stronger position than [platform.md](requirements/platform.md) assumed when it made that figure
+a budget rather than an invariant. Whether to promote it is not settled here — it would add to
+[invariants.md](invariants.md), and that list does not grow without the project owner saying so.
+
+**The warm-up pass is now a named obligation rather than a precaution.** wgpu creates pipelines
+and compiles shaders when asked, which is why it satisfies [I5](invariants.md) at all — but it
+creates render passes and framebuffers lazily, on first use, which lands inside the frame loop
+on the first frame that reaches a given configuration. They are cheap metadata objects and not
+shader compiles, and a non-zero resource-creation counter after frame one is still I5 violated
+as stated. So the load path must begin every attachment-and-load-op configuration the loaded
+puppet can reach, and *every state a puppet can reach* has the sharp edge named above: it is
+enumerated from puppet data, not discovered when a parameter first moves far enough to reveal a
+part that was hidden.

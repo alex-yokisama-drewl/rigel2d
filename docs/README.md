@@ -3,9 +3,9 @@
 Every document in the project is listed here. If it is not on this list, it does not exist —
 see [documentation.md](documentation.md).
 
-**Status: nothing is built yet.** One requirements pass is complete across every area listed
-below, with the planning concern sweep folded in and the research findings filed. No design, no
-plan, no code.
+**Status: nothing is built yet.** Requirements are complete across every area listed below, and
+technical design has settled the format, the evaluation pass, the scene, the runtime's
+boundaries and the stack. No plan, no code.
 
 What is settled is in [decisions.md](decisions.md), which is the list to read rather than one
 restated here — it supersedes its own entries in place, so a summary elsewhere goes stale.
@@ -13,8 +13,9 @@ restated here — it supersedes its own entries in place, so a summary elsewhere
 `CLAUDE.md`.
 
 **A session picking this up starts at `docs/wip/open-questions.md`**, which holds what is still
-undecided. The largest remaining `[open]` is how Live delivers transparent frames into OBS on
-Linux, which a spike settles before Live is designed.
+undecided. The largest remaining `[open]` is transparent output: it has not been observed
+working on any platform, it now gates both the OBS delivery path and the stack's own
+windowing assumption, and one spike settles both — see [stack.md](stack.md).
 
 ## Start here
 
@@ -56,6 +57,7 @@ Linux, which a spike settles before Live is designed.
 | [concerns/](concerns/) | The cross-cutting checklists, and how they grow |
 | [research/](research/) | Dated findings, each against the decision it fed |
 | [research/2026-11-26-linux-alpha-output.md](research/2026-11-26-linux-alpha-output.md) | How does the player get transparent frames into OBS on Linux? |
+| [research/2026-11-26-stack.md](research/2026-11-26-stack.md) | What should it be built on — language, GPU abstraction, UI toolkit? |
 | [research/2026-11-26-inochi-file-measurements.md](research/2026-11-26-inochi-file-measurements.md) | What is actually inside an inochi2d model file? |
 | [research/2026-11-26-deformation-models.md](research/2026-11-26-deformation-models.md) | How do other 2D systems model deformation, and is a skeleton needed? |
 | [research/2026-11-26-puppet-corpus.md](research/2026-11-26-puppet-corpus.md) | How large is a real 2D vtuber puppet, measured across a corpus? |
