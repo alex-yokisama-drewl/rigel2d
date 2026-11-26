@@ -203,8 +203,14 @@ def main():
         "--settings", default="{}", help="JSON input settings, e.g. allow_transparency"
     )
     ap.add_argument("--sender-args", default="--window")
+    ap.add_argument("--sender-cmd", default="", help="full sender command, replacing the built-in one")
+    ap.add_argument(
+        "--target-match", default="",
+        help="after creating the input, set its `target` to the list item containing this",
+    )
     ap.add_argument("--sender-env", default="", help="k=v,k=v applied to the sender")
     ap.add_argument("--keep-obs", action="store_true", help="do not kill OBS at the end")
+    ap.add_argument("--settle", type=float, default=6.0, help="seconds to let the capture negotiate")
     args = ap.parse_args()
 
     if not os.path.exists(SENDER):
@@ -219,7 +225,8 @@ def main():
         for pair in filter(None, args.sender_env.split(",")):
             k, v = pair.split("=", 1)
             overrides[k] = v
-        sender = launch("rigel-s0-sender", [SENDER] + args.sender_args.split(), overrides)
+        cmd = args.sender_cmd.split() if args.sender_cmd else [SENDER] + args.sender_args.split()
+        sender = launch("rigel-s0-sender", cmd, overrides)
         time.sleep(3)
 
         obs_proc = launch(
@@ -260,8 +267,28 @@ def main():
         )
         print(f"created {args.kind} with {args.settings}")
 
+        if args.target_match:
+            # The node must be chosen from the list the plugin enumerates; a name guessed and
+            # written straight into settings is silently ignored if it does not match an entry.
+            items = obs.call(
+                "GetInputPropertiesListPropertyItems",
+                {"inputName": INPUT, "propertyName": "target"},
+            )["propertyItems"]
+            hit = [i for i in items if args.target_match in str(i.get("itemValue", ""))
+                   or args.target_match in str(i.get("itemName", ""))]
+            if not hit:
+                sys.exit(
+                    f"no target matching {args.target_match!r}.\n"
+                    f"plugin offers: {[i.get('itemName') for i in items]}"
+                )
+            obs.call(
+                "SetInputSettings",
+                {"inputName": INPUT, "inputSettings": {"target": hit[0]["itemValue"]}},
+            )
+            print(f"target set to {hit[0]['itemName']!r}")
+
         # Let the capture negotiate and deliver frames before measuring.
-        time.sleep(6)
+        time.sleep(args.settle)
 
         obs.call(
             "SaveSourceScreenshot",

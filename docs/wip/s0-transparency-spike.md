@@ -17,8 +17,8 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 4 — Linux route B, PipeWire dmabuf + `obs-pwvideo`
-**Blocked on:** nothing
+**Current task:** 4 — **partial, awaiting a decision from the owner on how far to take it**
+**Blocked on:** whether to build a representative producer for route B, or decide on what is already known. See task 4.
 
 ---
 
@@ -219,13 +219,44 @@ Vulkan layer JSON installs into `~/.local/share/vulkan/implicit_layer.d`, which 
 searches by default. One undeclared build dependency: SIMDe, which `obs-studio` does not pull in
 and which libobs's own CMake config requires.
 
-### 4. Linux route B: PipeWire dmabuf + `obs-pwvideo` — `todo`
+### 4. Linux route B: PipeWire dmabuf + `obs-pwvideo` — `partial`
 
-The research's technical-fit primary. Publish a dmabuf stream and receive it in `obs-pwvideo`.
-Record what `libfunnel`'s unstable API and the single-maintainer status cost in practice.
+**Alpha is still unmeasured on this route.** What was established is below, and some of it is
+decision-relevant on its own.
 
-**Done when:** as task 3, plus a note on whether the format negotiation actually yielded an
-alpha-bearing format or silently fell back.
+**Confirmed by reading the shipped source**, which the research could only infer: `formats.c`
+maps `BGRA` to `GS_BGRA` and `RGBA` to `GS_RGBA` — **alpha-bearing**, where built-in OBS passes
+`GS_BGRX` at the same call and discards alpha. That structural advantage is real. It also accepts
+both `SPA_DATA_MemPtr` and `SPA_DATA_DmaBuf`.
+
+**Two integration costs the research's comparison table does not show.**
+
+- **The producer must declare three properties**, or the plugin will not list it at all:
+  `media.type=Video`, `media.class=Stream/Output/Video`, and `media.role` unset or `Production`.
+  A node published as `Video/Source` — the obvious choice, and what GStreamer's `pipewiresink`
+  does by default — is filtered out silently.
+- **Nothing links the producer to it.** The plugin found the target, the stream reached `paused`,
+  and no session manager ever created the link; frames flowed only after a manual `pw-link`.
+  Then format and size negotiated correctly, confirmed by OBS rendering at exactly 768×256. For
+  the player this means owning the link, or shipping WirePlumber rules — a setup cost that lands
+  on the beginner, and it is not in the research's *Beginner setup* row.
+
+**Where it stopped.** With the link made by hand, every probe read `0,0,0,0`: the geometry
+arrived, the pixels did not. The producer was GStreamer's `pipewiresink` in `mode=provide`,
+which is an unusual configuration and is **not** the producer this route is designed around —
+libfunnel is. Four variants were tried (wrong media class; correct class without `mode=provide`,
+which fails with *no target node available*; `mode=provide` unlinked; `mode=provide` linked by
+hand). The two-failures rule applies, so no fifth was attempted.
+
+**What a real answer needs:** libfunnel plus a small client, or a purpose-built `libpipewire`
+producer. Either is a half-day, and either would also settle whether the dmabuf import path
+behaves as the `MemPtr` path does.
+
+**Weighed against the route's maturity.** Its own maintenance note says the author no longer
+plans to invest beyond their own use cases, and the last functional release predates that note.
+Combined with the manual-linking finding, route B now looks materially weaker in practice than
+the research's recommendation of it as technical-fit primary — which is a finding in itself, and
+the owner should weigh it before more is spent here.
 
 ### 5. Our own Linux-first plugin: shape and cost — `todo`
 
@@ -341,3 +372,5 @@ invalid rather than as a transparency failure.
 **Assumptions:**
 
 **Deferred:**
+Route B's alpha measurement, pending the owner's decision on building a representative producer.
+Everything else about the route is recorded in task 4.
