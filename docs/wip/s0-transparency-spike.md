@@ -18,7 +18,7 @@ settled, and a dated file lands in [research/](../research/).
 ## Status
 
 **Current task:** 6 — Windows, Game Capture
-**Blocked on:** task 6 — the owner running the Windows bundle. Everything else on Linux is done.
+**Blocked on:** task 6 — a second Windows run on the DX12 backend. The first crashed on Vulkan.
 
 ---
 
@@ -379,6 +379,10 @@ invalid rather than as a transparency failure.
   scaffolding. The spike crate is standalone and not a member of anything.
 
 **Traps:**
+- **`--backend` was wired into the windowed path only, not the offscreen dump.** So the first
+  Windows bundle could not test DX12 without a window, and the one test that would have separated
+  "rendering is broken" from "transparency is broken" always ran on the backend that was
+  crashing. A diagnostic that cannot vary the thing under suspicion is not a diagnostic.
 - **The two windows were never positioned relative to each other.** Only their sizes were set,
   so the window manager placed each independently and the visible margin was whatever it happened
   to be. On Linux this went unnoticed because the harness used the positions the sender reports;
@@ -422,6 +426,9 @@ invalid rather than as a transparency failure.
   to the table but not equal.
 
 **Assumptions:**
+The Windows findings so far come from **one machine with Intel HD Graphics 630**, Kaby Lake
+hardware whose Windows Vulkan driver is legacy and no longer updated. Nothing about Windows in
+general should be concluded from it until a second backend, and ideally a second machine, agree.
 
 **Deferred:**
 Route B's alpha measurement. The sending half does not build on the target platform, so measuring

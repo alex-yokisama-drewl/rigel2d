@@ -10,7 +10,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
-use crate::{HEIGHT, WIDTH};
+use crate::{report, HEIGHT, WIDTH};
 
 /// Opaque backdrop colour. Channels are 0 or 255 so every expected composite is an exact
 /// integer — see `REFERENCE.md`.
@@ -24,16 +24,6 @@ const BACKDROP: wgpu::Color = wgpu::Color {
 /// Margin of backdrop visible around the test window, so a screenshot can confirm the backdrop
 /// is actually where we think it is before trusting any probe inside it.
 const MARGIN: u32 = 40;
-
-/// Print and flush immediately. A buffered line is lost when the process aborts, which is
-/// exactly the case this spike most needs to see.
-fn report(label: &str, value: &str) {
-    use std::io::Write;
-    println!("[{label}] {value}");
-    let _ = std::io::stdout().flush();
-    eprintln!("[{label}] {value}");
-    let _ = std::io::stderr().flush();
-}
 
 struct Surface {
     window: Arc<Window>,

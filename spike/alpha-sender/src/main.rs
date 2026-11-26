@@ -7,6 +7,15 @@
 
 mod window;
 
+/// Print and flush immediately, to both streams. A buffered line is lost when the process
+/// aborts, which is exactly the case this spike most needs to see.
+pub fn report(label: &str, value: &str) {
+    use std::io::Write;
+    println!("[{label}] {value}");
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+}
+
 /// `--backend vulkan|dx12|gl|metal` — on Windows the default is DX12, whose swapchains cannot
 /// present premultiplied alpha on an ordinary window; Vulkan may offer it. Which backend carries
 /// alpha is part of what this spike is measuring, so it must be selectable.
@@ -79,6 +88,27 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .cloned();
 
+    if args.iter().any(|a| a == "--adapters") {
+        // Pure enumeration: no device, no surface, no shader. If even this crashes, the
+        // installed driver is the problem and nothing in this program can work around it.
+        let backends = backend_from(&args);
+        let mut d = wgpu::InstanceDescriptor::new_without_display_handle();
+        d.backends = backends;
+        let instance = wgpu::Instance::new(d);
+        for a in pollster::block_on(instance.enumerate_adapters(backends)) {
+            let i = a.get_info();
+            report(
+                "adapter",
+                &format!(
+                    "{} | {:?} | {:?} | driver {} {}",
+                    i.name, i.backend, i.device_type, i.driver, i.driver_info
+                ),
+            );
+        }
+        report("done", "adapter enumeration complete");
+        return;
+    }
+
     if args.iter().any(|a| a == "--window") {
         window::run(
             backend_from(&args),
@@ -90,7 +120,7 @@ fn main() {
     }
 
     match out {
-        Some(path) => pollster::block_on(dump(&path, straight)),
+        Some(path) => pollster::block_on(dump(&path, straight, backend_from(&args))),
         None => {
             eprintln!(
                 "usage: alpha-sender (--dump <path.png> | --window) [--straight]\n\
@@ -159,8 +189,24 @@ pub fn build_pipeline(
     })
 }
 
-async fn dump(path: &str, straight: bool) {
-    let instance = wgpu::Instance::default();
+async fn dump(path: &str, straight: bool, backends: wgpu::Backends) {
+    report("step", "creating instance");
+    let instance = {
+        let mut d = wgpu::InstanceDescriptor::new_without_display_handle();
+        d.backends = backends;
+        wgpu::Instance::new(d)
+    };
+
+    report("step", "enumerating adapters");
+    for a in instance.enumerate_adapters(backends).await {
+        let i = a.get_info();
+        report(
+            "adapter found",
+            &format!("{} ({:?}, {:?}, driver {:?})", i.name, i.device_type, i.backend, i.driver_info),
+        );
+    }
+
+    report("step", "requesting adapter");
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions::default())
@@ -168,11 +214,12 @@ async fn dump(path: &str, straight: bool) {
         .expect("no GPU adapter — the spike needs a real one, not a software fallback");
 
     let info = adapter.get_info();
-    eprintln!(
-        "adapter: {} ({:?}, {:?})",
-        info.name, info.device_type, info.backend
+    report(
+        "using adapter",
+        &format!("{} ({:?}, {:?})", info.name, info.device_type, info.backend),
     );
 
+    report("step", "requesting device");
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor {
             label: Some("alpha-sender"),
@@ -199,7 +246,9 @@ async fn dump(path: &str, straight: bool) {
         view_formats: &[],
     });
 
+    report("step", "building pipeline (shader compile happens here)");
     let pipeline = build_pipeline(&device, format, straight);
+    report("step", "pipeline built");
 
     // Row stride is already 256-aligned at this width; REFERENCE.md explains the choice.
     let bytes_per_row = WIDTH * 4;
@@ -257,8 +306,10 @@ async fn dump(path: &str, straight: bool) {
         },
     );
 
+    report("step", "submitting");
     queue.submit([encoder.finish()]);
 
+    report("step", "mapping readback buffer");
     let slice = readback.slice(..);
     slice.map_async(wgpu::MapMode::Read, |r| r.expect("readback map failed"));
     device
@@ -272,8 +323,9 @@ async fn dump(path: &str, straight: bool) {
         px.swap(0, 2);
     }
 
+    report("step", "writing png");
     write_png(path, &rgba);
-    report(&rgba, straight, path);
+    report_probes(&rgba, straight, path);
 }
 
 fn write_png(path: &str, rgba: &[u8]) {
@@ -287,7 +339,7 @@ fn write_png(path: &str, rgba: &[u8]) {
         .expect("png data");
 }
 
-fn report(rgba: &[u8], straight: bool, path: &str) {
+fn report_probes(rgba: &[u8], straight: bool, path: &str) {
     let expected = if straight {
         &EXPECT_STRAIGHT
     } else {
