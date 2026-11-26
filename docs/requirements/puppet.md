@@ -10,16 +10,27 @@ response to named inputs so that a static drawing appears to move in three dimen
 
 Its pieces, named in [vocabulary.md](../vocabulary.md):
 
-- a **node tree** of parts, mesh groups and composites, which fixes draw order and nesting;
+- a **node tree** of parts, mesh groups and composites, which fixes draw order and nesting. A
+  **part is a leaf**: parts draw, and mesh groups and composites contain. Keeping each kind to
+  one job is what makes the tree's shape say where deformation and compositing can happen, and
+  it is why a cascade from a texture reaches the parts drawing it and stops. Art that wants to
+  sit under a shared transform goes in a mesh group, which is what one is for;
 - **textures**, referenced by parts;
-- **parameters**, each a one- or two-dimensional axis with keypoints along it;
+- **parameters**, each a one- or two-dimensional axis with keypoints along it. A parameter
+  **declares its axis range** — a minimum and a maximum per dimension — and carries **exactly
+  one neutral keypoint**. The validity rule that keypoints are within range presupposes the
+  first, and easing to neutral in [performing.md](performing.md) presupposes the second;
 - **bindings**, each mapping a parameter to something that changes — a node transform, or
   per-vertex offsets on a mesh — with values stored at keypoints and interpolated between;
 - **physics**, which drives parameters from simulated motion rather than from input;
 - **animations**, which drive parameters over time;
+- **chain deformers**, each a chain of **joints** deforming the geometry along it — see
+  [below](#a-chain-deformer-is-a-permanent-structure-not-a-bulk-edit-tool-proposed);
+- **masks**, each a reference from one part to another restricting where the first draws, as
+  [vocabulary.md](../vocabulary.md) defines;
 - **channel mappings**, each feeding one parameter from a named input channel. These are puppet
-  data although they are edited in Live rather than Studio, so that a delivered puppet reacts
-  for whoever receives it — see
+  data although they are edited in Live rather than Studio, and **Live writes them into the
+  puppet file** by saving it, so that a delivered puppet reacts for whoever receives it — see
   [performing.md](performing.md#channel-mappings-are-puppet-data-and-live-writes-them-decided).
 
 Inochi2d's model is the starting point and its vocabulary of pieces is largely right. This
@@ -57,10 +68,21 @@ There is no good universal rule for combining them, and this project does not pr
 What it commits to instead:
 
 - **Evaluation is deterministic and specified in the format.** The order in which deformations
-  apply is defined, not emergent. The same puppet and the same inputs produce the same geometry,
-  every time, in the editor and in the player alike.
+  apply is defined, not emergent. The claim is three distinct claims, because one unqualified
+  sentence would promise more than can be kept:
+  - **The same build on the same platform is bit-exact.** The same puppet and the same inputs
+    produce the same geometry, every time, in the editor and in the player alike.
+  - **Physics is deterministic given a fixed timestep.** It is not claimed to be reproducible
+    under a variable frame interval. That is a property of time-stepped simulation, not a defect.
+  - **Across platforms, the same geometry within a stated tolerance**, not bit-exact. The
+    supported tiers span three operating systems, and bit-exactness across them is not promised.
+    **The tolerance figure is `[open]`** — nothing is set, and nothing may assume a number until
+    it is.
 - **Composition modes are `[open]`** — a later addition, once there is evidence about which
-  ones are worth having.
+  ones are worth having. **What is settled is that the stored form carries a composition mode
+  from the first version**, with one defined value meaning the fixed order specified here.
+  Adding a mode later then adds a value and cannot alter any puppet authored before it. It costs
+  one field today and cannot be added once the format ships.
 
 **Because:** what makes the current situation workable in practice is that a rigger can adjust
 values by testing until it looks right. That only works if the result is *repeatable*. An
@@ -92,6 +114,8 @@ skeleton.
 
 A texture is an entity in its own right. A part references a texture; many parts may reference
 the same one. Reusing a drawing must cost one import and one texture, however many parts use it.
+**Textures are deduplicated by content hash at import**, so importing the same artwork for two
+parts yields one texture entity.
 
 **Because:** in inochi2d the two are conflated, so using the same shape six times means
 importing it six times and paying for it six times in the packed atlas. The cost lands on
@@ -109,7 +133,9 @@ is invisible in the stored file, because empty space compresses, and arrives in 
 the puppet loads. So:
 
 - **Resident texture memory does not exceed the source artwork**, and the ambition is to beat
-  it. Packing that inflates is worse than not packing.
+  it. Packing that inflates is worse than not packing. The comparison is against the artwork
+  **as delivered**, not as cropped: against the cropped form the requirement would be nearly
+  tautological, and as delivered it is the real guarantee.
 - **Parts are cropped to their own content before packing.** The same measurement found eight
   parts exported at an identical 920×780 with stored sizes from 0.03 MB to 1.16 MB — mostly
   transparent padding, each paying 2.74 MB resident regardless. Cropping is most of the
@@ -134,12 +160,18 @@ an archive with a manifest. A single opaque binary blob does not.
 
 ## Every entity has a stable identity **[proposed]**
 
-The puppet itself, and every node, texture, parameter, binding, keypoint and animation in it,
-carries an identifier that does
-not change when it is renamed, reordered or saved. Every reference between them is by that
-identifier — never by name, never by position in an array, never by offset in the file.
-Identifiers are unique within a puppet and are never reused for a different entity after a
-deletion.
+The puppet itself, and every piece listed in
+[What a puppet is](#what-a-puppet-is-proposed), carries an identifier that does not change when
+it is renamed, reordered or saved. Every reference between them is by that identifier — never by
+name, never by position in an array, never by offset in the file. A mask is a reference between
+parts and is covered without exception. Identifiers are unique within a puppet and are never
+reused for a different entity after a deletion.
+
+**The puppet's identifier identifies the puppet, not the file, and a copy keeps it.** A scene
+uses the path to find the file and the identifier to confirm it is the right puppet, so two
+files sharing one — a backup, say — is normal and not a defect. A filesystem copy cannot be
+intercepted, so a rule forbidding duplicates would be unenforceable. Studio's *save as* issues a
+new identifier, because that is the deliberate act of making a different puppet.
 
 **Because:** this is the mechanism behind "adding artwork preserves configuration", stated below. It is
 also what lets a scene bind to a puppet's parameters and survive the puppet being edited, and
@@ -161,25 +193,39 @@ I read".
 A puppet declares its format version, readable before anything else is parsed. The rules:
 
 - A file whose version adds things this build does not know **opens, and stays editable**. What
-  the build does not understand is carried through to the next save byte-for-byte. Silently
+  the build does not understand is carried through to the next save byte-for-byte — including
+  unmarked material, which the declared version licenses, as
+  [below](#unrecognised-data-is-marked-as-such-by-whoever-wrote-it-decided) says. Silently
   dropping it destroys the work of someone on a newer build, and that loss is invisible until
   the file reaches them again.
 - A file whose version breaks compatibility is **refused with a clear message**. It is never
   opened partially and then saved over.
 - Opening never writes. The first save that upgrades a file keeps a backup of the original.
+  **An upgrading save writes the file at the current version, and the backup holds the
+  pre-upgrade bytes exactly.** Byte-identity across builds necessarily breaks at an upgrade;
+  that is not a failure of [canonical serialisation](#the-same-puppet-saves-to-the-same-bytes-proposed).
 
 ### Unrecognised data is marked as such by whoever wrote it **[decided]**
 
 Preservation only works if the loader can tell *"data I do not understand"* apart from *"this
 file is malformed"*. So anything outside the core format carries an explicit marker naming the
-extension it belongs to, and the validator requires that marker.
+extension it belongs to, and the validator requires that marker — in a file whose declared
+version this build knows. A file declaring a *later* version is licensed by that declaration to
+carry material this build cannot place, marked or not.
 
 | Rule | |
 |---|---|
 | Extension data is namespaced and declares its origin and version | An identifier for the extension, the version it expects, and something human-readable to show a user who does not have it. **A puppet declares; it never installs** — see [invariants.md](../invariants.md) I6 |
 | Extension data is data | It is structured values — never a script, a command, a path or a URL to resolve. The no-execution rule covers it without exception |
-| Unmarked data that the core format does not define is **invalid**, not an extension | Otherwise a typo and an extension are indistinguishable, and the validator can reject neither |
+| In a file whose declared version this build knows, unmarked data that the core format does not define is **invalid**, not an extension | Otherwise a typo and an extension are indistinguishable, and the validator can reject neither |
+| In a file declaring a **later** version, unmarked material this build does not recognise is accepted and preserved opaquely, exactly as marked extension data is | A core field added by a later version is unmarked, because it is core at the version that declared it. The version declaration is what licenses it. Preserved material is data and is never interpreted, which is why accepting it is safe — [I1](../invariants.md) is untouched |
 | Preserved data round-trips byte-stably | It takes part in canonical serialisation below, so carrying someone's extension through a save does not make the file churn |
+
+**Why the gate falls this way:** the governing rule above is that a build never refuses merely
+because part of a file is unfamiliar. Requiring a marker on everything would reject exactly the
+newer file that rule promises to open; gating on the declared version is what follows from it.
+This section and the one above were previously in conflict on this point, and were reconciled
+this way rather than by reversing either.
 
 **Because:** the alternative — refusing to open, or opening read-only — protects the unknown
 data perfectly and stops the work. The likelier case is someone needing a small change to a file
@@ -220,18 +266,30 @@ code, and the same validator gates loading and saving.
 | Identifiers are unique | |
 | The tree is acyclic, with one root | |
 | Every texture, parameter and node reference resolves | A reference naming nothing is a malformed file. **Distinct from a texture whose payload is present but unreadable**, which loads with a visible placeholder ([authoring.md](authoring.md)) rather than failing the puppet |
-| Keypoints are ordered and within range | |
-| Binding value counts match the mesh topology they apply to, or the binding is marked stale | Staleness is the flagged outcome of [artwork changing under a rig](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) — a state the rigger resolves, not a malformed file |
-| Every number is finite | NaN and infinity are rejected, not clamped silently |
-| Enumerated values are known, or explicitly marked as extensions | |
+| Keypoints are ordered and within range | The range is the one the parameter declares |
+| Every parameter has exactly one neutral keypoint | None and more than one are both invalid. *Easing to neutral* ([performing.md](performing.md)) has no meaning without it, and a rule stated and never checked is a hope |
+| No part has children | A part is a leaf ([What a puppet is](#what-a-puppet-is-proposed)). Mesh groups and composites are the kinds that contain |
+| A binding's stale mark agrees with its value counts: counts that match the mesh topology it applies to and no mark, or counts that mismatch and the mark | Staleness is the flagged outcome of [artwork changing under a rig](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) — a state the rigger resolves, not a malformed file. **The derived state is authoritative and the mark must agree with it**, so a mismatch that is unmarked is invalid, and so is a match that is marked. A file from a stranger can lie; a derivation cannot. The mark stays useful as the cheap thing a loader reads first |
+| Every number is finite | NaN and infinity are rejected, not clamped silently. **This rule does not carry the version gate the row below does**, and the difference matters: it applies to every value this build interprets as a number, in a file of any declared version, so a later version's NaN in a node transform is still rejected rather than preserved into the frame loop. What it does not reach is material preserved opaquely — in data whose shape we do not know there is nowhere to look for a number, and almost any eight bytes read as one are a NaN |
+| Enumerated values are known, or explicitly marked as extensions | In a file whose declared version this build knows. A later version's unfamiliar value is preserved, under the [version gate](#unrecognised-data-is-marked-as-such-by-whoever-wrote-it-decided) |
 
 Every size and count the loader trusts has a **load limit**, declared in one place, checked
 **before allocating** — decompressed payload size, texture dimensions, vertex and node and parameter
 counts, tree depth, string length, total load memory. Exceeding one fails the load with a
 readable error in bounded time and memory. These limits are a defence against a corrupt or
-hostile file and are generous multiples of the stress puppet in
+hostile file and are multiples of the stress puppet in
 [platform.md](platform.md#the-reference-puppet-and-the-stress-puppet-proposed); they are **not** authoring
 limits, and they must not reappear as a choice presented to the person rigging.
+
+**The multiple is 4× the stress workload on each dimension.** It is provisional, to be revised
+the first time a legitimate file is refused.
+
+**The memory bound is assertable and the time bound is not.** Peak resident bytes during a
+failed load stay below the declared payload limit, which is exact. For time there is no
+reference machine, so a wall-clock figure would gate nothing; the honest form is that the work
+is linear in the declared size, with no unbounded loop. This is the same split between an
+asserted half and a recorded half that
+[platform.md](platform.md#how-this-is-verified-proposed) makes for the frame budget.
 
 A load never silently repairs a file and then writes the repair back.
 
@@ -255,6 +313,13 @@ Serialisation is canonical: stable ordering, no timestamps, no absolute paths, n
 machine names. Texture payloads are lossless and byte-identical across saves unless the artwork
 itself changed.
 
+**Preservation and canonical ordering are about different things and do not conflict.**
+Preservation concerns *contents*: the bytes of preserved material are written back verbatim.
+Ordering concerns *position*: where that material sits in the file is set by the canonical
+ordering, keyed on its marker — an extension's namespace identifier or, for unknown core
+material, its field identifier — which a build reads without understanding the contents. The
+same puppet therefore saves to the same bytes whatever order the preserved material arrived in.
+
 **Because:** it makes version control and third-party diffing work, which is most of the point
 of an open format — and it means a delivered puppet carries nothing about the machine that made
 it.
@@ -270,6 +335,11 @@ marked as no longer matching, and reported; the rigger resolves it at their own 
 stays loadable and editable throughout — a stale deformation is a flagged state, not a
 validation failure.
 
+**A stale deformation is skipped in rendering.** The part renders at its rest geometry for that
+binding, as though the deformation were absent. Other, non-stale bindings on the same node are
+unaffected. **Because:** it is predictable and cheap, and the rigger already has the flag telling
+them why the part looks unposed.
+
 | Case | Behaviour |
 |---|---|
 | Art re-exported and re-imported after an edit | Matched to existing parts by stored import provenance rather than by name alone. Art that no longer appears leaves its part in place, flagged as having lost its source |
@@ -283,14 +353,98 @@ What follows, as constraints rather than design:
 
 - **A deformation can outlive the mesh it was authored against.** A binding carries enough to
   tell whether it still matches, and a mismatch is a flag rather than the malformed-file case
-  below.
+  below. Staleness is mechanical, derived from the mismatch and never an annotation a rigger
+  writes; the stored mark must agree with the derivation, as the validity rules say.
 - **Stale deformation data round-trips**, like any other data a build carries but does not act
   on.
-- **Import provenance is stored per part** — the originating PSD layer, which
-  [One file](#one-file-decided) already requires.
+- **Import provenance is stored per part**, which [One file](#one-file-decided) already
+  requires. It is a **stable identifier taken from the source document** — a PSD layer
+  identifier where the format provides one — together with a **content hash of the imported
+  pixels**. Matching prefers the source identifier, falls back to the content hash, then to the
+  name. No path, username or machine name is stored, and nothing in it is ever resolved
+  ([I1](../invariants.md)).
 
-Deletion has the same character: deleting a texture that parts use, or a parameter that bindings
-reference, reports what it affects rather than cascading quietly.
+Deletion is **report, then a confirmed cascade.** Deleting a texture that parts use, or a
+parameter that bindings reference, first reports everything affected; the user confirms; the
+dependent entities go with it. What is refused is the *quiet* cascade, not the cascade — a
+dangling reference is a malformed file, and one validator gates save, so a report alone cannot
+be the end of it. The operation is undoable like any other ([authoring.md](authoring.md)), which
+is what makes a confirmed cascade acceptable rather than dangerous.
+
+**The cascade is transitive, and it walks dependents rather than referents.** One level does not
+satisfy the validator: deleting a texture removes the parts drawing it, and a **binding** that
+deformed one of those parts cannot exist without it either — so stopping after the first level
+leaves exactly the dangling reference the cascade exists to avoid. The set is closed — but in
+one direction only.
+
+**The direction is what stops it taking the puppet.** The closure follows *what depends on the
+deleted entity*, never *what the deleted entity reaches*. Containment is a stored reference like
+any other, so a closure that walked every reference would go from a part to the mesh group
+holding it and from there to the root: deleting one texture would delete everything. **A
+container is not a dependent of what it contains** — a mesh group with one fewer child is still
+a mesh group, and no closure walks upward into the root. The root can still be reached the other
+way, by a constitutive chain running down to it in a puppet small enough that the root is also a
+part; that case is refused rather than excepted, below.
+
+**Downward, containment is constitutive: removing a node removes the subtree under it.** A child
+cannot exist without a parent to hang from, so the closure continues down. Deleting a texture
+reaches the parts drawing it, and a **mesh group** whose every child is such a part goes with
+them only if it is itself a dependent — it is not, so it survives empty, by the rule above.
+Where the closure does run down is from a node deleted directly, or reached as a dependent: its
+children go, and theirs.
+
+**Re-parenting children instead is a different operation and gets a different name.** Dissolving
+a group keeps its children and removes only the group; deleting it removes both. Conflating them
+is how a rigger loses a branch they meant to keep, and the report names the whole subtree before
+either happens.
+
+The report names the whole set before anything changes.
+
+- Deleting a **texture** takes the **parts** that reference it. A part draws a mesh with a
+  texture; a part with no texture is not a part. The closure then continues from each of those
+  parts.
+- Deleting a **parameter** removes what cannot exist without it: its **bindings**, the **channel
+  mappings** that feed it, and the **physics** that drives it. An **animation** that drove it
+  **survives**, driving the rest. The nodes those bindings drove survive untouched too — a node
+  is not defined by being driven.
+
+**A dependent is removed only where the reference is constitutive; otherwise it just loses the
+reference.** Both leave no dangling reference, which is all the validator asks, so the rule is
+chosen on what it costs the rigger rather than on validity.
+
+| The reference is | Then | Examples |
+|---|---|---|
+| **Constitutive** — the dependent cannot exist without it | The dependent is removed, and the closure continues through it | A **part** without its **texture**; a **binding** or a **channel mapping** without its **parameter**; **physics** without the parameter it drives |
+| **Incidental** — the dependent is whole without it | The reference drops and the dependent stays. The closure stops here, because nothing was removed | A part that was **masked** by a removed part, which survives unmasked; an **animation** driving several parameters, one of them deleted, which survives driving the rest |
+
+**Which kind each reference is belongs to the format**, declared per reference kind rather than
+decided per deletion. That is what keeps the rule checkable, and what stops a new entity kind
+arriving with no stated answer.
+
+**A cascade whose result would not validate is refused, and says why.** The set is computed, the
+result is validated, and only then is anything offered to the user. This is the general form of
+a problem that first appears at the smallest size: in a single-part puppet the part *is* the
+root, so deleting its texture would take the root and leave a tree the validity rules reject —
+and that is a beginner's first import, not a corner. Stating it as *refuse what would not
+validate* rather than as an exception for the root means it also catches the same shape for
+entity kinds nobody has thought of yet.
+
+**The incidental case is the one that justifies the whole distinction.** Destroying a part
+because the part masking it was deleted, or destroying an animation because one of the
+parameters it drives went, would lose authored work that nothing requires us to lose.
+
+**An incidental dependent left empty still survives.** An animation whose only parameter was
+deleted remains, driving nothing. Removing it would be a deletion the user never confirmed,
+which is the quiet cascade this whole rule refuses — and an empty animation is visible, so the
+rigger can remove it themselves. The rule takes no exception for a dependent becoming empty,
+because every such exception returns once per entity kind.
+
+**The channel mapping is the case to be careful with.** Live writes mappings into a puppet file,
+so a deletion in the editor discards work the player wrote. That is a report the user must see
+in those terms, not a line item among others.
+
+**Stating it as a closure rather than a list** is what keeps the rule true as entity kinds are
+added, instead of needing a new clause each time something comes to reference a parameter.
 
 ## One file **[decided]**
 
@@ -309,11 +463,12 @@ Consequences that follow and are settled with it:
 - **There is no derived artifact that can be mistaken for a working copy**, which was the main
   risk of the alternative.
 - **The runtime skips what it does not need.** Authoring data is addressable separately, so the
-  player does not pay to load it.
+  player does not pay to load it. **The format declares, per kind of data, whether it is
+  runtime or authoring-only**, and the player skips exactly the authoring-only set.
 
 What a puppet stores is the **cut-up parts**, which are what rendering needs anyway, together
-with enough import provenance — the originating PSD layer's name, say — to match returning artwork
-on re-import. **The layered source document is not embedded.** It is the artist's working file
+with enough import provenance to match returning artwork on re-import, as
+[above](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) describes. **The layered source document is not embedded.** It is the artist's working file
 and belongs beside the puppet, not inside it, which also disposes of most of the question about
 what travels when a rigger delivers to a client.
 

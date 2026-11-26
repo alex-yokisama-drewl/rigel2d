@@ -30,7 +30,7 @@ attempted is project configuration, not an agent's judgment call.
 
 | | |
 |---|---|
-| Install | `rustup toolchain install stable && cargo build --workspace` — unverified, nothing is built yet |
+| Install | `cargo build --workspace`, with rustup installed; the compiler is the one `rust-toolchain.toml` pins — unverified, nothing is built yet |
 | Run locally | `cargo run -p rigel-studio`, `cargo run -p rigel-live` — same caveat |
 | Tests | `scripts/test-record.sh` (reads `.claude/test-cmd`) |
 | Documentation check | `scripts/docs-check.sh` |

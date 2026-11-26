@@ -7,7 +7,7 @@ runtime they share.
 
 | Tier | Platforms | Means |
 |---|---|---|
-| Supported | Linux, Windows | Tested before release. A defect here blocks a release |
+| Supported | Linux, Windows | **Target:** tested on real hardware before release, and a defect here blocks a release. **Today:** see [Who tests Windows](#who-tests-windows-and-on-what-proposed) — Linux is tested routinely, Windows only occasionally by hand |
 | Best-effort | macOS | Built and released. Tested only by whatever is automatable and by users |
 
 macOS is wanted and is not worth a significant amount of work. The way to get it cheaply is to
@@ -21,6 +21,27 @@ hosted macOS runners can verify that it builds and that structural assertions pa
 verify window compositing, transparency against a real compositor, or whether it feels right.
 Any macOS claim stronger than "it builds and the tests pass" is unfounded, and the tier above
 says so honestly rather than implying coverage that does not exist.
+
+### Who tests Windows, and on what **[proposed]**
+
+The project owner tests on real Linux and Windows hardware. Linux is tested routinely because it
+is where development happens. Windows gets occasional checks by hand, and **before the work is
+public the rest is trust**: hosted Windows CI gives a build and structural assertions only
+([stack.md](../stack.md)), the same standard that is insufficient to claim anything for macOS.
+So the Supported tier above is the target, and this is the state. It tightens when the work goes
+public. A Windows laptop is reachable over SSH, so automating against real Windows hardware is
+possible and not yet done; [ops.md](../concerns/ops.md) carries the caution on doing it.
+
+**Operating-system floors:**
+
+| Platform | Floor |
+|---|---|
+| Windows | Windows 10, 64-bit |
+| Linux | glibc 2.31 — Ubuntu 20.04, Debian 11 |
+| macOS | macOS 11 |
+
+The glibc floor binds the CI runner image as much as it describes users: building on a newer
+runner silently excludes older distributions.
 
 ## The speed requirement, stated as a budget **[proposed]**
 
@@ -235,6 +256,12 @@ A **soak run** at accelerated time, headless, with synthetic input, shows counte
 bytes flat over a stream's length. This is what catches the leak that only matters after three
 hours, which is exactly when it is most expensive to discover.
 
+**The stream length it targets is four hours** — long enough to cover the tail of real streams,
+and past the point where the leak above would appear. **It is its own job, not a push gate.** At
+sixty frames a second four hours is upward of eight hundred thousand frames, so folding it into
+the workspace test run would put minutes onto every ordinary run and it would be turned off.
+[testing.md](../testing.md) carries where it runs.
+
 This section states *what must be verified and why the split falls where it does*, which is a
 requirement. **How it is verified — the harness, the gates, and the full list of what is not
 tested — is [testing.md](../testing.md)**, which does not restate the reasoning above.
@@ -255,7 +282,7 @@ enforces the strict vocabulary ([decisions.md](../decisions.md)) needs somewhere
 
 ## Behaviour under contention and over budget **[open]**
 
-Three connected questions, none decided, and nothing may assume an answer to any of them:
+Two connected questions remain, neither decided, and nothing may assume an answer to either:
 
 - Under contention, whether Live **yields** — dropping frames so the game wins — or **holds**,
   so the stream stays smooth and the game suffers.
@@ -263,8 +290,28 @@ Three connected questions, none decided, and nothing may assume an answer to any
   refuses**, and whether it may hold textures below their authored resolution. This interacts
   with *no arbitrary dimension caps* in [puppet.md](puppet.md). Distinct from a **load limit**,
   which is a defence against a hostile file rather than a cap on authoring.
-- The tolerated deadline-miss rate and the stream length the soak run targets. Both figures in
-  the budget table above are guesses and are marked as such.
+
+Both are Live's behaviour and are not needed until Live is built.
+
+**The third question here has been answered.** The deadline-miss figures in the budget table
+stand as written and stay provisional — they can only be measured at the calibration sitting, so
+nothing routine checks them — and the soak targets four hours, above.
+
+## Local log and diagnostics report **[proposed]**
+
+Both applications keep a local log, bounded and rotated, never written synchronously or
+allocated for inside the frame loop. A diagnostics report is one action in the control surface,
+carrying build, commit, format version, operating system, graphics backend, adapter and the
+recent log.
+
+**The application never sends either.** A user attaches the report to an issue they file by
+hand, which is the only route by which a problem reaches the developers
+([decisions.md](../decisions.md)). **Neither may carry personal data:** home-directory paths are
+redacted, and no puppet or scene content, channel value or camera-derived value appears.
+
+The checks that hold this are in [ops.md](../concerns/ops.md), and
+[analytics.md](../concerns/analytics.md) depends on it as its answer to whether a question can be
+answered later.
 
 ## Windows code signing **[open]**
 

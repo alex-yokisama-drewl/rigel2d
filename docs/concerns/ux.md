@@ -114,7 +114,7 @@ every cycle. Each entry carries its provenance. See README.md.
 ### The interface itself
 
 - **Every operation is reachable and comfortable with mouse and keyboard alone** — `judgment`
-  No operation depends on pressure, tilt, hover or precision a mouse cannot comfortably produce. Cross-reference `accessibility.md` once that dimension is swept — keyboard-only is a stronger claim than this one and is not yet made.
+  No operation depends on pressure, tilt, hover or precision a mouse cannot comfortably produce. Cross-reference `accessibility.md`: keyboard-only is a stronger claim than this one, and it is deliberately not claimed for canvas manipulation, which is a stated exemption there.
   Seeded at planning, 2026-11-26.
 - **Viewport gizmos are not covered by chrome at the minimum window size** — `judgment`
   → `test`: bounding-box intersection between every gizmo and every panel and floating element, including gizmos at the viewport edge. This is the generating case from `README.md`.

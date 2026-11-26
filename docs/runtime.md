@@ -53,6 +53,11 @@ that writes a puppet must also carry through everything it did not parse — ext
 authoring data, a higher minor version's additions — which makes the write path and the
 preserve-what-you-do-not-understand rule the same mechanism rather than two.
 
+**Application configuration goes through the same path**, with a version and preservation of
+keys it does not understand. **A local log does not**: it is append-only and cannot go through
+write-beside-then-rename, so the I7 script carries an explicit allow-list for it. This settles
+what the rule covers; [I7](invariants.md) itself is unchanged.
+
 ## Counters are the requirement **[proposed]**
 
 [platform.md](requirements/platform.md#how-this-is-verified-proposed) explains why: there is no reference
