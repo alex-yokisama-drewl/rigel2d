@@ -1,0 +1,179 @@
+# The puppet file
+
+What is in a puppet, how it is encoded, and what a reader must do with it. The requirements this
+satisfies are in [requirements/puppet.md](requirements/puppet.md); this is the shape that
+satisfies them.
+
+A scene is a separate, much thinner file and is specified in [scene.md](scene.md).
+
+## The container is an archive with a manifest **[proposed]**
+
+A puppet is a zip archive. One entry carries the format version, one carries the structure as
+JSON, textures are separate entries, and authoring data is its own entry the runtime never
+reads.
+
+| Entry | Holds |
+|---|---|
+| `rigel2d.json` | The format name and version, and nothing else |
+| `puppet.json` | The node tree, parameters, bindings, physics, animations, channel mappings, texture records |
+| `textures/<identifier>.png` | One entry per distinct texture, cropped to its own content |
+| `authoring.json` | Import provenance and anything else only Studio acts on |
+
+**Because** the requirement is that a third party can inspect, change and generate a puppet with
+ordinary tooling. An archive delivers that literally: `unzip` gives a reader a JSON file a text
+editor opens and images any viewer displays. It also delivers the two structural requirements
+that plain JSON does not — binary payloads addressable without parsing the whole file, and
+authoring data the player can skip rather than load.
+
+What lost, and why, is in [decisions.md](decisions.md).
+
+### The version is readable on its own **[proposed]**
+
+`rigel2d.json` exists so that deciding whether to refuse a file costs one small bounded read,
+before any load limit is at risk and before the manifest is parsed. It carries a major and a
+minor number and nothing a reader needs to interpret.
+
+| | |
+|---|---|
+| Major differs | **Refuse**, with a message naming the version. Never open partially |
+| Minor is higher than this build knows | **Open, warn, stay editable.** Everything unrecognised is preserved — see below |
+| Minor is lower or equal | Open normally |
+
+This is the whole of [the compatibility
+rule](requirements/puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest)
+expressed as two numbers. A build must be able to render and save a structure it has no code
+for, so *can I render this* and *can I save this* are one question here and not two.
+
+## Identifiers are integers, not UUIDs **[proposed]**
+
+Every entity carries an unsigned 64-bit integer, unique within the puppet. The puppet records a
+high-water mark that never decreases, which is what makes an identifier never reused after a
+deletion. Identifier zero is reserved and means *no reference*.
+
+**Because** the governing requirement is that tools which are not ours can write a valid
+puppet. Emitting `1, 2, 3` needs nothing; emitting UUIDs needs a library in every tool that
+touches the format. Integers also diff legibly, which matters for a format whose whole case is
+that version control and third-party tooling work on it.
+
+UUIDs are the obvious alternative; [decisions.md](decisions.md) carries why they lost.
+
+**The trap this leaves.** Two tools editing one puppet without seeing each other's work can
+both allocate from the same high-water mark and produce colliding identifiers. There is no
+concurrent-editing story and no merge of divergent copies, so nothing exercises this today —
+but a tool that writes a puppet must take the high-water mark from the file it read, never from
+a count of what it found.
+
+## Extension data **[proposed]**
+
+Anything outside the core format lives under a reserved `x` key, present on any object, keyed by
+the extension's own identifier:
+
+```json
+"x": {
+  "com.example.wiggle": {
+    "version": "1.2",
+    "name": "Wiggle Deformer",
+    "data": { }
+  }
+}
+```
+
+| Rule | Why |
+|---|---|
+| `name` is human-readable and is what a user without the extension is shown | The warning on open has to name something a person recognises |
+| `data` is structured values only | Never a string that is executed, resolved or interpreted as a path or URL. [I1](invariants.md) |
+| A key the core format does not define, outside `x`, is **invalid** | Without this a typo and an extension are indistinguishable and the validator can reject neither |
+| `x` survives a save untouched, byte for byte | Including through Live, which writes puppets for channel mappings |
+
+The loader therefore keeps the parsed source alongside its typed structures rather than
+discarding it. That is a cost paid on every load, and it is the mechanism the whole
+preserve-what-you-do-not-understand rule rests on.
+
+## Canonical serialisation, and where zip fights it **[proposed]**
+
+The same puppet must save to the same bytes. JSON is the easy half: keys sorted, no insignificant
+whitespace, a fixed number format, UTF-8.
+
+**The archive is the half that goes wrong**, because a zip writer's defaults are all
+non-canonical. Every one of these must be pinned, and a writer that forgets one produces a file
+that churns in version control for no reason:
+
+- entry order fixed, sorted by path;
+- modification times fixed to a constant, never the clock;
+- no directory entries;
+- compression method and level fixed per entry kind;
+- no extra fields, and no external attributes carrying the writing machine's umask;
+- file names UTF-8, with no platform path separators.
+
+The last two are also how a machine's identity leaks into a delivered file, which
+[the requirement](requirements/puppet.md#the-same-puppet-saves-to-the-same-bytes) rules out for
+its own reasons.
+
+## Textures **[proposed]**
+
+One archive entry per distinct texture, PNG, cropped to its own content. PNG because it is
+lossless, carries the alpha channel this project is built around, and is readable by everything.
+
+**Cropping must not move anything.** A part's mesh coordinates are in the artwork's authored
+space, not in the cropped bitmap's. The texture record therefore carries the crop rectangle and
+the authored dimensions, and the runtime reconstructs the authored space on load. Getting this
+wrong shifts every mesh built on that texture, and it would do so silently.
+
+This is also what makes the
+[dimension-change remap](requirements/puppet.md#adding-artwork-when-the-art-and-the-rig-disagree-proposed)
+well-defined: a deformation is an offset in the authored space, so replacing artwork at a
+different size is a scaling of a space the file already names.
+
+How textures reach the GPU is not this document's concern and is deliberately not visible here —
+see [runtime.md](runtime.md).
+
+## Stale bindings are a state, not a failure **[proposed]**
+
+A binding carries enough to tell whether it still matches the mesh it applies to. When it does
+not, it is marked stale and kept. A stale binding loads, renders as though absent, saves
+unchanged, and is reported to the rigger.
+
+The validator treats staleness as legal and a value-count mismatch *without* the mark as
+malformed. That distinction is the whole reason the mark exists: without it, retained work and
+a corrupt file look identical.
+
+## Validation **[proposed]**
+
+The same validator gates loading and saving, and it must be runnable against the specification
+without our code — a committed JSON Schema for what a schema can express, plus the structural
+rules it cannot:
+
+- identifiers unique, and none above the high-water mark;
+- the tree acyclic with one root;
+- every reference resolves, or is the reserved zero;
+- keypoints ordered and within their parameter's range;
+- binding value counts matching their mesh, or marked stale;
+- every number finite;
+- enumerated values known, or under `x`.
+
+A generated puppet doubles as the conformance fixture proving a third party can write a valid
+one, which [platform.md](requirements/platform.md) already requires for its own reasons.
+
+### Load limits **[proposed]**
+
+Every size and count the loader trusts is limited, in one place, checked **before allocating**.
+The limits are generous multiples of the stress puppet and are not authoring limits — the
+distinction, and the reason it matters, is in
+[vocabulary.md](vocabulary.md) and
+[requirements/puppet.md](requirements/puppet.md#a-puppet-that-fails-its-integrity-rules-is-rejected-not-repaired).
+
+The archive makes one of these sharper than it would otherwise be: **a zip entry declares its
+decompressed size, and that declaration is attacker-controlled.** The limit is enforced against
+bytes actually decompressed, with the declared size used only to refuse early. A loader that
+trusts the header has a decompression bomb.
+
+## What is deliberately not here **[open]**
+
+- **Interpolation modes beyond linear.** Linear between keypoints is what the format defines
+  today. Another mode is a format addition under a higher minor version, and it does not disturb
+  [evaluation order](evaluation.md).
+- **Composition modes.** Settled as deferred in
+  [requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later).
+  [evaluation.md](evaluation.md) says what the single mode is and why the deferral is currently free.
+- **Named mapping profiles**, for a puppet carrying two channel-mapping setups. Named in
+  [requirements/performing.md](requirements/performing.md) as the answer if it is ever wanted.

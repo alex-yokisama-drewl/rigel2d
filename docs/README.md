@@ -39,7 +39,12 @@ Linux, which a spike settles before Live is designed.
 
 <!-- One line per design document, by the reader question it answers. -->
 
-*None yet — `tech-design` has not run.*
+| Doc | Answers |
+|---|---|
+| [format.md](format.md) | What is in a puppet file, how is it encoded, and what must a reader do? |
+| [evaluation.md](evaluation.md) | In what order is a puppet evaluated, and what composes with what? |
+| [scene.md](scene.md) | What does Live store about a sitting, and what does it deliberately not? |
+| [runtime.md](runtime.md) | What does the runtime own, where are its boundaries, and how is it measured? |
 
 ## Working on it
 

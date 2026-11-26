@@ -227,3 +227,73 @@ before then:** *"the applications never open an outbound network connection, ass
 is an assertion over our own code and a plugin is not our code, so either the claim narrows to
 the applications themselves or plugins are constrained from networking; and the security
 checklist's *"the player requests no screen-capture capability"* has the same shape.
+
+## 2026-11-26 — A puppet is a zip archive, not a single JSON document
+
+**Decided:** The container is an archive: a tiny version entry, the structure as JSON, one image
+entry per texture, and authoring data in its own entry.
+**Because:** two of the format requirements are structural rather than aesthetic — binary
+payloads must be addressable without parsing the whole file, and the player must be able to skip
+authoring data rather than load it. An archive delivers both by construction.
+**Rejected:** plain JSON with textures base64-encoded inside, which `requirements/puppet.md`
+explicitly allows and which a reader will reach for because it is simpler and more obviously
+inspectable. It loses three ways: it inflates the payload by about a third, a file with a
+hundred megabytes of base64 in it cannot be opened in the text editor that was the whole reason
+for choosing JSON, and reaching any part of it means parsing all of it. Also rejected: JSON
+beside a directory of images, which is the same design minus *One file*.
+**Consequences:** every zip writer default is non-canonical, so canonical serialisation now has
+a second half that is easy to get wrong and invisible when you do — `format.md` lists what must
+be pinned. A decompression-bomb check is also required, because an entry's declared size is
+attacker-controlled.
+
+## 2026-11-26 — Entity identifiers are integers, not UUIDs
+
+**Decided:** An unsigned 64-bit integer per entity, unique within the puppet, allocated from a
+stored high-water mark that never decreases.
+**Because:** the governing requirement is that tools which are not ours can write a valid
+puppet. Emitting `1, 2, 3` requires nothing of a third-party tool; emitting UUIDs requires a
+library in every one of them. Integers also diff legibly, and legible diffs are most of the case
+for an open format.
+**Rejected:** UUIDs, which are the obvious choice and have a real advantage — two puppets merge
+without renumbering. That advantage is worth little here, because merging another puppet copies
+what it takes and assigns fresh identifiers on the way in under either scheme.
+**Consequences:** two tools editing one puppet without seeing each other's work can allocate
+colliding identifiers. Nothing exercises this today — there is no concurrent editing and no
+merge of divergent copies — but it is a real edge the UUID scheme would not have had, and a
+writer must take the high-water mark from the file rather than from a count of what it found.
+
+## 2026-11-26 — Transform bindings sum componentwise and are never composed as matrices
+
+**Decided:** Where several bindings drive one node's transform, translation, rotation angle and
+scale accumulate separately and the matrix is built once from the accumulated values.
+**Because:** matrix multiplication is order-dependent, so composing transforms as matrices makes
+the result depend on binding order. Head roll, pitch and yaw all touching one node is ordinary
+rigging, not an edge case, and what makes it workable in practice is that the rigger adjusts
+values until it looks right. That loop needs the result to be repeatable and predictable; an
+order-dependent one destroys it, and it is also how the editor's viewport comes to disagree with
+the player's output.
+**Rejected:** composing transforms as matrices, which is what a newcomer will reach for because
+it is what every graphics text does and because it is more "correct" in the sense of being a
+proper composition of rigid transforms. It is the right answer for a scene graph, where one
+transform has one parent, and the wrong answer here, where many bindings contribute to one
+transform.
+**Consequences:** a composed rotation beyond the small angles rigging actually uses will not
+match what matrix composition would have produced. That is accepted; it is also what the
+incumbent tools do, so it will not surprise a rigger.
+
+## 2026-11-26 — One parameter has one driver, enforced by the validator
+
+**Decided:** Each parameter declares exactly one base driver — a channel mapping, a physics
+output, or nothing. Two is a validation failure. Animations are the one exception and override
+temporarily, blending in and out.
+**Because:** the alternative is a precedence rule, and a precedence rule resolves the conflict by
+silently discarding the loser. A rigger who has mapped a channel onto a parameter that physics
+also drives has made a mistake, and the useful moment to tell them is when the file is
+validated, not invisibly at frame time.
+**Rejected:** a documented precedence order, which is the obvious fix and looks more permissive.
+It is more permissive about exactly the thing that should not be permitted, and it turns a
+reportable authoring error into a silent behaviour nobody can see in the file.
+**Consequences:** a puppet that a third-party tool generates with two drivers on a parameter is
+refused rather than resolved, so the error message has to be good enough to act on. Anyone who
+genuinely wants a blend of two drivers has to express it as physics reading the other value,
+which is the one backward read the evaluation pass allows.
