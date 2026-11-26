@@ -1,7 +1,7 @@
 # Requirements — the editor
 
-What the application that builds puppets must do. The puppet model itself is in
-[puppet.md](puppet.md); this is about the work of authoring one.
+What Studio must do. What a puppet *is* belongs to [puppet.md](puppet.md); this is about the
+work of authoring one.
 
 **The editor is the larger of the two applications and this document is incomplete.** Sections
 tagged `[open]` are known gaps, not oversights.
@@ -17,7 +17,7 @@ out.**
 
 ## Bringing artwork in **[proposed]**
 
-- Layered PSD import, mapping layers onto parts, is the primary path.
+- Layered PSD import, mapping PSD layers onto parts, is the primary path.
 - Individual image files import directly.
 - **Merging into an existing puppet accepts more than one thing at a time** — several images, a
   PSD, or another puppet. Inochi Creator's one-at-a-time merge is a specific friction worth
@@ -80,15 +80,16 @@ follows from that, and none of it is optional.
 
 - A malformed, truncated, empty or unsupported PSD produces a message naming the file, the
   cause and a next action, and **leaves the puppet unchanged**.
-- A PSD whose layers are partly unusable imports the usable ones and **lists what it skipped**.
+- A PSD whose PSD layers are partly unusable imports the usable ones and **lists what it skipped**.
   Silently dropping them is a data-loss bug from the person's side of the screen.
 - **A multi-item merge reports an outcome per item.** One bad file does not cancel the rest or
   hide what happened to them — which is the whole value of merging many at once.
 - A puppet that will not load says where and why, in terms a person can act on rather than a
   parser's own words. A puppet with a missing texture shows a visible placeholder and says so.
 - When a puppet is partly not understood — which the format permits, see
-  [puppet.md](puppet.md#the-file-is-readable-and-writable-by-tools-that-are-not-ours) — **the
-  person is told what was ignored.**
+  [puppet.md](puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest) — **the
+  person is told what is unrecognised and what it belongs to.** Nothing is ignored: unrecognised
+  data is carried through to the next save untouched.
 
 ## The person can always tell what an edit will do **[proposed]**
 
@@ -157,10 +158,12 @@ and it costs more than the retrofit it is trying to prevent.
 
 **The line that holds whenever plugins arrive: a plugin never arrives inside a puppet, a scene
 or a source.** Installing one is an explicit act by the user, out of band from file sharing.
-This is what keeps *nothing a puppet, scene or source supplies is ever executed* true as an
-invariant — that sentence is about files, not about the application, and a plugin API does not
-touch it. A puppet able to carry a plugin would collapse the distinction, and most of the threat
-model with it, because puppets are traded between strangers and installed software is not.
+This is what keeps [I1](../invariants.md) true of our own code, which is where it does its work.
+It is **not** a claim that nothing supplied by a file can ever execute once plugins exist — a
+plugin can store code in extension data and run it itself, and that residual risk is accepted
+(`invariants.md` I1). What a puppet able to *carry* a plugin would destroy is the distinction
+itself: puppets are traded between strangers, installed software is not, and collapsing the two
+takes most of the threat model with it.
 
 **Until plugins exist, extensibility is open seams:** a file format third-party tools read and
 write ([puppet.md](puppet.md)), and an input protocol anything that can open a socket can speak
@@ -169,7 +172,8 @@ API never replaces it.
 
 ## Deferred **[open]**
 
-Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether the
-interface is translated into more than one language, and whether a pen tablet is a target input
-device — pressure, hover, and no right-click change the interaction model, and artists often
-work on one.
+Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether reuse
+of a part is a copy or a live reference; how the two sides of a symmetrical rig are kept in
+step; what form crash recovery takes; what happens to existing deformations when replacement
+art has different dimensions or a mesh is regenerated; and whether Studio keeps rolling backups
+of previous saves.

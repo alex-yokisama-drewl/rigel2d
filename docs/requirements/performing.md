@@ -1,7 +1,6 @@
 # Requirements — the player
 
-What the application that performs a puppet live must do. The puppet model is in
-[puppet.md](puppet.md).
+What Live must do. What a puppet *is* belongs to [puppet.md](puppet.md).
 
 The player renders a puppet driven by live input and delivers the result to streaming software.
 Everything here is in service of one sitting: start it, have it already set up, stream.
@@ -20,13 +19,12 @@ plugin with no Linux equivalent, which makes this a gap rather than a preference
 
 **The choice among the options below is deferred to the spike, deliberately.** Alpha has not
 been observed working end to end on any candidate path, so picking one now would be picking on
-the strength of source reading alone. The spike described at the end of this section is the
+the strength of source reading alone. The spike described below is the
 trigger: it decides this, and nothing should be built that assumes an answer before it runs.
 What is already settled, and does not wait for the spike, is that output sits behind a narrow
 interface that can host more than one backend.
 
-The first draft of this section required alpha output "without a plugin". Research has
-established what each platform actually offers
+What each platform actually offers
 ([2026-11-26-linux-alpha-output.md](../research/2026-11-26-linux-alpha-output.md)):
 
 | Platform | Plugin-free route to alpha | |
@@ -44,7 +42,7 @@ So the decision is narrower than it first appeared:
 
 | Option | |
 |---|---|
-| Depend on a third-party Linux plugin | No work for us. The two differ in risk: `obs-vkcapture` is actively released and the research rates it the safer dependency, while the `obs-pwvideo` route also pulls in `libfunnel`, which is single-author, has no tagged release, and declares its API unstable |
+| Depend on a third-party Linux plugin | No work for us. The two differ in risk. The research recommends the `obs-pwvideo` route as primary on technical fit, while noting it is a single-maintainer, best-effort project and pulls in `libfunnel`, which is single-author, has no tagged release and declares its API unstable. It recommends `obs-vkcapture` as the fallback, far more widely deployed and actively released, at the cost of a launch wrapper and a swapchain that actually presents |
 | **Write our own, Linux first, built to extend** | We own the Linux story. The sender is per-platform either way; `libobs` has one texture-import call per platform, so extending later is open without being committed to now |
 | Write our own for all three | Consistency at the cost of an install step where none is needed |
 
@@ -248,15 +246,15 @@ between those two is long and snaps the moment anything is reorganised.
 The cost is that a moved or renamed puppet breaks the reference — the common case, far more
 than a scene moving between machines. **Recovery is how that is handled, and the exact mechanism
 is `[open]`.** What is settled is the shape: the scene still loads, the missing item is dormant,
-and the control surface offers to locate it, skip it, or skip all like it. See the next point
-for why that cannot be a dialog in the way it first sounds.
+and the control surface offers to locate it, skip it, or skip all like it. It cannot be a modal
+asked during load, for the reason in
+[Nothing stops the puppet rendering](#nothing-stops-the-puppet-rendering-decided) above.
 
 ## Deferred **[open]**
 
-Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether
-OpenSeeFace's protocol is our native one or sits behind a protocol of our own, which decides
-whether the port is reachable from a web page; and whether a scene can be edited while
-streaming.
+Recorded rather than left as gaps, and tracked in `docs/wip/open-questions.md`: whether a scene
+can be edited while streaming; how a dormant scene entry is relocated in practice; and how a
+streamer learns something broke, above.
 
 Off-machine sources are deferred rather than open — the position is above, under *A source can
 drive the puppet and nothing else*.

@@ -93,7 +93,7 @@ every cycle. Each entry carries its provenance. See README.md.
   → `test`.
   Seeded at planning, 2026-11-26.
 - **The render surface's structure contains nothing but the render target, in every error state** — `judgment`
-  → `test`. Candidate invariant.
+  → `test`. Asserts [I2](../invariants.md).
   Seeded at planning, 2026-11-26.
 - **One broken scene item never blocks the rest** — `judgment`
   → `test`.

@@ -150,8 +150,13 @@ a format already in the wild is not possible.
 ## A build works with what it understands and preserves the rest **[decided]**
 
 The governing rule, and it is wider than versioning: **a build never discards data it does not
-understand, and never refuses to work because of it.** It operates on what it recognises, leaves
-everything else exactly as it found it, and writes it back on save.
+understand, and never refuses to work merely because some of a file is unfamiliar.** It operates
+on what it recognises, leaves everything else exactly as it found it, and writes it back on
+save.
+
+The one thing it does refuse is a file whose *version* declares a break in compatibility, below.
+That is a different case: not "part of this file is unfamiliar" but "this file is not the format
+I read".
 
 A puppet declares its format version, readable before anything else is parsed. The rules:
 
@@ -177,9 +182,10 @@ extension it belongs to, and the validator requires that marker.
 | Preserved data round-trips byte-stably | It takes part in canonical serialisation below, so carrying someone's extension through a save does not make the file churn |
 
 **Because:** the alternative — refusing to open, or opening read-only — protects the unknown
-data perfectly and stops the work. The far likelier outcome in practice is that someone needs to
-make a small change to a file that carries something they do not have, and the right answer is
-to let them, not to send them away.
+data perfectly and stops the work. The likelier case is someone needing a small change to a file
+carrying something they do not have, and the right answer is to let them. This was decided
+against read-only after a reversal; the alternatives and why they lost are in
+[decisions.md](../decisions.md).
 
 ### What the user is told **[decided]**
 
@@ -237,11 +243,11 @@ path or URL inside one is resolved outside the container it arrived in.
 **Because:** puppets are traded between strangers — a rigger delivers to a streamer, and the
 community shares files. Opening one must not be able to harm the machine.
 
-This is a candidate invariant, and **a plugin API does not threaten it.** The sentence is about
-what a *file* supplies, not about what the application may load: a plugin the user installs
-deliberately is not something a puppet supplied. What would invalidate it is in-puppet
-scripting, or any route by which a plugin could arrive inside a shared file — which is why
-[authoring.md](authoring.md) rules that out permanently while deferring the API itself.
+This is [I1](../invariants.md), and it binds **Rigel2D's own code**. It is not a promise about
+everything that may run on the machine once plugins exist: a plugin can store code in a puppet's
+extension data and execute it itself, and the format cannot prevent that. That residual risk is
+accepted as part of allowing plugins, and is why a plugin may never arrive inside a shared file
+([I6](../invariants.md)) — installation stays an explicit act, out of band from file sharing.
 
 ## The same puppet saves to the same bytes **[proposed]**
 

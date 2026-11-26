@@ -70,7 +70,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
   → `test`, where a limit with no fixture fails the check.
   Seeded at planning, 2026-11-26.
 - **A failed load leaves the displayed puppet unchanged** — `judgment`
-  → `test`: load a hostile fixture while a good puppet renders, and assert the rendered buffer is unchanged. Candidate invariant.
+  → `test`: load a hostile fixture while a good puppet renders, and assert the rendered buffer is unchanged. Asserts [I4](../invariants.md).
   Seeded at planning, 2026-11-26.
 
 ### The input port
@@ -88,7 +88,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
 ### What the applications may not do
 
 - **Nothing supplied by a puppet, scene or source is ever executed** — `judgment`
-  Review and a lint over the parsing paths; no field is evaluated as a script, a command or a format string, and no path or URL inside a file is resolved outside its container. **A plugin is not covered by this** — a plugin never arrives inside a file, which is what keeps the rule true. Candidate invariant.
+  Review and a lint over the parsing paths; no field is evaluated as a script, a command or a format string, and no path or URL inside a file is resolved outside its container. **A plugin is not covered by this** — a plugin never arrives inside a file ([I6](../invariants.md)), which is what keeps the rule true for our code. Asserts [I1](../invariants.md).
   Seeded at planning, 2026-11-26.
 - **Live requests no screen-capture or window-capture capability** — `judgment`
   → `script` scanning platform manifests and entitlements, failing on any. **Revisit before plugins ship**: the scan covers our own manifests, and a plugin is not our code.

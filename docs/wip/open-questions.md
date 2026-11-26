@@ -3,8 +3,9 @@
 What requirements work is waiting on. Deleted when the requirements are agreed and the phase
 plan is written; nothing here is permanent.
 
-What remains is **questions for the user** and **the proposed invariants**. The concern
-checklist entries that used to sit here have been approved and moved into `docs/concerns/`.
+What remains is **questions for the user**. The proposed invariants and the concern checklist
+entries that used to sit here were approved and moved into `docs/invariants.md` and
+`docs/concerns/`; the two sections at the foot record what changed on the way.
 
 ---
 

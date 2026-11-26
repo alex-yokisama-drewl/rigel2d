@@ -33,7 +33,7 @@ So the budget is not "fast enough" but **a fixed share of a defined machine unde
 load**.
 
 **The requirement falls on the player, not equally on both. [decided]** The player runs while
-someone is live in front of an audience, and a dropped frame there is visible and unrecoverable.
+someone is streaming in front of an audience, and a dropped frame there is visible and unrecoverable.
 The editor is a tool someone sits in front of; an operation that takes a moment longer is
 annoying, and so is a slow computer in general. Where the two conflict — a shared runtime
 decision that helps one and costs the other — the player wins. The editor's figures below are
@@ -144,7 +144,7 @@ still a hitch on stream.
 | Resident bytes, editor | 2 GB | | With the reference puppet and its source artwork open, on an 8 GB machine |
 | GPU resource creation or pipeline compilation in the frame loop | None | | **Invariant — see `docs/invariants.md` I5.** A mid-frame texture or shader compile is a visible hitch, and on some drivers a stall of hundreds of milliseconds |
 | CPU allocation in the frame loop | None | | A budget rather than an invariant, deliberately: whether zero is natural or contorted depends on the language, which is not yet chosen. Tighten once it is. A pause from allocation or collection is exactly the stutter the percentile budgets exist to prevent |
-| First-use work after the first presented frame | None | | Every render state a puppet can reach is prepared before it is first needed, or paid for during load |
+| First-use work after the first presented frame | None | | The broader form of the row above, and how I5 is actually asserted: every render state a puppet can reach is prepared before it is first needed, or paid for during load |
 | Startup to first frame | 3 s cold, 1 s warm | | Cold means every derived cache empty, which is every beginner's first run |
 | Puppet load | 2 s | | Including validation and texture upload |
 | Input latency | 2 frames | | From a packet arriving to the frame it affects. Latest value wins; the queue never grows |
@@ -171,9 +171,7 @@ than as one figure, because the table above does not scale uniformly: masks grow
 and the rest by a multiple.
 
 This is what catches accidental quadratic behaviour in deformation composition and physics,
-which is the failure mode that makes a tool pleasant on small rigs and useless on real ones —
-and the corpus shows real rigs are three times larger than this project assumed twice in a
-row.
+which is the failure mode that makes a tool pleasant on small rigs and useless on real ones.
 
 ## How this is verified **[proposed]**
 
@@ -210,12 +208,12 @@ must be stated rather than glossed:
   frame-time series and no routine contended benchmark; the figures in the budget table are
   targets that nothing checks day to day.
 - What occasional access buys is **calibration, not regression detection**. The right use of a
-  rare session is to measure the counter-to-milliseconds relationship once — establishing what
+  rare sitting is to measure the counter-to-milliseconds relationship once — establishing what
   the per-frame counter ceilings actually cost in time on real hardware — so that the counters
   CI *can* run stop being arbitrary and start standing in for the budget. Spending a rare
-  session hunting a regression instead would waste it.
+  sitting hunting a regression instead would waste it.
 - **This means the counter ceilings should be set provisionally and revised at the first
-  session on real hardware**, rather than treated as settled now.
+  sitting on real hardware**, rather than treated as settled now.
 - **The per-frame counters therefore carry the entire requirement.** This is workable — they
   are exact, they catch the regressions that cause timing problems, and they run in CI without
   a GPU — but they measure work done, not time taken. A change that makes each unit of work

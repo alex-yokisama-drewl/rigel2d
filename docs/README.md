@@ -7,15 +7,14 @@ see [documentation.md](documentation.md).
 below, with the planning concern sweep folded in and the research findings filed. No design, no
 plan, no code.
 
-What is settled is in [decisions.md](decisions.md): one repository for both applications, no
-inochi2d interoperability, a puppet is one file, no plugin API, no outbound network connection,
-and the interface uses the project's own vocabulary.
+What is settled is in [decisions.md](decisions.md), which is the list to read rather than one
+restated here — it supersedes its own entries in place, so a summary elsewhere goes stale.
+[invariants.md](invariants.md) carries what must never break, with its one-line half in
+`CLAUDE.md`.
 
 **A session picking this up starts at `docs/wip/open-questions.md`**, which holds what is still
-undecided, the proposed invariants, and the concern checklist entries awaiting approval —
-[invariants.md](invariants.md) is still empty because those have not been approved. The largest
-remaining `[open]` is how the player delivers transparent frames into OBS on Linux, which a
-spike settles before the player is designed.
+undecided. The largest remaining `[open]` is how Live delivers transparent frames into OBS on
+Linux, which a spike settles before Live is designed.
 
 ## Start here
 

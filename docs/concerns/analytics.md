@@ -48,14 +48,6 @@ later, when answering it matters.
 
 ## This project
 
-<!--
-Generated at planning, approved by the user, grown by harvest. See README.md.
-Record the naming convention, the analytics sink, and the required properties here on the first
-planning sweep — the Universal entries above reference them.
--->
-
-## This project
-
 - **Nothing is measured, because nothing is sent** — `test`
   This project makes no outbound network connection at all (`docs/decisions.md`), so every
   Universal entry above about emitting events, naming them consistently, or answering a

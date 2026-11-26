@@ -45,7 +45,7 @@ reader would reach for next belongs here above all others.>
 
 ## 2026-11-26 — A puppet is one file, with no separate project or export
 
-**Decided:** No editing project distinct from a runtime model. One file, always re-editable. It
+**Decided:** No editing project distinct from a runtime form of the same thing. One file, always re-editable. It
 stores the cut-up parts plus import provenance; the layered source document stays outside it.
 **Because:** measurement of two real inochi2d rigs found its project and export files carrying
 byte-identical rig data but for one key, and the export was the larger file for one of the two — so the
@@ -172,7 +172,9 @@ capability checks rather than one "do we support this version" flag.
 ## 2026-11-26 — Unrecognised data is preserved, not a reason to stop (supersedes the entry above)
 
 **Decided:** Reverses *"An older build opens a newer-but-additive puppet read-only"*, written
-earlier the same day. A build opens a file carrying data it does not understand, stays fully
+earlier the same day — **both halves of it**, the read-only rule and the claim that the promise
+begins at a release tagged 1.0. The hard promise does not start at a version number at all; it
+starts when the project is shared with a community, and the owner says when. A build opens a file carrying data it does not understand, stays fully
 editable, and writes that data back untouched on save. It warns on open, naming what is missing,
 and lets the user work. The rule is wider than format versioning: it covers any marked extension
 data, from any writer.
