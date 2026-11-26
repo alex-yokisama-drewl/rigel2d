@@ -14,7 +14,10 @@ import sys
 import tempfile
 import time
 
+
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from compositor_test_png import read_png  # noqa: E402
 SENDER = os.path.join(HERE, "target", "release", "alpha-sender")
 
 # REFERENCE.md: probes sit at x = 64 + 128 i, y = 128 within the test window.
@@ -130,62 +133,6 @@ def main():
         print("MIXED — see REFERENCE.md's caveat: a near miss on P1-P3 with P4 exact is a")
         print("colour-space question (blending in linear light), not a transparency failure.")
         sys.exit(1)
-
-
-def read_png(path):
-    """Decode a PNG to RGBA bytes without a third-party library."""
-    import zlib
-
-    data = open(path, "rb").read()
-    assert data[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
-    pos, idat, w = 8, b"", None
-    while pos < len(data):
-        ln = int.from_bytes(data[pos : pos + 4], "big")
-        typ = data[pos + 4 : pos + 8]
-        body = data[pos + 8 : pos + 8 + ln]
-        if typ == b"IHDR":
-            w = int.from_bytes(body[0:4], "big")
-            h = int.from_bytes(body[4:8], "big")
-            depth, colour = body[8], body[9]
-            assert depth == 8, f"unsupported bit depth {depth}"
-            assert colour in (2, 6), f"unsupported colour type {colour}"
-            channels = 3 if colour == 2 else 4
-        elif typ == b"IDAT":
-            idat += body
-        elif typ == b"IEND":
-            break
-        pos += 12 + ln
-
-    raw = zlib.decompress(idat)
-    stride = w * channels
-    out = bytearray()
-    prev = bytearray(stride)
-    p = 0
-    for _ in range(h):
-        f = raw[p]
-        line = bytearray(raw[p + 1 : p + 1 + stride])
-        p += 1 + stride
-        for i in range(stride):
-            a = line[i - channels] if i >= channels else 0
-            b = prev[i]
-            c = prev[i - channels] if i >= channels else 0
-            if f == 1:
-                line[i] = (line[i] + a) & 0xFF
-            elif f == 2:
-                line[i] = (line[i] + b) & 0xFF
-            elif f == 3:
-                line[i] = (line[i] + (a + b) // 2) & 0xFF
-            elif f == 4:
-                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
-                pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
-                line[i] = (line[i] + pr) & 0xFF
-        prev = line
-        if channels == 3:
-            for i in range(0, stride, 3):
-                out += line[i : i + 3] + b"\xff"
-        else:
-            out += line
-    return bytes(out), w, h
 
 
 if __name__ == "__main__":

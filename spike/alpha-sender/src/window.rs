@@ -33,6 +33,8 @@ struct Surface {
 
 pub struct App {
     straight: bool,
+    srgb: bool,
+    solo: bool,
     instance: wgpu::Instance,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
@@ -43,9 +45,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(straight: bool) -> Self {
+    pub fn new(straight: bool, srgb: bool, solo: bool) -> Self {
         Self {
             straight,
+            srgb,
+            solo,
             instance: wgpu::Instance::default(),
             device: None,
             queue: None,
@@ -73,6 +77,18 @@ impl App {
         Arc::new(event_loop.create_window(attrs).expect("create window"))
     }
 
+    fn format(&self) -> wgpu::TextureFormat {
+        // The experiment: vkcapture reports the swapchain's colour space to OBS, but the dmabuf
+        // carries a DRM format. If the format is non-sRGB the sampler does no decode while OBS
+        // still encodes on output, which is the 128 -> 188 shift. An sRGB format should make the
+        // two agree.
+        if self.srgb {
+            wgpu::TextureFormat::Bgra8UnormSrgb
+        } else {
+            wgpu::TextureFormat::Bgra8Unorm
+        }
+    }
+
     fn configure(&self, window: Arc<Window>, device: &wgpu::Device, alpha: wgpu::CompositeAlphaMode) -> Surface {
         let surface = self
             .instance
@@ -82,7 +98,7 @@ impl App {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             // Linear, never sRGB. REFERENCE.md explains why every number depends on it.
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: self.format(),
             // Auto, which resolves to Srgb for this format. That is what a real application
             // gets, so it is what the spike must measure. The format itself is linear, so the
             // shader's values reach the surface unencoded; the colour space only tells the
@@ -111,14 +127,21 @@ impl ApplicationHandler for App {
             return;
         }
 
-        // Backdrop first so the test window stacks above it.
-        let backdrop_win = self.make(
-            event_loop,
-            "alpha-sender backdrop",
-            WIDTH + MARGIN * 2,
-            HEIGHT + MARGIN * 2,
-            false,
-        );
+        // Backdrop first so the test window stacks above it. Skipped in solo mode: a capture
+        // route grabs a surface directly and needs no backdrop, and leaving a second window
+        // around lets the route capture the wrong one — which it did, silently, until the
+        // harness's own size check caught an 848x336 frame of flat magenta.
+        let backdrop_win = if self.solo {
+            None
+        } else {
+            Some(self.make(
+                event_loop,
+                "alpha-sender backdrop",
+                WIDTH + MARGIN * 2,
+                HEIGHT + MARGIN * 2,
+                false,
+            ))
+        };
         let test_win = self.make(event_loop, "alpha-sender test", WIDTH, HEIGHT, true);
 
         let surface = self
@@ -161,13 +184,10 @@ impl ApplicationHandler for App {
         }))
         .expect("device");
 
-        self.pipeline = Some(crate::build_pipeline(
-            &device,
-            wgpu::TextureFormat::Bgra8Unorm,
-            self.straight,
-        ));
+        self.pipeline = Some(crate::build_pipeline(&device, self.format(), self.straight));
         drop(surface);
-        self.backdrop = Some(self.configure(backdrop_win, &device, wgpu::CompositeAlphaMode::Opaque));
+        self.backdrop = backdrop_win
+            .map(|w| self.configure(w, &device, wgpu::CompositeAlphaMode::Opaque));
         self.test = Some(self.configure(test_win, &device, alpha));
         self.device = Some(device);
         self.queue = Some(queue);
@@ -242,10 +262,15 @@ impl ApplicationHandler for App {
                 // Report geometry once both windows have drawn, so a harness can probe absolute
                 // screen coordinates rather than guessing where the WM put us.
                 if !self.reported {
-                    if let (Some(b), Some(t)) = (&self.backdrop, &self.test) {
-                        if let (Ok(bp), Ok(tp)) = (b.window.outer_position(), t.window.outer_position())
-                        {
-                            println!("BACKDROP_AT {} {}", bp.x, bp.y);
+                    if let Some(t) = &self.test {
+                        if let Ok(tp) = t.window.outer_position() {
+                            if let Some(b) = &self.backdrop {
+                                if let Ok(bp) = b.window.outer_position() {
+                                    println!("BACKDROP_AT {} {}", bp.x, bp.y);
+                                } else {
+                                    return;
+                                }
+                            }
                             println!("TEST_AT {} {}", tp.x, tp.y);
                             println!("READY");
                             self.reported = true;
@@ -267,9 +292,9 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn run(straight: bool) {
+pub fn run(straight: bool, srgb: bool, solo: bool) {
     let event_loop = EventLoop::new().expect("event loop");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let mut app = App::new(straight);
+    let mut app = App::new(straight, srgb, solo);
     event_loop.run_app(&mut app).expect("run");
 }

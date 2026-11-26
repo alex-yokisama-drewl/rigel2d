@@ -17,7 +17,7 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 3 — Linux route A, `obs-vkcapture`
+**Current task:** 4 — Linux route B, PipeWire dmabuf + `obs-pwvideo`
 **Blocked on:** nothing
 
 ---
@@ -175,14 +175,40 @@ would have to convert in the shader. Premultiplied being the one offered is what
 dmabuf contract wants, so this is favourable, but it means `--window --straight` cannot measure
 what its name suggests and says so rather than reporting a misleading pass.
 
-### 3. Linux route A: `obs-vkcapture` — `todo`
+### 3. Linux route A: `obs-vkcapture` — `done`
 
-Install the plugin and its layer, run the sender through it, enable *Allow Transparency*, and
-probe what OBS emits. Record what the beginner setup actually required, including the launch
-wrapper or environment variable.
+**Alpha survives exactly. Colour does not.** Reproduced twice with the capture confirmed to be
+the right window.
 
-**Done when:** OBS's output is probed against the reference table and the premultiplication
-question is answered for this route, or the route is recorded as failing with the reason.
+| | |
+|---|---|
+| Alpha at every probe | Bit-exact: 255, 128, 64, 192, 0, 255 |
+| Colour at every probe | The **sRGB encoding** of what was sent: 128→188, 64→137, 192→225 |
+| With `allow_transparency` off | Alpha forced opaque, **colour still encoded**. The shift is not part of the transparency path |
+
+**The mechanism is pinned, not guessed.** `vkcapture.c` reads the Vulkan swapchain's
+`VkColorSpaceKHR` and reports a colour space to OBS, so the transport is not colour-space-blind.
+But OBS samples the imported dmabuf without decoding and applies one sRGB encode on output,
+whatever the format says. Requesting a `Bgra8UnormSrgb` surface — the obvious remedy — made it
+**worse in exactly the predicted way**: 223, 194, 242, which is the same encode applied twice.
+The prediction was written down before that run.
+
+**So the remedy is the opposite of the obvious one: render in linear light into a linear
+surface**, and let OBS's single encode produce the correct display output.
+
+**The finding that outlives this route.** The same bits mean different things to the two
+consumers measured so far — Mutter blends them as display-encoded values (task 2), OBS treats
+them as linear light. A frame correct for one is wrong for the other, and nothing in the
+transport settles it. That is a colour-space hazard sitting underneath the shared-runtime
+guarantee in [runtime.md](../runtime.md), which exists so that Studio's viewport and Live's
+output cannot disagree — and the viewport goes through the compositor while the output goes
+through OBS. **No document states this**, and it is not a vkcapture defect.
+
+**Beginner setup, measured.** Not in Ubuntu 24.04's repositories at all, so it is built from
+source — but it needs **no root**: `libobs` headers ship inside `obs-studio` itself, and the
+Vulkan layer JSON installs into `~/.local/share/vulkan/implicit_layer.d`, which the loader
+searches by default. One undeclared build dependency: SIMDe, which `obs-studio` does not pull in
+and which libobs's own CMake config requires.
 
 ### 4. Linux route B: PipeWire dmabuf + `obs-pwvideo` — `todo`
 
@@ -245,6 +271,10 @@ Filled as work proceeds; routed to the project documentation at finish. Leave a 
 than deleting it.
 
 **Built:**
+`spike/alpha-sender/obs-test.py` — drives OBS through its bundled obs-websocket: builds a scene
+and a capture source, saves that source's own render as a PNG, and probes it. Measures the
+source rather than the program output, so no scene background is composited behind the frame.
+Reusable for the Windows leg, which is why it takes the input kind and settings as arguments.
 `spike/alpha-sender/` — throwaway instrument for the spike: the test frame, the reference table
 derived before any route was tried, and a probe report that scores a frame against it. Offscreen
 dump only so far; no window yet.
@@ -266,6 +296,17 @@ invalid rather than as a transparency failure.
   scaffolding. The spike crate is standalone and not a member of anything.
 
 **Traps:**
+- **A capture route silently grabbed the wrong window.** The sender showed a backdrop and a test
+  window; vkcapture captured the backdrop and returned a frame of flat magenta that was
+  *internally consistent*. Only the harness's check on frame size caught it. `--solo` now
+  suppresses the backdrop for capture runs. Any route that picks a surface for itself can do
+  this, so **assert the captured size before trusting any probe**.
+- **`systemd-run --user --scope` does not escape a snap.** A scope stays in the caller's mount
+  namespace; it only appears to work for a command like `--version` that never loads the heavy
+  libraries. OBS died with `symbol lookup error ... /snap/core20/.../libpthread.so.0`. A
+  transient **service** — same command without `--scope` — is started by the user's systemd
+  manager, outside the confinement, and works. Both sender and consumer must be outside, since a
+  snap also has a private `/tmp`.
 - **wgpu 30 added `SurfaceConfiguration::color_space`, and its default `Auto` resolves to
   `Srgb`.** It sits directly on top of what this spike measures. With a linear `Bgra8Unorm`
   format the shader's values still reach the surface unencoded — the colour space only tells the

@@ -52,7 +52,11 @@ fn main() {
         .cloned();
 
     if args.iter().any(|a| a == "--window") {
-        window::run(straight);
+        window::run(
+            straight,
+            args.iter().any(|a| a == "--srgb"),
+            args.iter().any(|a| a == "--solo"),
+        );
         return;
     }
 
