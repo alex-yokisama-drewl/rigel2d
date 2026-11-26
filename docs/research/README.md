@@ -24,11 +24,5 @@ with the specific reason each lost.
 
 ## Files
 
-<!-- Listed in ../README.md's index like any other document. -->
-
-| Finding | Feeds |
-|---|---|
-| [2026-11-26-linux-alpha-output.md](2026-11-26-linux-alpha-output.md) | How the player delivers alpha-channel frames into OBS on Linux |
-| [2026-11-26-inochi-file-measurements.md](2026-11-26-inochi-file-measurements.md) | What is actually inside an inochi2d model file, measured on real rigs |
-| [2026-11-26-deformation-models.md](2026-11-26-deformation-models.md) | How other 2D systems model deformation, and whether a skeleton is needed |
-| [2026-11-26-puppet-corpus.md](2026-11-26-puppet-corpus.md) | How large a real 2D vtuber puppet is, measured across free Live2D and inochi2d rigs |
+Listed in [../README.md](../README.md), which is the only index there is. A second table here
+would be a copy that nothing checks — and was, until it fell two findings behind.

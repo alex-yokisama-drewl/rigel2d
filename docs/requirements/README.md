@@ -22,15 +22,8 @@ implementation.
 
 ## Files
 
-<!-- Listed in ../README.md's index like any other document. -->
+Listed in [../README.md](../README.md), which is the only index there is.
 
-| File | Answers |
-|---|---|
-| [puppet.md](puppet.md) | What is a puppet, and what must its file guarantee? |
-| [authoring.md](authoring.md) | What must the editor do, and what must it feel like? |
-| [performing.md](performing.md) | What must the player do, from tracking input to streaming output? |
-| [platform.md](platform.md) | What must it run on, and how well must it run there? |
-
-All are in draft. **No acceptance criteria exist yet** — no `<area>-acceptance.md` file has
-been written. They are commissioned from `acceptance-planner` once the `[open]` sections that
-would change them are resolved.
+**No acceptance criteria exist yet** — no `<area>-acceptance.md` file has been written. They
+are commissioned from `acceptance-planner` once the `[open]` sections that would change them
+are resolved.

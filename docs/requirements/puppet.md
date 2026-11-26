@@ -29,7 +29,7 @@ departures are the point rather than incidental.
 
 ## No general skeleton **[proposed]**
 
-No bones with weight-painted vertex skinning. The model stays parameter-and-deform: node
+No bones with weight-painted vertex skinning. The deformation model stays parameter-and-deform: node
 transforms, per-vertex offsets keyed to parameter keypoints, and nesting. One bone-like
 primitive is wanted and is described further down; it is not a general skeleton.
 
@@ -99,7 +99,7 @@ exactly the work beginners do most — building a puppet out of repeated simple 
 
 How textures are packed for the GPU is an implementation concern and must stay invisible to the
 person authoring. Packing may not impose a cost that authoring can see: no duplication, no
-manual atlas sizing, no arbitrary dimension ceilings presented as a choice.
+manual atlas sizing, no arbitrary dimension caps presented as a choice.
 
 **Packing must not cost memory.** Measurement of two real inochi2d rigs
 ([2026-11-26-inochi-file-measurements.md](../research/2026-11-26-inochi-file-measurements.md))
@@ -143,7 +143,7 @@ deletion.
 
 **Because:** this is the mechanism behind "adding artwork preserves configuration", stated below. It is
 also what lets a scene bind to a puppet's parameters and survive the puppet being edited, and
-what lets a merge remap collisions instead of refusing. Name-based or index-based references
+what lets a merge renumber what it brings in instead of refusing it. Name-based or index-based references
 break on exactly the operations this project exists to make easy, and retrofitting identity into
 a format already in the wild is not possible.
 

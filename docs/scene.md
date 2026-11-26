@@ -21,38 +21,28 @@ path is absolute rather than relative, and what that costs.
 disk as a puppet and the user never sees one. This keeps Live with exactly one thing it knows
 how to render and one validation path, which is worth more than the small cost of the wrapper.
 
-**Nothing about the machine is in the file.** The output device, window placement and the input
-port are application configuration, kept elsewhere. That is what makes *a scene never enables
-off-machine listening* true by construction rather than by a check someone can forget.
+What a scene holds and what it deliberately excludes — including that nothing about the machine
+is in it — is [performing.md](requirements/performing.md#what-a-scene-is-and-what-it-is-not-decided)'s,
+not restated here.
 
 ## Writes are incremental and atomic **[proposed]**
 
-A scene is written as it changes, not on exit, through the same atomic path as a puppet
+A scene is written as it changes, through the same atomic path as a puppet
 ([I7](invariants.md)). Live is already a writer of puppet files for channel mappings, so there
 is one write path in the application and not two.
 
-Relaunching after a crash restores the scene and resumes with no setup. This is the whole reason
-the file is written eagerly, and it is why a scene write must be cheap enough to do often — a
-scene is small for this reason as well as for portability.
+The requirement this serves — resuming after a crash with no setup — is
+[performing.md](requirements/performing.md#a-scene-survives-being-interrupted-proposed)'s. What
+follows for the design is that a scene write happens often and must therefore be cheap, which
+is a second reason the file is small.
 
 ## A dormant item **[proposed]**
 
-An item whose puppet is missing, or whose channel mapping resolves to nothing, loads as
-**dormant**: present in the scene, flagged in the control surface, drawing nothing, and
-surviving the next save because the user may yet restore what is missing.
-
-The rest of the scene renders. Nothing about this is a modal, a prompt or a blocking question
-during load — by the time anyone could answer one, the scene is already up, which is the point.
-The mechanism by which a dormant item is pointed at a moved file is `[open]` in
-[performing.md](requirements/performing.md#a-scene-survives-being-interrupted-proposed); what is settled
-is that it happens in the control surface, at the user's pace, while the scene renders.
-
-## Where scenes live **[proposed]**
-
-In a directory Live manages, reached through Live's interface rather than a file dialog. The
-file is still plain, still validated, still shareable by hand — and a scene arriving from
-elsewhere is untrusted input like any other file, validated on the same terms as a puppet before
-anything it names is opened.
+[performing.md](requirements/performing.md#nothing-stops-the-puppet-rendering-decided) says when
+an item becomes dormant and why nothing about it may block a load. What the file carries is the
+design half: **a dormant item is stored exactly as a live one.** Nothing records that it failed
+to resolve, because dormancy is a property of this run and not of the scene — the file the user
+restores tomorrow must be the file they had yesterday.
 
 ## Versioning **[proposed]**
 

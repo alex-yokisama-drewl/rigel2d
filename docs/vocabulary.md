@@ -94,8 +94,8 @@ confusion than the table above, because it catches the terms nobody thought to d
 |---|---|---|
 | Performance | Means both *a stage performance* and *how fast it runs*, and this project cares a great deal about both | **Live**, or "the player", for the first; "frame budget", "frame time" for the second |
 | Model | Means a character rig to a vtuber and a data model to a programmer. Both senses are live here | **Puppet** for the character; name the specific structure otherwise |
-| Session | Inochi Session's product name, and also a period of use, and also a streaming session | **Live** for the application |
+| Session | Inochi Session's product name, and also a period of use, and also a streaming session | **Live** for the application. *An agent's working session* is a separate, sanctioned sense — it is not about the software being built |
 | Object | Too loose to name a tree entry, and it will collide with whatever the implementation calls its base type | **Node**, or the specific kind |
 | Layer | A PSD layer and a draw-order layer are different things, and import maps one onto the other | **PSD layer** on the import side, **part** on the puppet side |
 | Sprite | Conflates the part with the texture, which this project deliberately separates | **Part** or **texture**, whichever is meant |
-| Project | There is no project file — a puppet is one file (`decisions.md`). The word now only invites the question back | **Puppet**, or **the repository**, whichever is meant |
+| Project | There is no project file — a puppet is one file (`decisions.md`), so the word invites a question with no answer | **Puppet**, or **the repository**, whichever is meant. *The project* as the undertaking, and *the project owner*, are sanctioned — what is banned is a project **file**, document or artifact |

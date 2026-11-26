@@ -1,13 +1,14 @@
 # Open questions
 
-The agenda: what requirements work is waiting on, grouped by what it blocks. Deleted when the
+The agenda: everything still open, grouped by what each one waits on. Deleted when the
 requirements are agreed and the phase plan is written.
 
 **This file carries no content.** Each line names a question and points at the `[open]` section
 that holds it — that section is the question's home, because it keeps the context the question
 needs and it survives this file being deleted. `scripts/docs-check.sh` lists every `[open]` tag
-in the documentation set, including the ones inside otherwise-settled sections; this is the
-subset that needs a decision from the project owner rather than from design work.
+in the documentation set, including the ones inside otherwise-settled sections. This file adds
+only the grouping — which of them need the project owner, which need design work, and which are
+waiting on a signal or on nothing at all.
 
 ---
 

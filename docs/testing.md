@@ -41,6 +41,12 @@ backend supplies the device so the load path still runs real code.
 project is not a browser**, so the translation is set out here once rather than rediscovered per
 test.
 
+**There are no breakpoints.** `scripts/ui-assertions.md` asks for the widths to be named here,
+and for a desktop application the answer is that there is one width that matters: the
+**minimum window size**, below which the window cannot be resized. Overlap and overflow are
+asserted there and at a comfortable default. The actual figure is set when Studio's layout is
+designed and belongs in this document when it is.
+
 | Pattern | Written in a browser as | Here |
 |---|---|---|
 | Overlap | `boundingBox()` intersection | `bounding_box()` on two AccessKit nodes, intersected |
@@ -114,8 +120,8 @@ Each with its reason. A gap on record is a decision; an unmentioned gap is a sur
 
 | Not tested | Why, and what stands in |
 |---|---|
-| Wall-clock frame time, and the contended budget | No reference machine is available for routine testing. The per-frame counters carry the requirement instead, and [platform.md](requirements/platform.md#how-this-is-verified-proposed) is explicit that this leaves "runs well on weak hardware" unverified rather than merely unmeasured |
-| Anything on macOS beyond building | No Mac to test on. A hosted runner says it builds and that structural assertions pass; window compositing, transparency against a real compositor, and whether it feels right are all unclaimed |
+| Wall-clock frame time, and the contended budget | No reference machine is available for routine testing. The counters carry the requirement instead — [platform.md](requirements/platform.md#how-this-is-verified-proposed) owns the reasoning and what it costs |
+| Anything on macOS beyond building | No Mac to test on — [platform.md](requirements/platform.md) sets the tier and what may be claimed. A hosted runner says it builds and that structural assertions pass |
 | Rendered pixels | Asserted on structure, never on pixels — the project-wide rule. Screenshots go to a human gate, for a person to look at |
 | A puppet's visual correctness | Judgment, at a gate. Whether a rig looks right is not a thing an assertion reaches |
 | The OBS output path | Until the spike in [performing.md](requirements/performing.md#which-platforms-need-an-obs-plugin-open) runs, there is nothing to test against. The spike's own assertions are on the pixel values OBS emits, which is the one place pixels are the right unit |

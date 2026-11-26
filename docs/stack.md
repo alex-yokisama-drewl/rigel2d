@@ -101,9 +101,8 @@ it builds and that structural assertions pass and nothing more
 
 ## Test command **[proposed]**
 
-`.claude/test-cmd` holds `cargo test --workspace`, so `scripts/test-record.sh` works. The counter
-gate is a separate job because it needs the generated workloads and compares against a committed
-baseline rather than passing or failing on its own terms.
+`.claude/test-cmd` holds it, which is what `scripts/test-record.sh` reads. The harness and the
+gates are [testing.md](testing.md).
 
 ## What this choice is still exposed to **[open]**
 

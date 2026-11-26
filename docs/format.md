@@ -169,6 +169,8 @@ rules it cannot:
 - the tree acyclic with one root;
 - every reference resolves, or is the reserved zero;
 - keypoints ordered and within their parameter's range;
+- **every parameter carrying at most one base driver** — a channel mapping, a physics output, or
+  none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
 - binding value counts matching their mesh, or marked stale;
 - every number finite;
 - enumerated values known, or under `x`.
@@ -189,13 +191,14 @@ decompressed size, and that declaration is attacker-controlled.** The limit is e
 bytes actually decompressed, with the declared size used only to refuse early. A loader that
 trusts the header has a decompression bomb.
 
-## What is deliberately not here **[open]**
+## What the format does not define yet **[proposed]**
 
-- **Interpolation modes beyond linear.** Linear between keypoints is what the format defines
-  today. Another mode is a format addition under a higher minor version, and it does not disturb
-  [evaluation order](evaluation.md).
-- **Composition modes.** Settled as deferred in
-  [requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed).
-  [evaluation.md](evaluation.md) says what the single mode is and why the deferral is currently free.
-- **Named mapping profiles**, for a puppet carrying two channel-mapping setups. Named in
-  [requirements/performing.md](requirements/performing.md) as the answer if it is ever wanted.
+Each of these is a settled position rather than an open question — the format defines one thing
+today and the addition, if it ever comes, is a higher minor version that older builds carry
+through untouched. None of them changes [evaluation order](evaluation.md).
+
+| | Today | If it is ever wanted |
+|---|---|---|
+| Interpolation between keypoints | Linear, and only linear | Another mode, as a format addition |
+| Composition of deformations | Summation, the single mode | Deferred in [requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed), which owns that question |
+| Channel-mapping setups per puppet | One | Named profiles, per [requirements/performing.md](requirements/performing.md) |

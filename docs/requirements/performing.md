@@ -81,9 +81,8 @@ Consequences that follow:
 - **A failed load changes nothing visible.** A puppet or scene is fully parsed and validated
   before it replaces what is displayed. A failure leaves the previous puppet rendering —
   never a partial puppet, a placeholder, or an error texture.
-- **The same applies to a puppet changing on disk.** If the editor saves while the player is
-  live, the player validates the new file and keeps the last good puppet if the new one is
-  invalid.
+- **The same applies to a puppet changing on disk.** If the editor saves while streaming, the
+  player validates the new file and keeps the last good puppet if the new one is invalid.
 - **A missing output device falls back rather than failing.** Output configuration is application
   configuration rather than scene content, so this is not a scene-load concern — but a device that
   has gone away since last launch must not stop Live starting or stop the puppet rendering.

@@ -22,7 +22,7 @@ and "it is usable" diverge most, and the one a developer in flow is least likely
 
 - **No interactive element is covered by another** — `test`
   Bounding-box intersection between every interactive element and every piece of persistent
-  chrome, at each supported breakpoint. *This is the check that was missing when a hotspot
+  chrome, at the minimum window size. *This is the check that was missing when a hotspot
   shipped beneath an inventory strip.*
 - **Nothing overflows its container unintentionally** — `test`
   Scroll width against client width.
@@ -47,7 +47,7 @@ and "it is usable" diverge most, and the one a developer in flow is least likely
 
 ### Layout
 
-- **Works at the supported breakpoints** — `test`
+- **Works at the minimum window size** — `test`
   Bounding-box assertions at each, not a glance at one.
 - **Long content does not break it** — `test`
   The longest plausible name, title, list. Test with the real maximum, not a short example.

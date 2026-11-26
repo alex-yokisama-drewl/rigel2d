@@ -33,8 +33,8 @@ option is a wall of unintuitive interface, and for whom the hardware is a laptop
 
 | Piece | What it is | Where it is specified |
 |---|---|---|
-| The puppet | The format and the deformation model both applications share | [requirements/puppet.md](requirements/puppet.md) |
-| The runtime | Evaluates and renders a puppet. Embedded in both applications, so that preview and performing are one code path | Not yet written |
+| The puppet | The format and the deformation model both applications share | [requirements/puppet.md](requirements/puppet.md), [format.md](format.md) |
+| The runtime | Evaluates and renders a puppet. Embedded in both applications, so that preview and performing are one code path | [runtime.md](runtime.md), [evaluation.md](evaluation.md) |
 | The editor | Builds puppets | [requirements/authoring.md](requirements/authoring.md) |
 | The player | Performs puppets live | [requirements/performing.md](requirements/performing.md) |
 

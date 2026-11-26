@@ -63,7 +63,7 @@ regression.
 Every figure below is stated against **one** puppet. A scene holding several costs roughly its
 share for each, and that is the expected and acceptable outcome — the same bargain as opening
 more browser tabs. Live is benchmarked on one puppet of average size rendering smoothly; it does
-not promise a fixed ceiling across a whole scene, and it does not degrade a puppet to stay
+not promise a fixed budget across a whole scene, and it does not degrade a puppet to stay
 inside one.
 
 **Because:** a whole-scene budget would make the common case pay for the rare one, and the
@@ -191,9 +191,14 @@ is what lets hosted CI, which has no real GPU, assert the things that cause the 
 | Heap allocations, GPU resource creations | Peak bytes during PSD import |
 | Name resolutions — must be zero | |
 
-Each counter has a ceiling in a **committed baseline file**, derived from one calibration run on
-the reference machine. CI fails on any counter above its baseline unless the baseline changes in
-the same commit with a stated reason. This is the primary gate, and it is exact.
+Each counter has a ceiling in a **committed baseline file**. CI fails on any counter above its
+baseline unless the baseline changes in the same commit with a stated reason. This is the
+primary gate, and it is exact.
+
+**The first baselines are set from a development machine and are provisional**, because no
+reference machine is available — see below. What a calibration sitting on real hardware buys is
+not the baselines themselves but the relationship between a counter and milliseconds, which is
+what stops the ceilings being arbitrary.
 
 Nothing resolves anything by name inside the frame loop. Channel names and parameter names
 resolve to direct references when a source connects and when a puppet loads; animation lookup
@@ -230,10 +235,9 @@ A **soak run** at accelerated time, headless, with synthetic input, shows counte
 bytes flat over a stream's length. This is what catches the leak that only matters after three
 hours, which is exactly when it is most expensive to discover.
 
-Per [testing.md](../testing.md) and `.claude/rules/testing.md`: the counter half carries the
-requirement, and judgment covers what it cannot reach. **This strategy belongs in
-[testing.md](../testing.md)** once that document is written; it is stated here because that one
-is still an empty template.
+This section states *what must be verified and why the split falls where it does*, which is a
+requirement. **How it is verified — the harness, the gates, and the full list of what is not
+tested — is [testing.md](../testing.md)**, which does not restate the reasoning above.
 
 ## English only **[decided]**
 
@@ -257,8 +261,8 @@ Three connected questions, none decided, and nothing may assume an answer to any
   so the stream stays smooth and the game suffers.
 - When a puppet exceeds the budget on a weak machine, whether Live **degrades, warns or
   refuses**, and whether it may hold textures below their authored resolution. This interacts
-  with *no arbitrary dimension ceilings* in [puppet.md](puppet.md). Distinct from a **load
-  limit**, which is a defence against a hostile file rather than a cap on authoring.
+  with *no arbitrary dimension caps* in [puppet.md](puppet.md). Distinct from a **load limit**,
+  which is a defence against a hostile file rather than a cap on authoring.
 - The tolerated deadline-miss rate and the stream length the soak run targets. Both figures in
   the budget table above are guesses and are marked as such.
 

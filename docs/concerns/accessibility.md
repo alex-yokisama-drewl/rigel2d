@@ -39,7 +39,7 @@ makes it the dimension with the least excuse for `judgment` entries.
 - **Interactive targets meet the minimum size** — `test`
   Bounding box.
 - **The layout survives text scaling** — `test`
-  At 200%, at each breakpoint.
+  At 200%, at the minimum window size.
 
 ### Motion
 

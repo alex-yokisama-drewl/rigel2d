@@ -66,7 +66,7 @@ sweep.
   → `test` once a fixture puppet and a loader exist: rename and reorder it, save, reload, assert every reference still resolves. The validator rejects name-based and index-based references.
   Seeded at planning, 2026-11-26.
 - **One shared validator gates load and save, and runs as a standalone command** — `judgment`
-  → `test` once the validator exists. Hostile fixtures — cycle, dangling reference, duplicate identifier, NaN, unordered keypoints, binding count mismatch — are all rejected, and save refuses to write an invalid puppet.
+  → `test` once the validator exists. Hostile fixtures — cycle, dangling reference, duplicate identifier, NaN, unordered keypoints, an *unmarked* binding count mismatch — are all rejected, and save refuses to write an invalid puppet. A mismatch **marked stale** is legal and must load, render and save; that is the paired assertion, and conflating the two would reject a file the format defines as valid.
   Seeded at planning, 2026-11-26.
 - **Unmarked data the core format does not define is rejected; marked extension data round-trips untouched** — `judgment`
   → `test` once extension data is implemented. This is what makes preservation and validation coexist: without the marker a typo and an extension are indistinguishable. See `docs/requirements/puppet.md`.
@@ -93,7 +93,7 @@ sweep.
 ### Editing without losing work
 
 - **Adding artwork preserves configuration** — `judgment`
-  → `test`: add images, a PSD and a merged puppet to a configured fixture, then assert every pre-existing identifier, binding, keypoint value and deformation is unchanged. Extend to the changed-dimensions and regenerated-mesh cases once those are decided.
+  → `test`: add images, a PSD and a merged puppet to a configured fixture, then assert every pre-existing identifier, binding, keypoint value and deformation is unchanged. Also the two cases `docs/requirements/puppet.md` settles: replacement art at different dimensions is remapped, and a regenerated mesh leaves its deformations retained and marked stale. Neither may discard anything.
   Seeded at planning, 2026-11-26.
 - **A random sequence of edits followed by undo-all returns a serialisation equal to the original** — `judgment`
   → `test`, as a property test over the operation set, including compound operations and import.

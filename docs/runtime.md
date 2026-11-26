@@ -95,9 +95,9 @@ by measurement costs nothing.
 ## The render surface boundary **[proposed]**
 
 The runtime draws puppet content and nothing else, into a surface it is handed. It has no
-capability to draw anything else, which is how [I2](invariants.md) is structural rather than
-observed: errors, dialogs and debug output cannot reach the render surface because the runtime
-has no means of putting them there and the applications have no access to it.
+capability to draw anything else — that is the runtime's half of making [I2](invariants.md)
+structural rather than observed. The other half is that the window itself belongs to no UI
+toolkit, which is [stack.md](stack.md)'s and not restated here.
 
 Studio's gizmos are drawn by Studio, outside the render surface, over a viewport that contains
 the same rendered content Live would produce.
@@ -109,8 +109,10 @@ A source may set channel values and trigger animations. The runtime exposes noth
 message size, channel-name count and name length are enforced at the boundary rather than
 deeper in.
 
-Clamping and the finite check happen here too, once, before stage 2 of the evaluation pass. See
-[evaluation.md](evaluation.md#1-input-proposed).
+**The finite check happens here, at the boundary. The clamp does not.** A value is clamped to
+the *parameter's* range, which the port cannot know — it is reached only after the mapping,
+normalisation and the response curve. Clamping here would protect raw input and nothing else.
+The full order is in [evaluation.md](evaluation.md#1-input-proposed).
 
 ## What the stack settled **[proposed]**
 
@@ -127,10 +129,10 @@ as the *device* for headless runs, so the load path and the resource-creation co
 real code without a GPU.
 
 **Zero CPU allocation in the frame loop is natural, and exactly countable.** A counting global
-allocator makes the per-frame heap-allocation counter exact rather than approximated, which is a
-stronger position than [platform.md](requirements/platform.md) assumed when it made that figure
-a budget rather than an invariant. Whether to promote it is not settled here — it would add to
-[invariants.md](invariants.md), and that list does not grow without the project owner saying so.
+allocator makes the per-frame heap-allocation counter exact rather than approximated. It stays a
+budget rather than becoming an invariant, and [invariants.md](invariants.md) under I5 carries
+why — the short form is that an allocation without a collector behind it is a slope, and
+invariants are for cliffs.
 
 **The warm-up pass is now a named obligation rather than a precaution.** wgpu creates pipelines
 and compiles shaders when asked, which is why it satisfies [I5](invariants.md) at all — but it

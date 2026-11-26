@@ -145,7 +145,7 @@ These are the rules that make the budget achievable, and each is counted rather 
 |---|---|
 | **Nothing resolves by name.** Channel and parameter names resolve to handles when a source connects and when a puppet loads | A name resolution per frame is work that grows with the rig and buys nothing. The counter being zero is the enforcement ([I3](invariants.md)) |
 | **No GPU resource creation and no pipeline compilation** | [I5](invariants.md). Every render state a puppet can reach is prepared before the first presented frame |
-| **No CPU allocation** | A budget rather than an invariant, because whether zero is natural or contorted depends on the stack ([requirements/platform.md](requirements/platform.md)) |
+| **No CPU allocation** | A budget rather than an invariant, settled as one in [invariants.md](invariants.md) under I5: this is a slope, and invariants are for cliffs |
 | **Animation lookup seeks; it does not scan** | The same shape as the name rule — cost that grows with the content for no gain |
 
 ## What a stale binding does **[proposed]**

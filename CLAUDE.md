@@ -4,7 +4,8 @@ A free and open-source 2D vtubing toolkit. **The editor** builds a layered drawi
 animated puppet; **the player** performs that puppet live from tracking input into streaming
 software. Same ground as Inochi Creator and Inochi Session, aimed at beginners and smaller
 streamers on weak hardware. Both applications and the runtime they share live in this
-repository. Nothing is built yet; requirements are in draft.
+repository. Nothing is built yet. Requirements are complete; technical design has settled the format, the
+evaluation pass, the scene, the runtime's boundaries and the stack. No phase plan, no code.
 
 The project is **Rigel2D**; the two applications are **Studio** and **Live**.
 
@@ -76,7 +77,7 @@ verifies the numbering corresponds.
 
 - **I1.** **Rigel2D never executes anything a puppet, scene or source supplies** — files are traded between strangers, so this is most of the threat model. Binds our code, not plugins.
 - **I2.** **Nothing but rendered puppet content ever reaches the render surface** — it is what the stream shows, on every failure path.
-- **I3.** **Every reference in a stored puppet or scene is by stable identifier** — never name, index or position. In memory, resolved handles are required instead.
+- **I3.** **Every reference in a stored puppet or scene is by stable identifier** — never name, index or position. Binds references to what the file *contains*; a channel and a puppet file are named outward. In memory, resolved handles are required instead.
 - **I4.** **A load that fails never replaces what is already displayed** — binds the replace path; loading an additional puppet is additive.
 - **I5.** **No GPU resource creation or pipeline compilation in the frame loop** — a mid-frame texture or shader is a visible hitch. CPU allocation is a budget, not this.
 - **I6.** **A plugin never arrives inside a puppet, a scene or a source** — installing is always explicit. A file may declare what it needs, never install it.
