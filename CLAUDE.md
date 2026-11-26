@@ -1,0 +1,72 @@
+# rigel2d
+
+A free and open-source 2D vtubing toolkit. **The editor** builds a layered drawing into an
+animated puppet; **the player** performs that puppet live from tracking input into streaming
+software. Same ground as Inochi Creator and Inochi Session, aimed at beginners and smaller
+streamers on weak hardware. Both applications and the runtime they share live in this
+repository. Nothing is built yet; requirements are in draft.
+
+The project is **Rigel2D**; the two applications are **Studio** and **Live**.
+
+## Working here
+
+**Route every piece of work through the `workflow` skill.** It orients and picks a lane —
+requirements, design, phase planning, feature, small fix, research, or finishing a cycle. Do
+not guess a lane, and do not skip to implementation because a request sounds simple.
+
+| | |
+|---|---|
+| Documentation index | `docs/README.md` — if it is not listed there, it does not exist |
+| Documentation rules | `docs/documentation.md` — governs where things go |
+| Dispatch contract | `.claude/rules/dispatch.md` — read before the first dispatch of a session |
+| Verification rules | `.claude/rules/testing.md` |
+| Cross-cutting checklists | `docs/concerns/` |
+
+**visual-checks: `automated`.** Whether automated visual verification is
+attempted is project configuration, not an agent's judgment call.
+
+## Running it
+
+| | |
+|---|---|
+| Install | Not yet — no stack chosen (`docs/stack.md` is `[open]`) |
+| Run locally | Not yet |
+| Tests | `scripts/test-record.sh` (reads `.claude/test-cmd`) |
+| Documentation check | `scripts/docs-check.sh` |
+
+Full detail in `docs/stack.md`.
+
+## Vocabulary
+
+Summarised from `docs/vocabulary.md`, which governs. **Strict** — a term used in a sense that
+document does not sanction is a defect, and it is how independently-written code becomes
+incompatible.
+
+| Term | Means |
+|---|---|
+| **Puppet** | A complete rig: node tree, textures, parameters, bindings, physics, animations |
+| **Node** | One entry in a puppet's tree. Part, mesh group, composite are kinds. Never "object" or "layer" |
+| **Part** | A node that draws a mesh with a texture. **References** a texture; never owns one |
+| **Texture** | An image, an entity in its own right. Many parts may reference one |
+| **Parameter** | A puppet's own named axis with keypoints. **Not** an input channel |
+| **Binding** | Maps a parameter to a node transform or to per-vertex offsets |
+| **Deformation** | Per-vertex mesh offsets. Not a transform, which moves a whole node |
+| **Scene** | The player's saved document: puppets, placement, sources, output |
+| **Source** | A feed of input over a port, supplying channels. A face tracker is one kind |
+| **Channel** | One named value from a source. Bound *to* a parameter |
+| **Rigel2D** | The project and toolkit as a whole, not either application |
+| **Studio** / **Live** | The two applications — the one that builds puppets, the one that performs them |
+| **The editor** / **the player** | Descriptive terms for Studio and Live. Still sanctioned |
+
+Never say: *performance* (means two things here), *model*, *session*, *object*, *layer*,
+*sprite*, *project*. `docs/vocabulary.md` says what to say instead, and why.
+
+## Invariants
+
+One line each, numbered to match `docs/invariants.md`, which carries the failure modes. **These
+two lists are one list in two halves and must never disagree** — `scripts/docs-check.sh`
+verifies the numbering corresponds.
+
+<!-- Format: In. <the rule> — <why, in a clause> -->
+
+*None yet.*
