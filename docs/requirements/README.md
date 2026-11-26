@@ -24,6 +24,10 @@ implementation.
 
 Listed in [../README.md](../README.md), which is the only index there is.
 
-**No acceptance criteria exist yet** — no `<area>-acceptance.md` file has been written. They
-are commissioned from `acceptance-planner` once the `[open]` sections that would change them
-are resolved.
+Acceptance criteria are commissioned from `acceptance-planner` once the `[open]` sections that
+would change them are resolved. **The puppet area has them; the others do not yet** — the plan
+in `docs/wip/` says when each is due and why the timing differs.
+
+**Criteria are not runnable tests, and on this project they could not be.** They name the
+fixture, the operation and the assertion; the tests that implement them wait on a workspace
+existing. A criterion is confirmed failing when its test is written, not when it is specified.

@@ -16,12 +16,18 @@ specific to this one:** the harness, the idioms, and what is deliberately not te
 | Structural UI | `egui_kittest`, headless | `tests/ui/` in `rigel-studio` and `rigel-live` |
 | Counters | The generated workloads against a committed baseline | `tests/counters/` in `rigel-runtime` |
 | Growth | The same counters on the stress workload, against the dimension that drives each | `tests/counters/`, beside the baseline gate |
-| Soak | Accelerated time, headless, synthetic input | `tests/soak/` in `rigel-runtime` |
+| Soak | Accelerated time, headless, synthetic input, over four hours of simulated stream | `tests/soak/` in `rigel-runtime`. **Ignored by default** — see below |
 
 `.claude/test-cmd` holds `cargo test --workspace`. The counter gate runs as its own job: it
 compares against a committed baseline rather than passing or failing on its own terms, and
 [platform.md](requirements/platform.md#how-this-is-verified-proposed) explains why that half carries the
 whole frame budget.
+
+**The soak is its own job too, and is excluded from the default run.** Four hours of simulated
+stream is upward of eight hundred thousand frames, which would put minutes onto every ordinary
+`cargo test --workspace`; a suite that slow stops being run, and the soak would be the thing
+switched off. It is marked ignored by default and run on its own schedule — nightly, and before
+a release. [platform.md](requirements/platform.md) sets the length and says why four hours.
 
 The growth row is the one that catches accidental quadratic behaviour in deformation
 composition and physics — the failure that makes a tool pleasant on small rigs and useless on
@@ -61,13 +67,17 @@ designed and belongs in this document when it is.
 **Computed colour has no per-element query, and does not need one.** The browser pattern exists
 because CSS cascades, so an element's colour is only knowable after resolution. egui has no
 cascade: a widget's colour comes from the one `Visuals` struct, by widget kind and interaction
-state. The assertion therefore moves — contrast is checked exhaustively over `Visuals`, for both
-themes, with no widget tree involved at all.
+state. The assertion therefore moves — contrast is checked exhaustively over `Visuals`, with no
+widget tree involved at all. There is one theme, dark, and the test iterates over whatever themes
+exist, so adding one later costs nothing.
 
-**This is wrong in exactly one case**, and it is the case to watch: a widget painted with a
-colour overridden at the call site is invisible both to the theme assertion and to the
-accessibility tree. **An overridden colour in interface code is therefore a reviewable defect**
-unless it is a puppet's own content, which is not interface.
+**This leaves a large case uncovered**, and in Studio it is the main one: a widget painted with a
+colour chosen at the call site is invisible both to the theme assertion and to the accessibility
+tree. The mesh editor, the timeline and the parameter graph are custom canvases that paint their
+own colours, so a contrast assertion over `Visuals` alone misses all of them. **Canvas palettes
+therefore have to be inside the contrast test**, not only guarded by review. Beyond the canvases,
+**an overridden colour in interface code is a reviewable defect** unless it is a puppet's own
+content, which is not interface.
 
 **Overflow is asserted from application state**, not from the tree. An egui `ScrollArea` exposes
 its content size and inner rect to the code that built it, so the test reaches into the panel's
@@ -88,8 +98,11 @@ shrinking coverage that note warns about.
 The rule:
 
 - **Every interactive element in a custom canvas registers itself**, with a role and an
-  accessible name, through egui's widget-info call. A gizmo, a keypoint, a timeline marker and a
-  draggable vertex are each an element.
+  accessible name, through egui's widget-info call. A gizmo, a keypoint, a timeline marker and
+  a piece of chrome are each an element. **Individual mesh vertices are not registered**:
+  canvas manipulation does not need to be keyboard-operable
+  ([accessibility.md](concerns/accessibility.md)), so the set to register is bounded and does
+  not scale with the vertex count.
 - **Every piece of persistent chrome is marked as such**, so the overlap assertion has both
   sides of its comparison.
 - **An element that cannot be registered cannot be shipped.** This is the rule that keeps the
@@ -99,6 +112,14 @@ The rule:
 A test asserts that every interactive element in each canvas appears in the tree, so that
 *forgetting* fails rather than silently narrowing what the other assertions cover. Tagged
 `test`, and it is the entry that makes the rest of the convention self-enforcing.
+
+**Where the independent second list comes from is undecided** **[open]**. The test as described
+cannot fail on its own: if the tree is the only list of a canvas's interactive elements, a
+forgotten element is absent from the tree and from the expectation alike, and the test passes.
+It needs a second list to compare the tree against.
+[accessibility.md](concerns/accessibility.md) names the canvas's own hit-test list as the
+intended source, but nothing is built, so nothing may assume it works. Until then the test is
+not known to be able to fail.
 
 **If this proves unworkable in practice, Slint is the named fallback** and the reasons are in
 [stack.md](stack.md) — its testing API is stronger, at a cost in coupling and licensing. That is
@@ -125,4 +146,5 @@ Each with its reason. A gap on record is a decision; an unmentioned gap is a sur
 | Rendered pixels | Asserted on structure, never on pixels — the project-wide rule. Screenshots go to a human gate, for a person to look at |
 | A puppet's visual correctness | Judgment, at a gate. Whether a rig looks right is not a thing an assertion reaches |
 | The OBS output path | Until the spike in [performing.md](requirements/performing.md#which-platforms-need-an-obs-plugin-open) runs, there is nothing to test against. The spike's own assertions are on the pixel values OBS emits, which is the one place pixels are the right unit |
+| Identifier reuse by a third-party writer | Duplicate identifiers within a file are detectable and rejected. Reuse across time by a writer that is not ours is undetectable without history nobody keeps. A recorded limitation, not a requirement |
 | Third-party tools reading our files | The generated conformance fixture proves a valid puppet can be written without our code; it does not prove anyone else's tool reads one |

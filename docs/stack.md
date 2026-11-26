@@ -15,7 +15,7 @@ and are not yet confirmed by use. [decisions.md](decisions.md) carries what lost
 | Language | Rust | No collector to put a pause inside an 8 ms 99th-percentile budget, and a counting `GlobalAlloc` makes the per-frame heap-allocation counter [platform.md](requirements/platform.md) demands exact rather than approximated |
 | GPU abstraction | wgpu | Creates pipelines when asked, synchronously, which is what [I5](invariants.md) needs. Its Metal backend is first-party, which is what makes macOS a build target rather than a port |
 | Windowing | winit | One API across the platforms, and it lets the render surface be a window no toolkit owns |
-| UI toolkit | egui, through `egui-wgpu` | Its test harness reads an AccessKit tree headlessly, which is the only Rust answer that covers roles and accessible names as well as geometry. MIT/Apache-2.0, which leaves the deferred plugin question open |
+| UI toolkit | egui, through `egui-wgpu` | Its test harness reads an AccessKit tree headlessly, which is the only Rust answer that checks the roles, accessible names and geometry of the tree egui builds. **It says nothing about delivery**: whether the platform adapter (UIA on Windows, AT-SPI on Linux) hands that tree to assistive technology cannot be automated here. MIT/Apache-2.0, which leaves the deferred plugin question open |
 | Plugin host, when it arrives | Undecided, WebAssembly likely | Not built now. Recorded because Rust having no stable ABI is usually called a weakness and here is nearly irrelevant: [I1](invariants.md) wants a sandbox, and a WebAssembly host commits to no native ABI today |
 
 ### The render surface is a window the toolkit does not own **[proposed]**
@@ -57,8 +57,7 @@ literally cannot pass until there is something to run; the first feature to land
 makes these steps real, and it must correct them here.
 
 ```
-rustup toolchain install stable      # the version is pinned in rust-toolchain.toml
-cargo build --workspace
+cargo build --workspace              # with rustup installed: the compiler is the one rust-toolchain.toml pins
 cargo run -p rigel-studio
 cargo run -p rigel-live
 ```
@@ -73,13 +72,24 @@ Neither application requires configuration to start, and that is a property wort
 beginner's first run must not involve a settings file.
 
 What exists is application configuration in the platform's standard per-user location — the
-output device, window placement, and the input port. **None of it is scene content**, for the
-reason [scene.md](scene.md) gives. A missing or unreadable configuration file falls back to
-defaults and never blocks startup, which is the same rule as
+output device, window placement, and the input port, and in Live the per-source normalisation and
+channel renames. **None of it is scene content**, for the reason [scene.md](scene.md) gives. A
+missing or unreadable configuration file falls back to defaults and never blocks startup, which
+is the same rule as
 [a missing output device](requirements/performing.md#nothing-stops-the-puppet-rendering-decided).
 
 There are no secrets, no accounts and no service endpoints, because
 [neither application opens an outbound connection](decisions.md).
+
+### What a fallback to defaults may overwrite **[proposed]**
+
+A configuration file that is **missing** falls back to defaults silently. One that **exists but
+cannot be read** is kept and never overwritten: the application starts on defaults and says so
+once in the control surface, which also offers a reset.
+
+**Because** Live's configuration holds per-source normalisation, which is per-person calibration
+that is expensive to redo, and a silent overwrite would destroy it. The reset exists because a
+beginner will not find the per-user directory. The checks are in [ops.md](concerns/ops.md).
 
 ## On push **[proposed]**
 
@@ -98,6 +108,19 @@ Gate 3 is the one that carries the frame budget, and it runs without a GPU — s
 the build is additionally exercised on Windows and on a hosted macOS runner, which can say that
 it builds and that structural assertions pass and nothing more
 ([platform.md](requirements/platform.md) is explicit that no stronger macOS claim is founded).
+
+### What a release requires **[proposed]**
+
+A release is built by CI from a tag. The conditions it must meet are the entries under
+*Building and shipping* in [ops.md](concerns/ops.md), and are not restated here.
+
+| Platform | Packaging |
+|---|---|
+| Linux | A plain tarball and an AppImage. **Not a sandboxed format**: a sandbox breaks the absolute puppet paths a scene stores ([scene.md](scene.md)) and the per-user configuration location above |
+| Windows | A zip, with an installer only if one proves necessary |
+| macOS | A disk image, at its best-effort tier |
+
+Artifacts are published with checksums on the same public forge as the issue tracker.
 
 ## Test command **[proposed]**
 

@@ -94,7 +94,10 @@ in one sentence, where "one outbound connection, under these conditions, honouri
 preference" is neither.
 **Consequences:** users learn about releases from wherever the project publishes them, not from
 the application. Crash diagnosis depends on what users report by hand — which bites hardest on
-macOS, where nobody on the project has hardware to reproduce on.
+macOS, where nobody on the project has hardware to reproduce on. A bad or insecure release
+cannot be recalled from machines that already have it, and nothing tells a user that a fix
+exists, so a security fix reaches only those who go looking. This is a cost of the decision, and
+the decision stands.
 
 ## 2026-11-26 — The interface uses the project's strict vocabulary
 

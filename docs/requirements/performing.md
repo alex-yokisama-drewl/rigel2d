@@ -35,8 +35,8 @@ documentation, and none of it has been observed working
 | Linux | **No** | OBS's built-in PipeWire path is portal-based and declares the texture without an alpha channel, so transparency is discarded on arrival |
 
 **Linux is the odd one out, not the general case.** This matters because it rules out the
-tempting symmetry: writing one plugin of our own for all three platforms would *add* an install
-step on the two platforms that do not need one, in the name of consistency. Uniformity is not
+tempting symmetry: writing one plugin of our own for every platform would *add* an install step
+on the platforms the table above shows need none, in the name of consistency. Uniformity is not
 worth that.
 
 So the decision is narrower than it first appeared:
@@ -62,7 +62,7 @@ rather than assume.
 **Settled regardless:** output sits behind a narrow interface that can host more than one
 backend, because the candidates differ in maturity and any of them may fail.
 
-**A spike comes before design lock, and it covers all three platforms.** Alpha has not been
+**A spike comes before design lock, and it covers every platform.** Alpha has not been
 observed working end to end on *any* path — not Linux, not Windows Game Capture, not macOS
 Syphon. Every conclusion above is drawn from reading source code and documentation. The spike
 pushes a known half-transparent frame through each route into a real OBS and asserts on the
@@ -132,6 +132,11 @@ easier to understand on opening than two windows will be by default.
 
 What form any of this takes is Studio and Live interface design and is not settled here.
 
+**A constraint that design must satisfy, not a defect in the requirement:** the render surface
+cannot say what it is for. [I2](../invariants.md) admits nothing but puppet content, and
+[stack.md](../stack.md) makes it an undecorated window no toolkit owns. Its identity can only
+come from its OS window title and from the control surface describing it.
+
 ## How a streamer learns something broke **[open]**
 
 The render surface must stay clean and the control surface may be behind a full-screen game. So
@@ -144,10 +149,10 @@ OS notification, and a tray state. Undecided.
 A scene chooses what happens when a source stops sending, from a fixed set: **hold the last
 pose**, **ease to a neutral pose**, or **play an idle animation**. It is a scene setting because
 the right answer depends on the puppet and on what the streamer is doing — a rig with no
-authored idle cannot offer the third, and a streamer who steps away wants something different
-from one whose tracker glitched mid-sentence.
+authored idle cannot offer the idle animation, and a streamer who steps away wants something
+different from one whose tracker glitched mid-sentence.
 
-Constraints on all three:
+Constraints on every one of them:
 
 - **It never freezes mid-expression, jumps, or crashes.** Whichever behaviour is selected, the
   transition into it is continuous.
@@ -297,6 +302,24 @@ Consequences that follow:
 - **It must be unmistakable what saving does.** Inochi Session's equivalent is confusing — "save to file" does not make clear *what* is written or *where*, and a user can reasonably think they are saving a scene when they are modifying a puppet. The interface names the puppet being changed, and what in it changes, before it changes.
 - **Two mapping setups for one puppet is not supported**, and is expected to be rare. If it is wanted later, the answer is named mapping profiles in the puppet, or a plugin — not moving mappings back into the scene.
 
+### A puppet changed on disk since it was loaded **[proposed]**
+
+Live writes mappings into a puppet file while Studio may hold that same puppet open, so a save
+must not silently discard the other application's work. **There is no locking.** The file is the
+user's and a text editor can change it too, so a lock would be a promise the system cannot keep.
+
+A save compares a content hash against the one recorded at load or last save. Where the only
+difference is channel mappings, the mappings are re-read from disk and the rest is kept. That
+merge is tractable because mappings are a bounded part of the format and every reference is by
+stable identifier ([I3](../invariants.md)). Where a targeted merge is not possible, the user is
+warned and chooses to overwrite or cancel. Nothing is ever silently discarded. The checks are in
+[ops.md](../concerns/ops.md).
+
+**A second running instance is not a special case.** Nothing prevents one, for the same reason
+nothing locks the file: the rule above is written against *anything* having changed the file,
+including another copy of the same application, and a mechanism that recognised our own second
+instance would still not recognise the text editor. The hash comparison is the whole answer.
+
 ## What a scene is, and what it is not **[decided]**
 
 A scene holds a background, the puppets and images in it, and where each one sits. That is all,
@@ -344,6 +367,16 @@ is `[open]`.** What is settled is the shape: the scene still loads, the missing 
 and the control surface offers to locate it, skip it, or skip all like it. It cannot be a modal
 asked during load, for the reason in
 [Nothing stops the puppet rendering](#nothing-stops-the-puppet-rendering-decided) above.
+
+### A scene that crashes Live **[proposed]**
+
+A relaunch after a crash during a load restores the scene, **except** the item that was being
+loaded when the last launch died, which comes back **dormant** — the state this document already
+defines for an item that cannot be loaded. Recovering the rest of the setup is the point;
+retrying the item that killed it is how a loop starts on stream day.
+
+Once a crash has happened there is no stream left to save, so the goal is recovering the setup
+rather than continuity. The mechanism and its checks are in [ops.md](../concerns/ops.md).
 
 ## Editing a scene while streaming **[open]**
 
