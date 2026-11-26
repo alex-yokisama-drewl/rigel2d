@@ -49,9 +49,10 @@ incompatible.
 | **Part** | A node that draws a mesh with a texture. **References** a texture; never owns one |
 | **Texture** | An image, an entity in its own right. Many parts may reference one |
 | **Parameter** | A puppet's own named axis with keypoints. **Not** an input channel |
-| **Binding** | Maps a parameter to a node transform or to per-vertex offsets |
+| **Binding** | Maps a parameter to a node transform or to per-vertex offsets. Edited in Studio |
+| **Channel mapping** | Maps a channel to a parameter. Puppet data, edited in Live |
 | **Deformation** | Per-vertex mesh offsets. Not a transform, which moves a whole node |
-| **Scene** | The player's saved document: puppets, placement, sources, output |
+| **Scene** | Live's saved document: a background, which puppets and images, and where each sits. Deliberately thin |
 | **Source** | A feed of input over a port, supplying channels. A face tracker is one kind |
 | **Channel** | One named value from a source. Bound *to* a parameter |
 | **Rigel2D** | The project and toolkit as a whole, not either application |

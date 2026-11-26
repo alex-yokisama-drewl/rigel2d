@@ -88,6 +88,10 @@ Consequences that follow:
 - **One broken item never blocks a scene.** A missing puppet, a channel mapping that resolves to nothing, or an
   absent channel loads as a dormant entry, flagged in the control surface; the rest of the scene renders. A dormant
   entry survives the next save, because the user may yet restore what is missing.
+- **Recovery is offered, never demanded.** Pointing a dormant entry at a moved file happens in the control surface,
+  at the user's pace, while the scene renders. It is not a modal asked during load, and there is no "cancel the scene
+  load" — by the time anyone could answer, the scene is already up, which is the point. A stream does not wait for a
+  file dialog.
 
 ## The render surface carries nothing but the puppet, including when things fail **[decided]**
 
@@ -130,6 +134,25 @@ Constraints on all three:
 **A new scene defaults to easing to neutral.** It is unambiguous on stream, and it is the one
 behaviour every puppet can perform without carrying authored content for it.
 
+## The input protocol is ours, and the channel vocabulary with it **[decided]**
+
+Rigel2D defines the protocol and the set of channel names it carries. OpenSeeFace is **one
+source implementation behind it**, an adapter like any other, not the native protocol.
+
+**Because:** channel mappings live in the puppet (below). A puppet's mapping is therefore only
+worth storing if a channel name means the same thing whoever is sending it — otherwise handing
+someone a rigged puppet hands them a mapping that is dead weight against their tracker, and the
+main benefit of storing it disappears. A defined vocabulary is what makes a delivered puppet
+work on arrival.
+
+It also fits the extensibility story: anything that can open a socket can speak this protocol,
+and adapting a tracker that speaks something else is writing a small program, not loading code
+into ours.
+
+**The transport is a tech-design question, not a requirement.** One consequence is worth
+carrying into it: a transport a web page can reach needs origin checks, and one it cannot
+removes that concern entirely rather than mitigating it.
+
 ## A source can drive the puppet and nothing else **[decided]**
 
 The input port is the application's only network surface and it is treated as untrusted.
@@ -151,17 +174,79 @@ The input port is the application's only network surface and it is treated as un
   of a name. Channel names being an open vocabulary is the point of the design and also the way
   a flood exhausts memory, so the cap is what makes the openness safe.
 
+## Channel mappings are puppet data, and Live writes them **[decided]**
+
+The mapping from a channel to a parameter is stored **in the puppet**, not in the scene, and it
+is **edited in Live** rather than in Studio.
+
+**Why it is in the puppet:** mapping a tracker onto a rig is real work, done once. Storing it
+with the puppet means a delivered puppet moves and reacts for whoever receives it, which is the
+whole beginner story. Storing it in a scene would mean redoing it for every scene, and losing it
+when a puppet is handed on.
+
+**Why Live edits it:** mapping is tuned by watching yourself move, which only Live can show.
+Live receives the tracking data and renders the result, so it is the only place the feedback
+loop is closed.
+
+**Live does not need to understand the whole puppet format to do this.** It loads what it
+renders and what it maps, and carries everything else through untouched — the same rule that
+lets any build open a file carrying data it does not recognise
+([puppet.md](puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest)). The
+mechanism was built for format versions and extensions; Live writing mappings is the same
+problem and gets the same answer for free.
+
+Consequences that follow:
+
+- **Live writes puppet files, so [I7](../invariants.md#i7-a-failed-save-never-damages-the-previous-file) binds Live too.** Every write goes through the one atomic-write path. Live is not a read-only application and must not be built as though saving were Studio's problem.
+- **It must be unmistakable what saving does.** Inochi Session's equivalent is confusing — "save to file" does not make clear *what* is written or *where*, and a user can reasonably think they are saving a scene when they are modifying a puppet. The interface names the puppet being changed, and what in it changes, before it changes.
+- **Two mapping setups for one puppet is not supported**, and is expected to be rare. If it is wanted later, the answer is named mapping profiles in the puppet, or a plugin — not moving mappings back into the scene.
+
+## What a scene is, and what it is not **[decided]**
+
+A scene holds a background, the puppets and images in it, and where each one sits. That is all,
+deliberately.
+
+**Nothing about the machine is scene content.** The output device, window placement and the
+input port are application configuration. Two reasons: a scene stays portable, so the file being
+findable and shareable costs nothing; and *a scene never enables off-machine listening* becomes
+true by construction rather than by a check that could be forgotten.
+
+**Anything more elaborate than placement is a puppet.** An animated or interactive background is
+a puppet with its own rig, and the scene merely places it. This is a workaround in form and the
+right shape in substance: Live gets exactly one thing it knows how to render, and scene
+complexity has somewhere to go that is already specified and already validated.
+
+**Live accepts plain image files in a scene**, without the user having to make a puppet first.
+Whether an image is internally a one-part puppet or its own kind of scene item is a tech-design
+question and deliberately left there — it does not change what the user does.
+
+### Where scenes live **[decided]**
+
+Scenes are stored in a directory Live manages, and the user reaches them through Live's
+interface rather than through a file dialog. They are not documents in the sense a puppet is
+one: nobody is expected to curate a folder of them.
+
+The file is still findable, still a plain validated file, and can still be shared by hand. That
+is a property of being honest about storage, not an invitation — and a scene that arrives from
+elsewhere is untrusted input like any other file.
+
 ## A scene survives being interrupted **[proposed]**
 
 Scene changes are written as they happen, not only on exit, and written atomically — a crash or
 a kill mid-stream cannot corrupt a scene. After a crash, relaunching restores the scene and
 resumes with no setup.
 
-A scene refers to a puppet by a relative path together with the puppet's own identifier, and
-binds to parameters by identifier ([puppet.md](puppet.md#every-entity-has-a-stable-identity)),
-so that editing a puppet does not break the scene that uses it. What moves between machines and
-what does not — output device, window placement, absolute paths — are kept separate, and a
-missing output device falls back rather than failing the load.
+A scene refers to a puppet by an **absolute path together with the puppet's own identifier**
+([puppet.md](puppet.md#every-entity-has-a-stable-identity)), so that editing a puppet does not
+break the scene that uses it. Absolute rather than relative, because a scene lives in a
+directory Live manages while puppets live wherever the user keeps them, and a relative path
+between those two is long and snaps the moment anything is reorganised.
+
+The cost is that a moved or renamed puppet breaks the reference — the common case, far more
+than a scene moving between machines. **Recovery is how that is handled, and the exact mechanism
+is `[open]`.** What is settled is the shape: the scene still loads, the missing item is dormant,
+and the control surface offers to locate it, skip it, or skip all like it. See the next point
+for why that cannot be a dialog in the way it first sounds.
 
 ## Deferred **[open]**
 

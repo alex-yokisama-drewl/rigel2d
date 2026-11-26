@@ -80,6 +80,9 @@ sweep.
 
 ### Writing to disk
 
+<!-- Both applications write puppet files: Live writes channel mappings. These entries bind Live
+     as much as Studio. -->
+
 - **Every write to a puppet, scene or autosave path goes through one atomic-write function** — `judgment`
   → `script` once the function exists, failing on any write outside it. A paired test injects failure at each step and asserts the prior file is intact.
   Seeded at planning, 2026-11-26.

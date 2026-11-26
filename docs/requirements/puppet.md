@@ -16,7 +16,11 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
 - **bindings**, each mapping a parameter to something that changes — a node transform, or
   per-vertex offsets on a mesh — with values stored at keypoints and interpolated between;
 - **physics**, which drives parameters from simulated motion rather than from input;
-- **animations**, which drive parameters over time.
+- **animations**, which drive parameters over time;
+- **channel mappings**, each feeding one parameter from a named input channel. These are puppet
+  data although they are edited in Live rather than Studio, so that a delivered puppet reacts
+  for whoever receives it — see
+  [performing.md](performing.md#channel-mappings-are-puppet-data-and-live-writes-them).
 
 Inochi2d's model is the starting point and its vocabulary of pieces is largely right. This
 project departs from it deliberately in several places recorded below — textures as entities

@@ -45,12 +45,12 @@ NOT. The negative half is usually the useful half.
 | **Deformation** | Per-vertex offsets applied to a mesh | Not a transform, which moves a whole node |
 | **Animation** | Parameter values driven over time, on a timeline | |
 | **Physics** | Simulated motion that drives parameters, rather than input driving them | |
-| **Scene** | The player's saved document: which puppets, placed where, fed by which sources, output how | Not a puppet. A scene references puppets |
+| **Scene** | Live's saved document: a background, which puppets and images, and where each sits | Not a puppet, and deliberately thin. It holds placement, not behaviour — a scene references puppets, never contains one |
 | **Source** | A feed of input arriving over a port, supplying channels. A face tracker is one kind | Not a tracker specifically. Anything that can open a socket is a source |
 | **Channel** | One named value arriving from a source | Not a parameter. See above |
 | **Mask** | A part that restricts where another part draws | Not a composite, which groups children for blending |
 | **Chain deformer** | A sequence of linked joints deforming geometry along it, a permanent part of a rig. For hair, tails, ropes | Not a skeleton, and it does not generalise into one |
-| **Channel mapping** | A scene's assignment of a channel to a parameter | **Not a binding.** A binding belongs to a puppet and maps a parameter to geometry; a mapping belongs to a scene and feeds the parameter |
+| **Channel mapping** | A puppet's assignment of a channel to one of its parameters | **Not a binding.** Both belong to the puppet, and the pair is the whole chain: a mapping feeds a parameter from a channel, a binding takes that parameter to geometry. Studio edits bindings, Live edits mappings |
 | **Render surface** | The surface the player draws the puppet on, containing nothing else | Not the control surface |
 | **Control surface** | The player's interface. Never captured, never part of the output | Not the render surface |
 | **Frame time** | Wall clock from the start of a frame's CPU work to that frame's presentation | Not frame rate. Pacing is what matters, and an average hides it |

@@ -53,8 +53,26 @@ in force.*
 | Question | Why it matters |
 |---|---|
 | How does a streamer learn something broke, when the render surface must stay clean and the control surface may be behind a full-screen game? | A sound, an OS notification, a tray state. Without an answer, a live failure is silent |
-| Is OpenSeeFace's protocol our native protocol, or one source implementation behind a protocol of our own? | Decides whether the port is reachable from a web page, which decides whether it needs origin checks |
-| Can a scene be edited while live? Is there a locked state? | |
+| Can a scene be edited while streaming? Is there a locked state? | Thinner now that a scene is only placement, but not answered |
+| What exactly happens when a scene's puppet has moved or been renamed? | The shape is settled — dormant entry, relocate from the control surface, never a modal during load. The mechanism is `[open]` in `performing.md` |
+
+*Resolved 2026-11-26: the input protocol and its channel vocabulary are ours; OpenSeeFace is one
+source implementation behind it. Forced by mappings living in the puppet — a stored mapping is
+only worth storing if a channel name means the same thing whoever sends it. The transport is a
+tech-design question, carrying one consequence: a transport a web page can reach needs origin
+checks, and one it cannot removes the concern rather than mitigating it.*
+
+*Resolved 2026-11-26, the scene model. A scene is a background, the puppets and images in it,
+and where each sits — nothing about the machine, so it stays portable and cannot enable
+off-machine listening by construction. Anything more elaborate than placement is a puppet. Live
+accepts plain images. Scenes live in a directory Live manages. Channel mappings are puppet data,
+edited in Live, which therefore writes puppet files and is bound by I7. In
+`docs/requirements/performing.md` and `docs/vocabulary.md`, which this changes — mapping
+previously belonged to the scene.*
+
+*Deferred 2026-11-26: two mapping setups for one puppet. Expected to be rare; the answer if
+wanted is named mapping profiles in the puppet, or a plugin — never moving mappings back into
+the scene.*
 
 *Resolved 2026-11-26: what the puppet does when its source drops is a scene setting, choosing
 among hold, ease to neutral, and idle animation, defaulting to ease to neutral — in

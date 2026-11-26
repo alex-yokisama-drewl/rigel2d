@@ -102,6 +102,15 @@ every cycle. Each entry carries its provenance. See README.md.
   → `test`, covering each of the three scene-selected drop behaviours, the continuous transition into and out of each, and a scene naming an idle animation the puppet does not carry.
   Seeded at planning, 2026-11-26.
 
+### Saving, and what it changes
+
+- **Any save names what is being written and where, before it is written** — `judgment`
+  Specifically: Live editing a channel mapping is modifying a *puppet*, and must say so. Inochi Session's "save to file" is the generating case — a user can reasonably believe they are saving a scene while a puppet is being changed.
+  Seeded at planning, 2026-11-26.
+- **A dormant scene entry can be relocated from the control surface while the scene renders** — `judgment`
+  → `test`. Recovery is offered, never demanded: no modal during scene load, no path where a missing file stalls the render. Cross-reference the frame-counter entry above.
+  Seeded at planning, 2026-11-26.
+
 ### The interface itself
 
 - **Every operation is reachable and comfortable with mouse and keyboard alone** — `judgment`
