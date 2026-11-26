@@ -283,11 +283,9 @@ A puppet is one file. There is no separate editing project and no separate expor
 form. Any puppet, from anywhere, opens in the editor.
 
 **Because:** there is nothing a project file would hold that a puppet should not. Measurement of
-two real inochi2d rigs
-([2026-11-26-inochi-file-measurements.md](../research/2026-11-26-inochi-file-measurements.md))
-found the project and the export carrying byte-identical rig data but for a single key, with the
-export being the *larger* file for one of them. The separation costs a file to lose, a pair to
-keep in sync, and the "I exported but lost the project" failure, and buys nothing measurable.
+two real inochi2d rigs found the separation buying nothing — the figures are in
+[2026-11-26-inochi-file-measurements.md](../research/2026-11-26-inochi-file-measurements.md),
+and what it costs and which alternatives lost are in [decisions.md](../decisions.md).
 
 Consequences that follow and are settled with it:
 

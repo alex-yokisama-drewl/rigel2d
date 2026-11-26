@@ -15,7 +15,7 @@ colours a puppet may contain and degrades edges — a limitation about output pl
 the artwork, which is the wrong place for it. Inochi Session's transparency is a Windows-only
 plugin with no Linux equivalent, which makes this a gap rather than a preference.
 
-### Only Linux needs an OBS plugin **[open]**
+### Which platforms need an OBS plugin **[open]**
 
 **The choice among the options below is deferred to the spike, deliberately.** Alpha has not
 been observed working end to end on any candidate path, so picking one now would be picking on
@@ -24,7 +24,8 @@ trigger: it decides this, and nothing should be built that assumes an answer bef
 What is already settled, and does not wait for the spike, is that output sits behind a narrow
 interface that can host more than one backend.
 
-What each platform actually offers
+What each platform offers **on paper** — every row below is drawn from reading source and
+documentation, and none of it has been observed working
 ([2026-11-26-linux-alpha-output.md](../research/2026-11-26-linux-alpha-output.md)):
 
 | Platform | Plugin-free route to alpha | |
