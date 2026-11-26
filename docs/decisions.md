@@ -344,3 +344,30 @@ loop that the budget binds.
 **Consequences:** two windows to place, move and remember the geometry of, and a user who can
 lose one behind the other. Studio's viewport is a paint callback into the shared device rather
 than a window of its own, so the split costs nothing there.
+
+## 2026-11-26 — Normalisation belongs to the source, the response curve to the puppet
+
+**Decided:** A channel mapping stores a response curve, defined over the *normalised* channel.
+Normalisation — compensating for this person, this camera, this tracker — is held per source in
+Live's configuration and is never puppet data.
+**Because:** one word, "range", covers two transformations that vary with different things.
+Shaping varies with the puppet and is authored work a recipient wants delivered. Normalisation
+varies with whose face is in front of the camera, and a specified range does not close that gap
+— a real user's hardest squint reads 0.80 against a nominal maximum of 1, and natural head
+movement reaches about two-thirds of a nominal angular range
+(`research/2026-11-26-tracker-interchange.md`). Stored per puppet, that compensation encodes the
+rigger's face at the rigger's desk and is wrong for everyone else; stored per source, the
+recipient calibrates once and every puppet they are handed thereafter arrives correct.
+**Rejected:** one stored input range per mapping, carrying both. This is what VTube Studio does,
+it is the obvious design, and it is what a reader will reach for — and its users re-tuning a
+purchased model is the observable consequence. Also rejected: a channel name and a parameter
+with nothing else, which was this project's own position until today. It assumes a name pins the
+numbers as well as the meaning; widely used trackers disagree on sign, zero point, unit and
+range for a single quantity, and even where a vocabulary pinned a range, transports carrying it
+rescaled it under the same names.
+**Consequences:** the channel vocabulary has to pin unit, range, zero point, sign and semantic
+class per channel, not just a name — a much larger specification than "a list of channel names"
+implies, and it is now on the critical path rather than beside it. Live needs a calibration
+affordance it would not otherwise have had. A user moving machines recalibrates, which is
+correct and will still surprise someone. And the evaluation pass gains an order that has to be
+stated rather than assumed: finite check, normalise, curve, clamp.

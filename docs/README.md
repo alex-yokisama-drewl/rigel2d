@@ -63,6 +63,7 @@ plumbing additionally waits on the spike named in [stack.md](stack.md), which is
 | [research/](research/) | Dated findings, each against the decision it fed |
 | [research/2026-11-26-linux-alpha-output.md](research/2026-11-26-linux-alpha-output.md) | How does the player get transparent frames into OBS on Linux? |
 | [research/2026-11-26-stack.md](research/2026-11-26-stack.md) | What should it be built on — language, GPU abstraction, UI toolkit? |
+| [research/2026-11-26-tracker-interchange.md](research/2026-11-26-tracker-interchange.md) | Do different trackers send interchangeable data, and what must a mapping store? |
 | [research/2026-11-26-inochi-file-measurements.md](research/2026-11-26-inochi-file-measurements.md) | What is actually inside an inochi2d model file? |
 | [research/2026-11-26-deformation-models.md](research/2026-11-26-deformation-models.md) | How do other 2D systems model deformation, and is a skeleton needed? |
 | [research/2026-11-26-puppet-corpus.md](research/2026-11-26-puppet-corpus.md) | How large is a real 2D vtuber puppet, measured across a corpus? |

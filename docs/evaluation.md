@@ -28,10 +28,27 @@ surface, never into it ([I2](invariants.md)).
 
 ## 1. Input **[proposed]**
 
-Every arriving channel value is checked finite and clamped to the range of the parameter it
-feeds, **before stage 2 and therefore before any binding sees it**. A source cannot deform a
-puppet past its authored extremes and a NaN never reaches the renderer; this is where that is
-enforced, once, rather than defensively at each later stage.
+A channel value passes through four steps, in this order, and the order is the whole content of
+this stage:
+
+| | Step | |
+|---|---|---|
+| 1 | **Finite check** | Reject anything that is not a finite number, as it arrives |
+| 2 | **Normalisation** | The source's own calibration, from Live's configuration, onto the channel's specified range |
+| 3 | **Response curve** | The mapping's authored shaping, from the normalised channel onto the parameter's axis |
+| 4 | **Clamp** | To the parameter's range |
+
+**The first and last positions are the load-bearing ones.** The finite check is first because
+a NaN entering normalisation propagates through everything after it and arrives as geometry.
+The clamp is last because normalisation and the curve are both transformations that can leave
+the range — so clamping earlier would protect raw input and nothing else. Between them, a
+source cannot deform a puppet past its authored extremes however it is calibrated or shaped,
+and a NaN never reaches the renderer.
+
+All four happen **before stage 2 and therefore before any binding sees anything**, once, rather
+than defensively at each later stage. Steps 2 and 3 are defined in
+[performing.md](requirements/performing.md#normalisation-is-the-recipients-shaping-is-the-riggers-proposed);
+what belongs here is only that they sit in this order.
 
 Latest value wins. The queue never grows — a source sending faster than the frame rate has its
 intermediate values discarded, not buffered.

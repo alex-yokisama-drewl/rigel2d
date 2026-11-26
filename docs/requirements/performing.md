@@ -168,11 +168,25 @@ behaviour every puppet can perform without carrying authored content for it.
 Rigel2D defines the protocol and the set of channel names it carries. OpenSeeFace is **one
 source implementation behind it**, an adapter like any other, not the native protocol.
 
-**Because:** channel mappings live in the puppet (below). A puppet's mapping is therefore only
-worth storing if a channel name means the same thing whoever is sending it — otherwise handing
-someone a rigged puppet hands them a mapping that is dead weight against their tracker, and the
-main benefit of storing it disappears. A defined vocabulary is what makes a delivered puppet
-work on arrival.
+**Because:** channel mappings live in the puppet (below), so a mapping is only worth storing if
+a channel means the same thing whoever is sending it. **A name is not enough for that, and the
+vocabulary therefore pins more than names.** Per channel it fixes the unit, the numeric range,
+the zero point, the sign, and the channel's [semantic class](../vocabulary.md) — whether the
+number is an absolute measurement, a modelled activation, or a value already relative to the
+sender's own running baseline.
+
+Each of those is a thing widely used trackers disagree on today, for the same quantity, in ways
+that invert or rescale a rig rather than merely degrade it
+([2026-11-26-tracker-interchange.md](../research/2026-11-26-tracker-interchange.md)). Eye
+openness alone is emitted with three different zero points and two different signs across
+common sources, and one of them emits two mutually incompatible eye values itself. Pinning only
+the name is what VMC does, and it is why a VMC adapter cannot be a pass-through.
+
+**And pinning all of that is still not sufficient**, which is the part most easily assumed away.
+A specified range is not the range a person produces: a real user's hardest squint reads 0.80
+against a nominal maximum of 1, and natural head movement reaches about two-thirds of a nominal
+angular range. That residual gap is per person and per camera, not per tracker, and it is
+closed by normalisation rather than by specification — below.
 
 It also fits the extensibility story: anything that can open a socket can speak this protocol,
 and adapting a tracker that speaks something else is writing a small program, not loading code
@@ -197,13 +211,37 @@ else, an emote feed say, whose names do not collide in the first place.
 **A mapping names a channel, and may name a source.** The source half is optional and is the
 niche case; absent, the mapping takes the channel from whichever source supplies it.
 
-**Whether a name and a parameter are enough is `[open]`.** Everything above assumes a channel's
-name pins its *numbers* as well as its meaning — the same range, the same sensitivity, the same
-zero point — so that a mapping made against one tracker behaves on another. If that is false,
-a delivered mapping is dead weight on arrival and the mapping must carry a range or a
-normalisation, or the player must hold a per-machine calibration. That changes the format, so
-nothing should be built on the thin version until it is settled. Research is in flight; it will
-land in `docs/research/` and the answer belongs in this section.
+### Normalisation is the recipient's, shaping is the rigger's **[proposed]**
+
+One word — "range" — covers two transformations, and putting them in one place is what makes a
+delivered puppet need re-tuning. They are split here.
+
+| | Varies with | Lives in |
+|---|---|---|
+| **Normalisation** | The person, the camera, the tracker | The source, in Live's configuration |
+| **Response curve** | The puppet, and taste | The mapping, in the puppet |
+
+**Normalisation is per machine and belongs to the source**, because the variance it corrects is
+a person's face at a person's desk. Storing it per puppet would make the recipient redo it for
+every puppet they own — the same cost this document cites against putting mappings in a scene.
+Calibrated once, it applies to everything they are ever handed.
+
+**A response curve is authored work and travels with the puppet.** A rigger deciding this eye
+shuts fully at seven tenths of the axis, or that this parameter should read dramatically rather
+than faithfully, is expressing intent about *this rig*, and it is exactly what a recipient
+should not have to recreate.
+
+**The curve is defined over the normalised channel, never over raw values.** This is what makes
+it portable: its input is a calibrated axis rather than whatever the rigger's webcam happened
+to produce. Without the normalisation layer beneath it a stored curve would be as unportable as
+a stored raw range, and would be better not stored at all.
+
+**Calibration is offered, never required.** An uncalibrated source uses the channel's specified
+range and works; the puppet moves on first run. Nothing about calibration may block a source
+connecting, a scene loading, or a frame rendering — the rule in
+[Nothing stops the puppet rendering](#nothing-stops-the-puppet-rendering-decided) does not have
+an exception here. What calibration buys is the last of a person's range, and a beginner should
+reach it by being offered it rather than by being stopped until they do it.
 
 **Live shows which source each mapped channel is arriving from.** A collision is a thing the
 user should see rather than deduce: where two connected sources supply one name and the mapping
