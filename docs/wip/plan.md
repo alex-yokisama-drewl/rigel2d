@@ -2,7 +2,8 @@
 
 The current phase: which subsystems get built, in what order where order matters.
 
-**Status: proposed. Not yet agreed.** Nothing is built.
+**Status: agreed 2026-11-26.** Nothing is built. S0 is in flight; every other subsystem is
+not started.
 
 ## Where this phase ends, and why there
 
