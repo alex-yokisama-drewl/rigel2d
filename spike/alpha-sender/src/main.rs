@@ -16,6 +16,18 @@ pub fn report(label: &str, value: &str) {
     let _ = std::io::stderr().flush();
 }
 
+/// `--adapter <substring>` — pick a GPU by name, case-insensitive.
+///
+/// On a dual-GPU laptop, OBS's Game Capture hook shares a texture with the captured process, and
+/// cannot do so across two different GPUs. Which GPU each side runs on is therefore part of what
+/// decides whether capture works at all, and it has to be selectable to be testable.
+pub fn adapter_filter(args: &[String]) -> Option<String> {
+    args.iter()
+        .position(|a| a == "--adapter")
+        .and_then(|i| args.get(i + 1))
+        .map(|s| s.to_ascii_lowercase())
+}
+
 /// `--backend vulkan|dx12|gl|metal` — on Windows the default is DX12, whose swapchains cannot
 /// present premultiplied alpha on an ordinary window; Vulkan may offer it. Which backend carries
 /// alpha is part of what this spike is measuring, so it must be selectable.
@@ -112,6 +124,7 @@ fn main() {
     if args.iter().any(|a| a == "--window") {
         window::run(
             backend_from(&args),
+            adapter_filter(&args),
             straight,
             args.iter().any(|a| a == "--srgb"),
             args.iter().any(|a| a == "--solo"),
@@ -120,7 +133,7 @@ fn main() {
     }
 
     match out {
-        Some(path) => pollster::block_on(dump(&path, straight, backend_from(&args))),
+        Some(path) => pollster::block_on(dump(&path, straight, backend_from(&args), adapter_filter(&args))),
         None => {
             eprintln!(
                 "usage: alpha-sender (--dump <path.png> | --window) [--straight]\n\
@@ -189,7 +202,7 @@ pub fn build_pipeline(
     })
 }
 
-async fn dump(path: &str, straight: bool, backends: wgpu::Backends) {
+async fn dump(path: &str, straight: bool, backends: wgpu::Backends, want: Option<String>) {
     report("step", "creating instance");
     let instance = {
         let mut d = wgpu::InstanceDescriptor::new_without_display_handle();
@@ -207,6 +220,21 @@ async fn dump(path: &str, straight: bool, backends: wgpu::Backends) {
     }
 
     report("step", "requesting adapter");
+    if let Some(w) = &want {
+        let found = instance
+            .enumerate_adapters(backends)
+            .await
+            .into_iter()
+            .find(|a| a.get_info().name.to_ascii_lowercase().contains(w.as_str()));
+        match found {
+            Some(a) => {
+                let i = a.get_info();
+                report("using adapter", &format!("{} ({:?}, {:?}) [matched --adapter]", i.name, i.device_type, i.backend));
+                return dump_with(path, straight, a).await;
+            }
+            None => report("WARNING", &format!("no adapter matching {w:?}; falling back to the default")),
+        }
+    }
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions::default())
@@ -219,6 +247,12 @@ async fn dump(path: &str, straight: bool, backends: wgpu::Backends) {
         &format!("{} ({:?}, {:?})", info.name, info.device_type, info.backend),
     );
 
+    dump_with(path, straight, adapter).await
+}
+
+/// The rest of the offscreen render, once a GPU has been chosen. Split out so that `--adapter`
+/// can pick one explicitly and still take exactly the same path afterwards.
+async fn dump_with(path: &str, straight: bool, adapter: wgpu::Adapter) {
     report("step", "requesting device");
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor {

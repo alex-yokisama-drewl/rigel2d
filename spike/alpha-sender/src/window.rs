@@ -36,6 +36,7 @@ pub struct App {
     srgb: bool,
     solo: bool,
     chosen_format: Option<wgpu::TextureFormat>,
+    adapter_filter: Option<String>,
     instance: wgpu::Instance,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
@@ -46,12 +47,19 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(backends: wgpu::Backends, straight: bool, srgb: bool, solo: bool) -> Self {
+    pub fn new(
+        backends: wgpu::Backends,
+        adapter_filter: Option<String>,
+        straight: bool,
+        srgb: bool,
+        solo: bool,
+    ) -> Self {
         Self {
             straight,
             srgb,
             solo,
             chosen_format: None,
+            adapter_filter,
             instance: {
                 let mut d = wgpu::InstanceDescriptor::new_without_display_handle();
                 d.backends = backends;
@@ -154,13 +162,31 @@ impl ApplicationHandler for App {
             .instance
             .create_surface(test_win.clone())
             .expect("probe surface");
-        let adapter = pollster::block_on(self.instance.request_adapter(
-            &wgpu::RequestAdapterOptions {
-                compatible_surface: Some(&surface),
-                ..Default::default()
-            },
-        ))
-        .expect("no adapter");
+        // On a dual-GPU laptop the Game Capture hook shares a texture with the captured
+        // process and cannot do that across two GPUs, so which one this picks decides whether
+        // capture works at all.
+        let adapter = match &self.adapter_filter {
+            Some(w) => pollster::block_on(self.instance.enumerate_adapters(wgpu::Backends::all()))
+                .into_iter()
+                .find(|a| a.get_info().name.to_ascii_lowercase().contains(w.as_str()))
+                .unwrap_or_else(|| {
+                    report("WARNING", &format!("no adapter matching {w:?}; using the default"));
+                    pollster::block_on(self.instance.request_adapter(
+                        &wgpu::RequestAdapterOptions {
+                            compatible_surface: Some(&surface),
+                            ..Default::default()
+                        },
+                    ))
+                    .expect("no adapter")
+                }),
+            None => pollster::block_on(self.instance.request_adapter(
+                &wgpu::RequestAdapterOptions {
+                    compatible_surface: Some(&surface),
+                    ..Default::default()
+                },
+            ))
+            .expect("no adapter"),
+        };
 
         let caps = surface.get_capabilities(&adapter);
         let info = adapter.get_info();
@@ -348,9 +374,15 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn run(backends: wgpu::Backends, straight: bool, srgb: bool, solo: bool) {
+pub fn run(
+    backends: wgpu::Backends,
+    adapter_filter: Option<String>,
+    straight: bool,
+    srgb: bool,
+    solo: bool,
+) {
     let event_loop = EventLoop::new().expect("event loop");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let mut app = App::new(backends, straight, srgb, solo);
+    let mut app = App::new(backends, adapter_filter, straight, srgb, solo);
     event_loop.run_app(&mut app).expect("run");
 }

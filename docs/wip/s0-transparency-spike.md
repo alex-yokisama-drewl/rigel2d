@@ -18,7 +18,7 @@ settled, and a dated file lands in [research/](../research/).
 ## Status
 
 **Current task:** 6 — Windows, Game Capture
-**Blocked on:** task 6 — one remaining Windows step: Game Capture against the DX12 window.
+**Blocked on:** task 6 — Game Capture shows nothing on the owner's machine, including for real games. Trying a GPU-pairing fix.
 
 ---
 
@@ -331,6 +331,28 @@ hardware wgpu selects Vulkan by default, which is why the first run looked like 
 Neither offers `PreMultiplied` or `PostMultiplied`. This is the expected consequence of wgpu
 presenting through `CreateSwapChainForHwnd`, which is opaque-only on Windows; desktop
 transparency there needs DirectComposition or a layered window, and wgpu exposes neither.
+
+**Game Capture captured nothing — and not only from us.** The window appears in OBS's list and
+the source renders empty, with `Allow Transparency` making no difference. **The owner reports the
+same behaviour with real games on this machine**, so it predates anything here.
+
+The machine is an Optimus laptop carrying both GPUs, and the Game Capture hook shares a texture
+with the captured process, which it cannot do across two different GPUs. The sender ran on the
+Intel GPU; if OBS runs on the NVIDIA one, capture is empty. A `--adapter` switch now exists so
+each side can be put on the same GPU and the theory tested rather than argued.
+
+**This is decision-relevant even if the pairing fixes it.** `performing.md` picks Game Capture
+as the Windows route precisely because it needs no plugin. A route that fails silently — the
+window listed, the source blank, no error — on a common laptop class is a poor default for an
+audience of beginners, who have no way to tell a GPU-pairing problem from a broken application.
+It is a mark against the route and a point in favour of owning the Windows side too.
+
+**A second, unrelated symptom, recorded because it was offered and is worth not re-diagnosing.**
+OBS Window Capture on that machine returns a stale image of whatever sat behind the window, not
+updating. That is the legacy BitBlt capture method copying a screen region rather than reading
+the window; the fix is the *Windows 10 (1903 and up)* method. It cannot serve this spike —
+window capture reads the composited desktop, where the alpha is already gone — but it is why
+window capture is not an alternative route here.
 
 **The distinction that keeps this from being fatal.** Two different things were being conflated:
 
