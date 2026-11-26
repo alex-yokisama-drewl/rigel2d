@@ -27,7 +27,7 @@ waiting on a signal or on nothing at all.
 
 | Question | Lives in |
 |---|---|
-| Which platforms need an OBS plugin | `requirements/performing.md`. Deferred to the spike deliberately; the spike is the trigger |
+| **Transparent output, and which platforms need an OBS plugin** | `requirements/performing.md` and `stack.md`. **The largest open item.** Transparency has not been observed working on any platform, and it now gates both the OBS delivery path and the stack's windowing assumption — one spike settles both, and it should come early |
 | How a dormant scene entry is relocated in practice | `requirements/performing.md`. Shape settled, mechanism open |
 | Composition modes for deformations | `requirements/puppet.md`. Waits on evidence about which are wanted |
 | Randomness, and first run | `requirements/authoring.md` |
