@@ -59,3 +59,63 @@ and "it is usable" diverge most, and the one a developer in flow is least likely
 Generated at planning by concern-analyst, approved by the user, grown by harvest at the end of
 every cycle. Each entry carries its provenance. See README.md.
 -->
+
+### Nothing is lost
+
+- **Every mutating operation in Studio is undoable, and undo then redo restores the puppet exactly** — `judgment`
+  → `test`. Requires operations to be enumerable, which is a design constraint worth stating out loud — and the same shape a plugin API would eventually drive.
+  Seeded at planning, 2026-11-26.
+- **Unsaved changes are never lost silently** — `judgment`
+  → `test`, covering close, open-another, and a simulated crash.
+  Seeded at planning, 2026-11-26.
+- **A failed import leaves the puppet unchanged and says why** — `judgment`
+  → `test` over fixtures: truncated PSD, zero layers, corrupt layer, unsupported blend mode, oversized canvas, non-image file. Assert file, cause and next action, and an unchanged serialisation.
+  Seeded at planning, 2026-11-26.
+
+### Telling the user what happened
+
+- **Every user-visible error is in one catalogue with what, why and next action, all non-empty** — `judgment`
+  → `test`. The catalogue is also where the strict-vocabulary lint looks, and where English-only means text lives.
+  Seeded at planning, 2026-11-26.
+- **A batch merge reports a per-item outcome** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+- **Any operation over 100 ms shows progress within 100 ms and cancels without effect** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+- **Opening a file carrying unrecognised data warns, names what is missing, and still allows editing** — `judgment`
+  → `test`. The warning must not imply an install route while plugins do not exist. See `docs/requirements/puppet.md`.
+  Seeded at planning, 2026-11-26.
+
+### Live never stops rendering
+
+- **No dialog or error state stops the frame counter advancing** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+- **The render surface's structure contains nothing but the render target, in every error state** — `judgment`
+  → `test`. Candidate invariant.
+  Seeded at planning, 2026-11-26.
+- **One broken scene item never blocks the rest** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+- **A source going silent and returning is handled without a restart** — `judgment`
+  → `test`, covering each of the three scene-selected drop behaviours, the continuous transition into and out of each, and a scene naming an idle animation the puppet does not carry.
+  Seeded at planning, 2026-11-26.
+
+### The interface itself
+
+- **Every operation is reachable and comfortable with mouse and keyboard alone** — `judgment`
+  No operation depends on pressure, tilt, hover or precision a mouse cannot comfortably produce. Cross-reference `accessibility.md` once that dimension is swept — keyboard-only is a stronger claim than this one and is not yet made.
+  Seeded at planning, 2026-11-26.
+- **Viewport handles are not covered by chrome at the minimum window size** — `judgment`
+  → `test`: bounding-box intersection between every handle and every panel and floating element, including handles at the viewport edge. This is the generating case from `README.md`.
+  Seeded at planning, 2026-11-26.
+- **The longest plausible node, parameter and channel names do not overflow the tree or binding lists** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+- **The active mode and the current edit target are exposed as inspectable state** — `judgment`
+  → `test`: switching mode, parameter or keypoint changes it. This is what makes the editing-between-keypoints trap testable rather than a matter of someone noticing.
+  Seeded at planning, 2026-11-26.
+- **A first-time user reaches a moving puppet from a PSD without outside help** — `judgment`
+  Human gate on the first end-to-end build. Stays `judgment` permanently. Watch for every point where the tester stops, searches or asks; each becomes an entry.
+  Seeded at planning, 2026-11-26.

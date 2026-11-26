@@ -57,3 +57,51 @@ silent until it is catastrophic, which is why the entries lean toward `test` ove
 Generated at planning, approved by the user, grown by harvest. See README.md.
 Record the threat model, the roles, and anything exempt here on the first planning sweep.
 -->
+
+### Untrusted input
+
+- **Every parser of untrusted input survives hostile input** — `judgment`
+  → `test` once parsers exist: a time-boxed fuzz run in CI over the puppet, scene, PSD, image and port-message parsers. No crash, no hang, bounded memory.
+  Seeded at planning, 2026-11-26.
+- **A committed set of hostile fixtures is rejected cleanly** — `judgment`
+  → `test`. Truncated, cyclic, duplicate identifiers, out-of-range index, NaN, oversized dimensions, decompression bomb, traversal-style entry names, unknown sections.
+  Seeded at planning, 2026-11-26.
+- **Load limits are defined in one place and each is exercised by a fixture just over it** — `judgment`
+  → `test`, where a limit with no fixture fails the check.
+  Seeded at planning, 2026-11-26.
+- **A failed load leaves the displayed puppet unchanged** — `judgment`
+  → `test`: load a hostile fixture while a good puppet renders, and assert the rendered buffer is unchanged. Candidate invariant.
+  Seeded at planning, 2026-11-26.
+
+### The input port
+
+- **The port binds to loopback, and loading a scene never changes that** — `judgment`
+  → `test`. Off-machine listening is deferred, not rejected; when it arrives it is an explicit in-app opt-in and still never enabled from a file.
+  Seeded at planning, 2026-11-26.
+- **A source can set channel values and trigger animations, and nothing else** — `judgment`
+  → `test`: malformed, oversized and many-channel messages leave scene state, loaded puppets and output configuration unchanged, within the memory cap.
+  Seeded at planning, 2026-11-26.
+- **Channel values are finite and clamped before binding** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+
+### What the applications may not do
+
+- **Nothing supplied by a puppet, scene or source is ever executed** — `judgment`
+  Review and a lint over the parsing paths; no field is evaluated as a script, a command or a format string, and no path or URL inside a file is resolved outside its container. **A plugin is not covered by this** — a plugin never arrives inside a file, which is what keeps the rule true. Candidate invariant.
+  Seeded at planning, 2026-11-26.
+- **Live requests no screen-capture or window-capture capability** — `judgment`
+  → `script` scanning platform manifests and entitlements, failing on any. **Revisit before plugins ship**: the scan covers our own manifests, and a plugin is not our code.
+  Seeded at planning, 2026-11-26.
+- **No outbound network connection is opened** — `judgment`
+  → `script`. Same caveat as above: the assertion covers our code, so its scope needs restating before plugins ship. See `docs/decisions.md`.
+  Seeded at planning, 2026-11-26.
+
+### Supply chain
+
+- **Dependencies are locked with hashes, CI actions pinned to commit hashes, scan clean or triaged** — `judgment`
+  → `script` once there is a dependency manifest.
+  Seeded at planning, 2026-11-26.
+- **Signing keys and release tokens are unreachable from pull-request jobs** — `judgment`
+  → `script` once releases exist.
+  Seeded at planning, 2026-11-26.

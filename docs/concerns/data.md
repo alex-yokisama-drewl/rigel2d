@@ -59,3 +59,42 @@ Generated at planning, approved by the user, grown by harvest. See README.md.
 Record retention rules, the deletion policy, and the scale numbers here on the first planning
 sweep.
 -->
+
+### The format and what it promises
+
+- **Every entity has a stable identifier, and every reference is by identifier** — `judgment`
+  → `test` once a fixture puppet and a loader exist: rename and reorder it, save, reload, assert every reference still resolves. The validator rejects name-based and index-based references.
+  Seeded at planning, 2026-11-26.
+- **One shared validator gates load and save, and runs as a standalone command** — `judgment`
+  → `test` once the validator exists. Hostile fixtures — cycle, dangling reference, duplicate identifier, NaN, unordered keypoints, binding count mismatch — are all rejected, and save refuses to write an invalid puppet.
+  Seeded at planning, 2026-11-26.
+- **Unmarked data the core format does not define is rejected; marked extension data round-trips untouched** — `judgment`
+  → `test` once extension data is implemented. This is what makes preservation and validation coexist: without the marker a typo and an extension are indistinguishable. See `docs/requirements/puppet.md`.
+  Seeded at planning, 2026-11-26.
+- **Unknown fields and entities survive a load-then-save round trip** — `judgment`
+  → `test`. Covers both the newer-format case and marked extension data from a writer this build does not know.
+  Seeded at planning, 2026-11-26.
+- **Every released format version has a committed fixture the current build loads; fixtures are append-only** — `judgment`
+  → `script` once there is a released version. Note the compatibility promise does not harden until the project is shared with a community.
+  Seeded at planning, 2026-11-26.
+
+### Writing to disk
+
+- **Every write to a puppet, scene or autosave path goes through one atomic-write function** — `judgment`
+  → `script` once the function exists, failing on any write outside it. A paired test injects failure at each step and asserts the prior file is intact.
+  Seeded at planning, 2026-11-26.
+- **Saving an unmodified puppet is byte-identical, with no timestamps, paths or machine names** — `judgment`
+  → `test`. Preserved extension data takes part in canonical serialisation, or carrying it makes files churn.
+  Seeded at planning, 2026-11-26.
+
+### Editing without losing work
+
+- **Adding artwork preserves configuration** — `judgment`
+  → `test`: add images, a PSD and a merged puppet to a configured fixture, then assert every pre-existing identifier, binding, keypoint value and deformation is unchanged. Extend to the changed-dimensions and regenerated-mesh cases once those are decided.
+  Seeded at planning, 2026-11-26.
+- **A random sequence of edits followed by undo-all returns a serialisation equal to the original** — `judgment`
+  → `test`, as a property test over the operation set, including compound operations and import.
+  Seeded at planning, 2026-11-26.
+- **A file written by an independent generator, using no project code, validates and loads** — `judgment`
+  → `test`. The reference puppet generator satisfies this; it is the machine-checkable form of "third parties can write the format".
+  Seeded at planning, 2026-11-26.

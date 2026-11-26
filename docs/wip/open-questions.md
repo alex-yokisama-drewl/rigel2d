@@ -3,10 +3,8 @@
 What requirements work is waiting on. Deleted when the requirements are agreed and the phase
 plan is written; nothing here is permanent.
 
-Two halves: **questions for the user**, and **checklist entries proposed by the concern sweep
-and awaiting approval**. The second half must not be copied into `docs/concerns/` until
-approved — an agent-generated list nobody agreed to is a list nobody believes
-(`docs/concerns/README.md`).
+What remains is **questions for the user** and **the proposed invariants**. The concern
+checklist entries that used to sit here have been approved and moved into `docs/concerns/`.
 
 ---
 
@@ -139,114 +137,15 @@ settles the requirement behind it at the same time, which is a larger step than 
 
 ---
 
-# Proposed concern checklist entries, awaiting approval
+# Concern checklist entries — approved and moved
 
-From the planning sweep of 2026-11-26. Triaged down from what the analysts returned; the ones
-dropped were either duplicates across dimensions or gated on questions above.
+*Approved 2026-11-26 and written into `docs/concerns/` under each dimension's *This project*
+section, every entry tagged `judgment` with the check that would promote it named inline.*
 
-Provenance for every entry below is "seeded at planning, 2026-11-26".
-
-**A note on tags.** `docs/concerns/README.md` says an entry tagged `script` or `test` whose
-check does not exist is worse than no entry. Nothing is built, so *every* entry here would be
-`judgment` on the day it is added. The tag shown is the intended end state, and each names what
-promotes it. Deciding how to handle that gap — add them as `judgment` now, or hold them until
-their phase — is itself a question for the user.
-
-## data
-
-- **Every entity has a stable identifier, and every reference is by identifier** — `test`
-  Rename and reorder a fixture puppet, save, reload, assert every reference still resolves. The
-  validator rejects name-based and index-based references.
-- **One shared validator gates load and save, and runs as a standalone command** — `test`
-  Hostile fixtures — cycle, dangling reference, duplicate identifier, NaN, unordered keypoints,
-  binding count mismatch — are all rejected. Save refuses to write an invalid puppet.
-- **Every write to a puppet, scene or autosave path goes through one atomic-write function** — `script`
-  Fails on any write outside it. A paired test injects failure at each step and asserts the
-  prior file is intact.
-- **Saving an unmodified puppet is byte-identical, with no timestamps, paths or machine names** — `test`
-- **Unknown fields and entities survive a load-then-save round trip** — `test`
-- **Every released format version has a committed fixture the current build loads; fixtures are append-only** — `script`
-- **Adding artwork preserves configuration** — `test`
-  Add images, a PSD and a merged puppet to a configured fixture. Assert every pre-existing
-  identifier, binding, keypoint value and deformation is unchanged. Includes the
-  changed-dimensions and regenerated-mesh cases once those are decided.
-- **A random sequence of edits followed by undo-all returns a serialisation equal to the original** — `test`
-  Property test over the operation set, including compound operations and import.
-- **A file written by an independent generator, using no project code, validates and loads** — `test`
-  The reference puppet generator satisfies this. It is the machine-checkable form of "third
-  parties can write it".
-
-## security
-
-- **Every parser of untrusted input survives hostile input** — `test`
-  Time-boxed fuzz run in CI over puppet, scene, PSD, image and port-message parsers. No crash,
-  no hang, bounded memory.
-- **A committed set of hostile fixtures is rejected cleanly** — `test`
-  Truncated, cyclic, duplicate identifiers, out-of-range index, NaN, oversized dimensions,
-  decompression bomb, traversal-style entry names, unknown sections.
-- **Load limits are defined in one place and each is exercised by a fixture just over it** — `test`
-  A limit with no fixture fails the check.
-- **A failed load leaves the displayed puppet unchanged** — `test`
-  Load a hostile fixture while a good puppet renders; assert the rendered buffer is unchanged.
-- **The input port binds to loopback by default, and loading a scene never changes that** — `test`
-- **A source can set channel values and trigger animations, and nothing else** — `test`
-  Malformed, oversized and many-channel messages leave scene state, loaded puppets and output
-  configuration unchanged, within the memory cap.
-- **Channel values are finite and clamped before binding** — `test`
-- **The player requests no screen-capture or window-capture capability** — `script`
-  Scan platform manifests and entitlements; fail on any.
-- **Dependencies are locked with hashes, CI actions pinned to commit hashes, scan clean or triaged** — `script`
-- **Signing keys and release tokens are unreachable from pull-request jobs** — `script`
-
-## performance
-
-- **Every per-frame counter has a committed baseline ceiling** — `script`
-  Promoted once the runtime exposes headless counters. Fails on any counter above baseline
-  unless the baseline changes in the same commit with a reason.
-- **Per-frame counters scale no worse than linearly from the reference puppet to the stress puppet** — `test`
-  Catches accidental quadratic behaviour in deformation composition and physics.
-- **Nothing in the frame loop resolves by name or scans linearly** — `test`
-  The name-resolution counter is zero; animation lookup is independent of animation length.
-- **Parts sharing one texture leave resident texture bytes and upload count unchanged** — `test`
-  Asserts the `[decided]` texture-reuse requirement in `puppet.md`.
-- **No first-use work after the first presented frame** — `test`
-  Resource creations and pipeline preparation after frame one are zero, for every blend, mask
-  and composite combination the puppet uses.
-- **Startup and load budgets hold with every derived cache empty** — `test`
-- **The input path is latest-wins and bounded, and its latency in frames is asserted** — `test`
-  Injected clock. Includes a flood case and a many-distinct-channel-names case.
-- **Edit cost, undo step size and bytes written per save are independent of total puppet size** — `test`
-- **Import peak memory is independent of PSD layer count** — `test`
-- **A soak run at the stated stream length leaves counters and resident bytes flat** — `test`
-
-## ux
-
-- **Every mutating editor operation is undoable, and undo then redo restores the puppet exactly** — `test`
-  Requires operations to be enumerable, which is a design constraint worth stating out loud.
-- **A failed import leaves the puppet unchanged and says why** — `test`
-  Fixtures: truncated PSD, zero layers, corrupt layer, unsupported blend mode, oversized canvas,
-  non-image file. Assert file, cause and next action, and an unchanged serialisation.
-- **A batch merge reports a per-item outcome** — `test`
-- **Any operation over 100 ms shows progress within 100 ms and cancels without effect** — `test`
-- **Every user-visible error is in one catalogue with what, why and next action, all non-empty** — `test`
-- **No dialog or error state stops the player's frame counter advancing** — `test`
-- **A source going silent and returning is handled without a restart** — `test`
-  Covers each of the three scene-selected drop behaviours, the continuous transition into and
-  out of each, and the case where a scene names an idle animation the puppet does not carry.
-- **The render surface's structure contains nothing but the render target, in every error state** — `test`
-- **One broken scene item never blocks the rest** — `test`
-- **Unsaved changes are never lost silently** — `test`
-  Close, open-another, and simulated crash.
-- **The active mode and the current edit target are exposed as inspectable state** — `test`
-  Switching mode, parameter or keypoint changes it. This is what makes the
-  editing-between-keypoints trap testable rather than a matter of someone noticing.
-- **Viewport handles are not covered by chrome at the minimum window size** — `test`
-  Bounding-box intersection between every handle and every panel and floating element, including
-  handles at the viewport edge. This is the generating case from `docs/concerns/README.md`.
-- **The longest plausible node, parameter and channel names do not overflow the tree or binding lists** — `test`
-- **A first-time user reaches a moving puppet from a PSD without outside help** — `judgment`
-  Human gate on the first end-to-end build. Watch for every point where the tester stops,
-  searches or asks; each becomes an entry.
+**Why they are all `judgment` today:** `docs/concerns/README.md` says an entry tagged `script` or
+`test` whose check does not exist is worse than no entry, because it reads as covered. Nothing is
+built, so nothing can be tagged otherwise yet. Each entry names its intended end state and what
+has to exist first; promoting them is work for the phase that builds the thing.
 
 ## Dimensions not yet swept
 

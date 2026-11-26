@@ -47,3 +47,42 @@ Generated at planning, approved by the user, grown by harvest. See README.md.
 Record the realistic scale numbers and the budgets here on the first planning sweep — the
 Universal entries reference them.
 -->
+
+### The frame loop
+
+- **Every per-frame counter has a committed baseline ceiling** — `judgment`
+  → `script` once the runtime exposes headless counters, failing on any counter above baseline unless the baseline changes in the same commit with a reason.
+  Seeded at planning, 2026-11-26.
+- **Per-frame counters scale no worse than linearly from the reference puppet to the stress puppet** — `judgment`
+  → `test`. Catches accidental quadratic behaviour in deformation composition and physics.
+  Seeded at planning, 2026-11-26.
+- **Nothing in the frame loop resolves by name or scans linearly** — `judgment`
+  → `test`: the name-resolution counter is zero, and animation lookup is independent of animation length.
+  Seeded at planning, 2026-11-26.
+- **No first-use work after the first presented frame** — `judgment`
+  → `test`: resource creations and pipeline preparation after frame one are zero, for every blend, mask and composite combination the puppet uses.
+  Seeded at planning, 2026-11-26.
+- **A soak run at the stated stream length leaves counters and resident bytes flat** — `judgment`
+  → `test`. The stream length is still `[open]` in `docs/requirements/platform.md`.
+  Seeded at planning, 2026-11-26.
+
+### Memory and loading
+
+- **Parts sharing one texture leave resident texture bytes and upload count unchanged** — `judgment`
+  → `test`. Asserts the `[decided]` texture-reuse requirement in `puppet.md`.
+  Seeded at planning, 2026-11-26.
+- **Startup and load budgets hold with every derived cache empty** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+- **Import peak memory is independent of PSD layer count** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
+
+### Input and editing
+
+- **The input path is latest-wins and bounded, and its latency in frames is asserted** — `judgment`
+  → `test` with an injected clock, including a flood case and a many-distinct-channel-names case.
+  Seeded at planning, 2026-11-26.
+- **Edit cost, undo step size and bytes written per save are independent of total puppet size** — `judgment`
+  → `test`.
+  Seeded at planning, 2026-11-26.
