@@ -17,8 +17,8 @@ settled, and a dated file lands in [research/](../research/).
 
 ## Status
 
-**Current task:** 4 — **partial, awaiting a decision from the owner on how far to take it**
-**Blocked on:** whether to build a representative producer for route B, or decide on what is already known. See task 4.
+**Current task:** 5 — costing our own Linux-first plugin
+**Blocked on:** nothing
 
 ---
 
@@ -219,44 +219,43 @@ Vulkan layer JSON installs into `~/.local/share/vulkan/implicit_layer.d`, which 
 searches by default. One undeclared build dependency: SIMDe, which `obs-studio` does not pull in
 and which libobs's own CMake config requires.
 
-### 4. Linux route B: PipeWire dmabuf + `obs-pwvideo` — `partial`
+### 4. Linux route B: PipeWire dmabuf + `obs-pwvideo` — `done`
 
-**Alpha is still unmeasured on this route.** What was established is below, and some of it is
-decision-relevant on its own.
+**Answered, though not the way the task expected: the route cannot be assembled on the target
+platform today.** Alpha was never measured because the sending half does not build.
 
-**Confirmed by reading the shipped source**, which the research could only infer: `formats.c`
-maps `BGRA` to `GS_BGRA` and `RGBA` to `GS_RGBA` — **alpha-bearing**, where built-in OBS passes
-`GS_BGRX` at the same call and discards alpha. That structural advantage is real. It also accepts
-both `SPA_DATA_MemPtr` and `SPA_DATA_DmaBuf`.
+**The receiver is sound.** `obs-pwvideo` builds and installs per-user with no root, and
+`formats.c` maps `BGRA` to `GS_BGRA` and `RGBA` to `GS_RGBA` — **alpha-bearing**, where built-in
+OBS passes `GS_BGRX` at the same call and discards alpha. The research could only infer that;
+it is now read from the shipped source. It accepts both `SPA_DATA_MemPtr` and `SPA_DATA_DmaBuf`.
 
-**Two integration costs the research's comparison table does not show.**
+**The sender does not build on Ubuntu 24.04 LTS.** libfunnel needs `pw_stream_is_lazy`,
+`PW_KEY_NODE_SUPPORTS_LAZY` and `SPA_META_SyncTimeline`, and **all three are absent from the
+PipeWire 1.0.5 headers the LTS ships**. Its `meson.build` declares no minimum version, so the
+failure arrives as a wall of compile errors rather than a readable message. Going back before the
+sync-timeline commit does not help — the previous commit fails on the lazy-scheduling API
+instead, which is why the attempt stopped there rather than bisecting further into an untagged
+history of a library whose own README calls the API unstable.
 
-- **The producer must declare three properties**, or the plugin will not list it at all:
-  `media.type=Video`, `media.class=Stream/Output/Video`, and `media.role` unset or `Production`.
-  A node published as `Video/Source` — the obvious choice, and what GStreamer's `pipewiresink`
-  does by default — is filtered out silently.
-- **Nothing links the producer to it.** The plugin found the target, the stream reached `paused`,
-  and no session manager ever created the link; frames flowed only after a manual `pw-link`.
-  Then format and size negotiated correctly, confirmed by OBS rendering at exactly 768×256. For
-  the player this means owning the link, or shipping WirePlumber rules — a setup cost that lands
-  on the beginner, and it is not in the research's *Beginner setup* row.
+**Two further costs, found before the build wall.**
 
-**Where it stopped.** With the link made by hand, every probe read `0,0,0,0`: the geometry
-arrived, the pixels did not. The producer was GStreamer's `pipewiresink` in `mode=provide`,
-which is an unusual configuration and is **not** the producer this route is designed around —
-libfunnel is. Four variants were tried (wrong media class; correct class without `mode=provide`,
-which fails with *no target node available*; `mode=provide` unlinked; `mode=provide` linked by
-hand). The two-failures rule applies, so no fifth was attempted.
+- **The producer must declare `media.type=Video`, `media.class=Stream/Output/Video` and
+  `media.role` unset or `Production`**, or the plugin never lists it. A node published as
+  `Video/Source` — GStreamer's default — is filtered out silently.
+- **Nothing links producer to consumer.** The plugin found the target and the stream reached
+  `paused`; frames flowed only after a manual `pw-link`, after which format and size negotiated
+  correctly at 768×256. libfunnel's own README corroborates this, describing "hacky pw-cli
+  shenanigans" for redirecting streams.
 
-**What a real answer needs:** libfunnel plus a small client, or a purpose-built `libpipewire`
-producer. Either is a half-day, and either would also settle whether the dmabuf import path
-behaves as the `MemPtr` path does.
+**The verdict that matters.** The research named this route technical-fit primary and
+`obs-vkcapture` the fallback. On measured evidence that is backwards: vkcapture works end to end
+today with alpha bit-exact, while this route needs a PipeWire newer than the LTS ships, manual
+graph linking, and undocumented producer properties — against a maintenance note saying the
+author no longer invests beyond their own use cases.
 
-**Weighed against the route's maturity.** Its own maintenance note says the author no longer
-plans to invest beyond their own use cases, and the last functional release predates that note.
-Combined with the manual-linking finding, route B now looks materially weaker in practice than
-the research's recommendation of it as technical-fit primary — which is a finding in itself, and
-the owner should weigh it before more is spent here.
+**What remains genuinely unknown** is whether alpha survives `obs-pwvideo`'s dmabuf import in
+practice. The format table says it should. Settling it needs either a newer PipeWire or a
+purpose-built producer, and neither is worth doing before the owner has chosen a route.
 
 ### 5. Our own Linux-first plugin: shape and cost — `todo`
 
@@ -372,5 +371,6 @@ invalid rather than as a transparency failure.
 **Assumptions:**
 
 **Deferred:**
-Route B's alpha measurement, pending the owner's decision on building a representative producer.
-Everything else about the route is recorded in task 4.
+Route B's alpha measurement. The sending half does not build on the target platform, so measuring
+it would require a newer PipeWire or a purpose-built producer — not worth doing before a route is
+chosen. Everything else about the route is settled in task 4.
