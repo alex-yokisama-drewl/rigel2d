@@ -76,6 +76,18 @@ resolves; plus the validator rejecting name-based and index-based references.
 indices once at load is required, because nothing in the frame loop may resolve by name
 (`docs/concerns/performance.md`). This invariant is about what is written to disk.
 
+**What it binds is references to things the file contains.** Two stored references point outward
+instead, and neither is an exception to the rule so much as outside what the rule is about.
+Both are deliberate and both are specified elsewhere:
+
+| Reference | Why a name or a path, and where it is settled |
+|---|---|
+| A channel mapping names a **channel** | A channel is supplied by a source the puppet has never met, on a machine the rigger has never seen. A shared name is the only thing the two ends can agree on in advance, which is why the channel vocabulary is Rigel2D's own — `docs/format.md`, `docs/requirements/performing.md` |
+| A scene item names a **puppet file** by absolute path, *and* by that puppet's identifier | The path finds the file; the identifier is the reference and is what survives the puppet being edited. The path is a locator, not a reference — `docs/scene.md` |
+
+A reference to a node, texture, parameter, binding, keypoint or animation has no such excuse and
+is covered without exception.
+
 ## I4. A load that fails never replaces what is already displayed
 
 **Why:** Live is on a stream. Replacing a good puppet with a partial one, a placeholder or an

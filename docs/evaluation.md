@@ -58,6 +58,12 @@ Physics reads the previous frame's accumulated transforms, which is what makes h
 head turn. That is the one backward read in the pass, it is a frame old deliberately, and it is
 why the pass does not loop.
 
+**The pattern this forces, named because it is what riggers will reach for.** Inertia on a
+tracked value — a head turn that overshoots and settles — is not physics modulating the tracked
+parameter, because that would be two drivers on one parameter. It is physics reading the
+tracked parameter and driving a *second* one, with bindings combining the two. The extra
+parameter is the cost of every parameter's value having exactly one origin.
+
 ## 3. Binding evaluation **[proposed]**
 
 A binding stores values at its parameter's keypoints. Evaluating it means finding the keypoints
@@ -79,6 +85,13 @@ is order-dependent, so two bindings rotating one node would give a different res
 which was applied first, and the rigger's feedback loop — adjust, look, adjust again — would be
 sitting on top of something they cannot see or predict. This is the one most likely to be
 "fixed" by someone who knows graphics; [decisions.md](decisions.md) says why it is deliberate.
+
+**What would reopen this.** Componentwise summation and matrix composition agree for small
+angles and diverge as rotations grow. The signal is therefore concrete rather than a matter of
+taste: a rigger composing large rotations on one node — a limb, not a head tilt — and finding
+the result visibly wrong in a way matrix composition would have got right. That is evidence, and
+it should reopen the choice rather than be worked around. Nothing in the format depends on the
+answer, so the cost of changing it is the runtime and the rigs already authored, not the files.
 
 **The honest observation worth recording:** summation is commutative, so the evaluation order
 this document specifies does not currently change any result. That is not a reason to leave it

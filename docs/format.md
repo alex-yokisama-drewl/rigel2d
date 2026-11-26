@@ -127,6 +127,22 @@ different size is a scaling of a space the file already names.
 How textures reach the GPU is not this document's concern and is deliberately not visible here —
 see [runtime.md](runtime.md).
 
+## A channel mapping **[proposed]**
+
+A mapping stores the channel's name and the identifier of the parameter it feeds. It may also
+name a source, and that field is empty in almost every puppet — see
+[performing.md](requirements/performing.md#channels-have-default-names-and-those-names-are-what-travels-proposed).
+
+**A channel is referenced by name, which is outside what [I3](invariants.md) binds rather than
+an exception to it.** Everything *inside* a puppet is referenced by identifier; a channel is not
+inside the puppet. It is supplied by a source the puppet has never met, on a machine the rigger
+has never seen, and a shared name is the only thing the two ends can agree on in advance. That
+is why the channel vocabulary is Rigel2D's own rather than a tracker's — the name *is* the
+contract, and the requirement that mappings travel with the puppet rests on it entirely.
+
+Names resolve to handles when a source connects, so nothing resolves by name in the frame loop
+([evaluation.md](evaluation.md)).
+
 ## Stale bindings are a state, not a failure **[proposed]**
 
 A binding carries enough to tell whether it still matches the mesh it applies to. When it does

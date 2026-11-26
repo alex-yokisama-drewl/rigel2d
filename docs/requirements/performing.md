@@ -106,6 +106,33 @@ works by capturing a window or the desktop creates the route by which another wi
 appear on a live stream. This constrains the Linux transparency research above, and is a reason
 to prefer a mechanism where the player hands over its own frames.
 
+## Two windows, and the user knowing which is which **[proposed]**
+
+The render surface and the control surface are separate windows
+([stack.md](../stack.md)). That is a design decision taken for
+[I2](../invariants.md) and for the frame budget, and it lands a requirement here: **two windows
+is a thing the user has to understand, not merely tolerate.**
+
+- **Both are visible on first open**, positioned so neither is hidden behind the other. A first
+  run that appears to show one window is a first run where the other is presumed broken.
+- **It is unmistakable which window the stream shows.** The render surface is the one OBS
+  captures and the control surface is never captured; a user who has these the wrong way round
+  puts their interface on stream, which is the failure [I2](../invariants.md) exists to prevent
+  — arrived at from the user's side rather than the code's.
+- **Each window says what it is for**, at the point of first use rather than in documentation.
+- **Losing one behind the other is recoverable** from the other, without restarting and without
+  the file system. A window that cannot be found again is a window that is gone.
+- **Placement is remembered** between runs, as application configuration rather than scene
+  content ([scene.md](../scene.md)).
+
+**Because** the split is invisible in a feature list and obvious in use, and the audience is
+beginners. The whole reason for two windows is a property the user never sees — that nothing but
+the puppet can reach the captured surface — so the cost of the split falls entirely on them
+unless it is designed for. Inochi Session's single window is the thing to beat here, and it is
+easier to understand on opening than two windows will be by default.
+
+What form any of this takes is Studio and Live interface design and is not settled here.
+
 ## How a streamer learns something broke **[open]**
 
 The render surface must stay clean and the control surface may be behind a full-screen game. So
@@ -154,6 +181,28 @@ into ours.
 **The transport is a tech-design question, not a requirement.** One consequence is worth
 carrying into it: a transport a web page can reach needs origin checks, and one it cannot
 removes that concern entirely rather than mitigating it.
+
+### Channels have default names, and those names are what travels **[proposed]**
+
+Every channel in Rigel2D's vocabulary has a **default name**, and a source's channels can be
+**renamed in Live**, per source. Almost nothing renames anything, and that is the point: two
+machines running different trackers both present `head_yaw` under its default name, so a
+delivered puppet's mappings resolve on arrival without being touched. Portability comes from
+the defaults being standard rather than from the puppet knowing anything about the source.
+
+Renaming exists for the narrow case it is needed for — two sources of the same kind, which is
+an experiment rather than a setup. The ordinary multi-source case is a tracker and something
+else, an emote feed say, whose names do not collide in the first place.
+
+**A mapping names a channel, and may name a source.** The source half is optional and is the
+niche case; absent, the mapping takes the channel from whichever source supplies it.
+
+**Live shows which source each mapped channel is arriving from.** A collision is a thing the
+user should see rather than deduce: where two connected sources supply one name and the mapping
+does not say which is meant, Live reports it and the user resolves it by renaming one source's
+channel or by qualifying the mapping. It is reported, never silently resolved by an ordering —
+a puppet that reacts to the wrong tracker is indistinguishable, on stream, from one that is
+broken.
 
 ## A source can drive the puppet and nothing else **[decided]**
 
