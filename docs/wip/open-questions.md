@@ -29,7 +29,6 @@ needs and it survives this file being deleted. This file adds only the grouping.
 
 | Question | Lives in |
 |---|---|
-| **Transparent output, and which platforms need an OBS plugin** | `requirements/performing.md` and `stack.md`. **The largest open item**, and the first subsystem in [plan.md](plan.md). Transparency has not been observed working anywhere, and it gates both the OBS delivery path and the stack's windowing assumption — one spike settles both, and if it fails the stack choice reopens |
 | Where the independent second list comes from that lets the custom-canvas test fail | `testing.md` — *The convention custom canvases need*. `concerns/accessibility.md` names the canvas's own hit-test list as the intended source; nothing is built. The other half of this question, how dense elements are summarised, was settled by the keyboard exemption — vertices are no longer registered at all |
 | What the cross-platform determinism tolerance is | `requirements/puppet.md` — the determinism section. Bit-exactness is claimed per platform; across platforms the figure is unset |
 | Which data the format declares authoring-only | `requirements/puppet.md` — *One file*. That the format declares it is settled; the membership is a format design question for the format subsystem. **The mirror axes are the first settled member**, declared authoring-only where they are introduced in *What a puppet is* |

@@ -5,7 +5,7 @@
 
 Pushes a known half-transparent frame through every candidate route into a real OBS and asserts
 on the pixel values OBS emits. Done means the `[open]` in
-[performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-open) is
+[performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-decided) is
 resolved on evidence rather than on source reading, the Game Capture capability tension is
 answered, point 1 of [stack.md](../stack.md#what-this-choice-is-still-exposed-to-open) is
 settled, and a dated file lands in [research/](../research/).

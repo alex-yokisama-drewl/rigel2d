@@ -43,6 +43,40 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-27 — We write the OBS plugin for Linux ourselves, rather than depending on one
+
+**Decided:** On Linux the player delivers frames through a plugin of our own, built so that it
+can be extended to the other platforms later. Windows keeps stock OBS Game Capture; macOS is
+unmeasured and keeps the Syphon client on paper. Settled against measurement
+([research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md)).
+**Because:** alpha turned out to survive every route measured, so the risk was never the thing
+the spike was commissioned to find. What does not survive is colour. Each host silently assumes
+an encoding of the buffer it is handed, the two measured hosts assume *different* ones, and
+neither reports a mismatch — so a renderer correct for one is wrong for the other by an amount
+that reads as a plausible picture rather than a fault. Both were invisible to the eye and were
+caught only by comparing against values written down in advance. A plugin of our own cannot stop
+a conversion being necessary, but it makes the conversion ours and explicit against a format we
+define, instead of a host inferring one from a buffer carrying no colour-space tag.
+**Rejected:** depending on **`obs-vkcapture`**, which a reader will reach for first because it is
+the only Linux route measured working end to end, with alpha bit-exact. It loses on ownership
+rather than on function: the route carrying our output would belong to a third party, it is not
+in Ubuntu's repositories so a beginner builds it from source, and the colour conversion stays
+ours to maintain either way. Also rejected: **PipeWire with `obs-pwvideo`**, which the earlier
+research named the technical-fit primary — its receiver is sound and its format table genuinely
+carries alpha, but libfunnel does not build against the PipeWire the target distribution ships,
+and nothing links producer to consumer without manual intervention. And: **writing our own for
+every platform**, which still fails *uniformity is not worth an install step where none is
+needed* — though less clearly than when that was written, because the Windows route is now known
+to fail silently when the player and OBS land on different GPUs.
+**Consequences:** a plugin is a compatibility surface against an API with no stability promise.
+`OBS_DECLARE_MODULE()` bakes `LIBOBS_API_VER` in at compile time and libobs increments its major
+version on breaking changes, so this is a rebuild and a re-release per OBS major — roughly
+annual — before any of Windows signing or macOS notarisation, which arrive if it is ever
+extended. Against that, the plugin is the *small* half of the work: the sender is per-platform
+under every option, and most of a reference implementation's bulk is swapchain interception that
+a player exporting its own texture does not need.
+
+
 ## 2026-11-26 — Studio has no operation that deletes a texture
 
 **Decided:** A texture is not a thing the rigger deletes. It arrives by import and is collected
