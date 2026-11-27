@@ -360,13 +360,13 @@ fn manifest_version(bytes: &[u8]) -> Result<FormatVersion, Rejection> {
 /// `EXT-7`, `EXT-9`).
 pub fn load(path: &Path) -> Result<Loaded, Rejection> {
     let opened = read_file(path)?;
-    // The rules the source text alone can show are reached here, before the
+    // The rules the source text alone can show are reached first, before the
     // validator, because a `Puppet` cannot hold the facts they are about — an
     // absent member, a key outside `x`, a token gated on the declared version.
-    if !opened.violations.is_empty() {
-        return Err(Rejection::Invalid(opened.violations));
-    }
-    crate::validate::validate(&opened.puppet).map_err(Rejection::Invalid)?;
+    // Both halves live in `validate::verdict`, which `validate_file` calls too,
+    // so the loader's verdict and the standalone one are the same verdict and
+    // not two that drift (`VAL-13`).
+    crate::validate::verdict(&opened)?;
     Ok(Loaded {
         puppet: opened.puppet,
         report: opened.report,

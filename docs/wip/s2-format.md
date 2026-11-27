@@ -18,15 +18,15 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 to 5 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 6, the validator.**
+**Current task:** tasks 1 to 6 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 7, the writer.**
 **Blocked on:** nothing.
 
 **Gate 2 is red from here**, as designed: task 3 wrote the acceptance tests against a declared
 surface whose every body is `unimplemented!()`, and they fail. Tasks 4 to 7 turn them green.
-After task 5 every remaining failure but one is at an `unimplemented!()` in `validate.rs`; the
-one that is not is `EXEC-5`, which catches the same panic and reports it as an assertion of its
-own. Task 5's handoff carries the table.
+After task 6 **every remaining failure is at an `unimplemented!()` in `save.rs`**, and nothing
+ends inside `tests/` — the two that did after task 5, `EXEC-5` and `CANON-2`, are the validator
+wearing an assertion and `EXEC-5` now passes. Task 6's handoff carries the table.
 
 **Deferred out of task 1 and now closed:** `scripts/fixtures-check.sh` is wired into gate 2.
 
@@ -430,7 +430,7 @@ it is due before S4.
 not that S2 must ship provisional figures for everything, but that the plan does not record which
 limits have no workload dimension to be derived from, nor that S2 is where that gap first bites.
 
-### 6. The validator — `todo`
+### 6. The validator — `done`
 
 The single gate on load and save, plus the committed JSON Schema for what a schema can express
 and the standalone command `VAL-13` needs. Every rejection names the rule broken and at least one
@@ -448,7 +448,21 @@ unconditionally. Otherwise `VER-1` loads a later-minor file and then cannot save
 exactly the compatibility rule inverted. `VAL-13` compares the standalone verdict with the
 embedded one and does **not** catch this, because both go through `validate_file`.
 
+**Done**, in `validate.rs`, `src/bin/rigel-validate.rs` and `schema/`. Every fixture reaches the
+outcome [the catalogue](../../crates/rigel-format/tests/fixtures/catalogue.json) records for it,
+through `validate_file` and through `load` alike, asserted as a sweep beside the reader's.
+`load` and `validate_file` now share one `verdict`, so `VAL-13`'s *the same validator* is
+structural rather than a resemblance. The schema and the document stating its boundary are in
+`crates/rigel-format/schema/`, held against the reader's member lists by a unit test.
+
+**Every remaining acceptance failure is at an `unimplemented!()` in `save.rs`** and is task 7's.
+Nothing ends inside `tests/`.
+
 ### 7. The writer — `todo`
+
+**Read task 6's *Traps* first.** A reordered puppet is valid in memory and the writer is what
+canonicalises it, which decides the shape of a save — `ID-3` is the test that settles it, and it
+has never run.
 
 Canonical JSON and canonical zip — every default a zip writer brings pinned — the one atomic
 write path, and the version-upgrade backup. Preserved material written back verbatim, positioned
@@ -624,6 +638,35 @@ the limit table against the committed `stress` dimensions and against the two fi
 has to bite on, the entry-name classifier, the rejection accessors, the PNG header read — and, in
 `load.rs`, the reader against the real corpus, including a catalogue-driven sweep asserting that
 **no fixture the catalogue calls valid is refused by the reader**.
+
+Task 6. The validator, the standalone command and the committed schema.
+
+`validate.rs` — `validate(&Puppet)`, which implements every rule in
+[format.md](../format.md)'s *Validation* list and every rule `Rule` enumerates, except the three
+families that are the reader's. `validate_file`, and `verdict`, which is the one place the
+reader's violations and the validator's are combined and which **`load` now calls too**: the
+loader's verdict and the standalone one are the same code rather than two that resemble each
+other, which is what `VAL-13` is about. `PhysicsConstant::as_str`, because `VAL-25` asks the
+rejection to name the constant.
+
+`src/bin/rigel-validate.rs` — the command, against the contract its own doc comment already
+declared: one path argument, `accepted` or the bounded rejection on stdout, exit `0`, `1` or `2`.
+
+`crates/rigel-format/schema/` — `puppet.schema.json`, `rigel2d.schema.json`, and `README.md`,
+which states **where the boundary falls**: a row per rule saying whether a schema can express it,
+what the schema does not cover, and the three places it is stricter than this build's reader. The
+schema expresses more than it first looks: the reserved zero as a minimum, the required polarity,
+every enumerated list, `additionalProperties: false` for unmarked data, the physics sign rules,
+a non-negative blend duration, and finiteness — as the single-precision bounds, which is
+`VAL-18`'s rule stated rather than approximated.
+
+Unit tests beside the module: one per rule, built by breaking a valid in-memory puppet in exactly
+one way; the containment check driven over the square of `NodeKind::ALL` and the range check over
+`PhysicsConstant::ALL`; and **two catalogue-driven sweeps** — every fixture reaches the outcome
+the catalogue records for it through `validate_file`, and the loader's verdict equals the
+standalone one on every fixture. Two more hold the committed schema against `decode.rs`'s member
+lists and the boundary document against `Rule`, because a schema and a table in a document are
+exactly the artifacts that drift unchecked.
 
 **Decisions made:**
 
@@ -812,6 +855,54 @@ Task 5.
 - **An absent figure in `limits::FIGURES` refuses the load.** Its doc comment already said an
   absent figure is a defect rather than *no limit*; this is that sentence implemented, and it is
   unreachable today because every row carries a figure.
+
+Task 6.
+
+- **`validate(&Puppet)` admits an unfamiliar enumerated value unconditionally**, which task 4
+  raised and task 6 was told to settle. Settled as stated: the gate is the **declared version**
+  and a `Puppet` carries none, so `Rule::EnumeratedValueKnown` stays reachable only from the
+  reader. A unit test carries the reasoning so that it is a decision in the suite rather than an
+  omission somebody later "fixes".
+- **`load` and `validate_file` share `validate::verdict`.** **Because** `VAL-13` asserts the two
+  verdicts agree on every fixture, and two call sites performing the same two steps in the same
+  order is a resemblance a later edit breaks silently. One function is the claim; the test is
+  then a regression check rather than the only thing holding them together. This is the one edit
+  task 6 made to `load.rs`.
+- **Keypoints are ordered lexicographically over the position vector, strictly.**
+  [format.md](../format.md) says *keypoints by position along their axis* and a parameter may
+  declare two axes, so *along their axis* names no order for a two-dimensional one. Comparing
+  coordinate by coordinate is what the corpus already carries — `body_lean`'s keypoints are in
+  exactly that order — and it gives any number of axes a total order without a second rule.
+  Strict, so two keypoints at one position are out of order as well: interpolating between them
+  has no defined result. See *Contradicts docs*.
+- **`Rule::BindingValueCountAgreesWithStaleMark` covers both counts a binding can disagree on** —
+  one value per keypoint of its parameter, and, for a deformation, one offset per vertex of the
+  target's mesh. **Because** [format.md](../format.md) names only the mesh and `BindingValues::len`
+  names only the keypoints, while the mark means one thing: *this binding no longer matches what
+  it applies to*. Two rules would make a fixture's rejection depend on which count it broke, and
+  `rigged:binding-count-mismatch-unmarked` breaks the one the document does not name.
+- **Every violation names an offender, defaulting to the puppet's own identifier.** **Because**
+  `VAL-12` asks every rejection naming a rule to name at least one offending identifier, and a
+  rule broken by the puppet as a whole — no root at all, say — otherwise names nothing. The
+  default is in `violate`, so a rule added later cannot forget it.
+- **The verdict collects every rule broken rather than stopping at the first**, capped at the
+  same figure the decoder caps its own list at. **Because** a rejection naming one rule makes the
+  corpus's one-defect discipline the only thing standing between a test and a false
+  attribution; and
+  because a person repairing a file wants the list. The cap is what keeps `VAL-12`'s *bounded*
+  true for a hostile file, and the structural checks run before the sweep over every number so
+  that it is the sweep that gets cut.
+- **The committed schema lives in `crates/rigel-format/schema/`, not in `docs/`.** **Because** it
+  is an artifact the crate's tests hold against the decoder, not prose; `docs/README.md` indexes
+  documents and this is a pair of JSON files with a document explaining them. The boundary
+  document is beside them for the same reason — a third party who runs the schema needs it in the
+  same directory, not in a tree they have not been given.
+- **The schema is not run in CI, and says so.** **Because** validating a document against it needs
+  a JSON Schema implementation in the locked graph, bought to check files the acceptance suite
+  already loads through the validator. What the suite does hold is the schema's **member lists**
+  against `decode.rs`'s, which is the half that drifts. Running it is `VAL-14`'s human gate.
+- **`decode.rs`'s key sets are `pub(crate)`**, for that test and nothing else, with a comment
+  above them saying so.
 
 **Contradicts docs:**
 
@@ -1040,6 +1131,53 @@ the same moment, and **reported rather than fixed**.
   or count of something the format defines and nesting depth is a property of the encoding; it is
   a constant in `json.rs` and a file past it is refused as malformed. Worth a sentence somewhere.
 
+Task 6. Found while implementing the validator against the documents, the corpus and the tests at
+the same moment, and **reported rather than fixed**.
+
+- **The ordering rules read as rules about the stored form, and `ID-3` says the in-memory order
+  is free.** [format.md](../format.md)'s *Validation* list requires keypoints ordered, and its
+  *Canonical serialisation* section makes ordering *part of the canonical form* — a rule about
+  **writing**. `identity::id_3` reverses `nodes`, `parameters`, `textures`, `bindings`, every
+  parameter's keypoints and the binding values against them, and then expects the save to
+  succeed and the reload to come back canonically ordered. Both cannot be true of the same rule
+  unless the **writer canonicalises before validating**. Implemented with the rule in
+  `validate(&Puppet)`, which is where the specification's list puts it; what that costs is
+  stated under *Traps*, because it lands on task 7 and nothing exercises it yet.
+- **[format.md](../format.md) does not say what *ordered by position* means for a
+  two-dimensional parameter.** `body_lean` declares two axes. The order implemented is
+  lexicographic over the position vector, which is what the corpus carries; the document should
+  say so, because a third-party writer has nothing to derive it from.
+- **[format.md](../format.md) requires every number finite and names no precision, while
+  `VAL-18` requires finiteness judged at the precision evaluation uses.** The criterion is what
+  makes `rigged:nonfinite-after-narrowing` a defect; the document does not mention the question,
+  so a conforming third-party validator would accept that file. This is the clearest case in the
+  format of two tools disagreeing about validity, which is exactly what the criterion exists to
+  prevent, and it belongs in the document rather than only in a criterion.
+- **The *Validation* list says *binding value counts matching their mesh* and the contract says
+  they match the parameter's keypoints.** Both are real counts and both are what the mark is
+  about; the document names one and `BindingValues::len`'s doc comment names the other. See
+  *Decisions made*.
+- **The puppet's own gravity has no stated rule, and the validator applies none beyond
+  finiteness.** `PhysicsConstant::Gravity` is the **per-node multiplier**; a puppet-level gravity
+  below zero is accepted today. Whether negative means *up* or is a defect is not in the
+  document and no criterion asks.
+- **Nothing says whether a part must reference a texture.** The reserved zero means *no
+  reference*, so a part carrying `"texture": 0` validates. `rigged:dangling-texture-ref` names a
+  texture that is absent, which is a different thing. No fixture carries the first.
+- **`format.md` says `output_source` and `output_scale` are *per axis of that parameter* and no
+  rule checks that they are.** A physics node may name a one-axis parameter and carry three
+  output sources. Not a rule the document states, not a criterion, and so not implemented —
+  reported because it is the kind of disagreement the evaluation pass will meet first.
+- **`rigged:id-zero`'s rejection names the reserved zero as its offending identifier**, which is
+  true and nearly useless: the offender *is* zero. A `Puppet` does not record which entity
+  carried an identifier — `Puppet::identifiers` is a flat list — so naming the owner would mean
+  a second walk written only for the message. `VAL-12`'s letter is met; its spirit is thin for
+  this one rule.
+- **The root rule, again.** Task 4 reported that *a kind that contains* is the general phrase and
+  the parenthetical naming mesh group and composite is the actual rule. Confirmed from the other
+  side: `may_be_root` is what the validator reads, and physics *contains* and may not be the
+  root.
+
 **Traps:**
 
 - **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
@@ -1112,6 +1250,32 @@ Task 5.
   `test result: FAILED. 0 passed; 1 failed` line that belongs to the child and not to the suite.
   Counting result lines rather than reading them gets this wrong.
 
+Task 6.
+
+- **The writer must canonicalise before it validates, and nothing proves it yet.**
+  `validate(&Puppet)` enforces keypoint order, and `identity::id_3` reverses a parameter's
+  keypoints in memory — with the binding values against them, which is the meaning-preserving
+  reorder — and then saves. That save succeeds only if `save` sorts keypoints by position and
+  permutes each binding's values with them **before** handing the puppet to the validator. It is
+  work the writer has to do anyway, because `ID-3` also asserts the reload comes back in
+  canonical order; what is easy to miss is that it must happen on the *validating* path too.
+  **Every identity test dies at `save`'s `unimplemented!()` today**, so this costs nothing until
+  task 7 and then costs an afternoon. The alternative — moving the rule into the reader, where
+  the stored order is a fact about the text — was weighed and rejected; see *Tried and rejected*.
+- **A parent walk that does not colour nodes never terminates on `rigged:cycle`.** The fixture
+  reparents the head of the physics chain under its own child, so walking up from either node
+  loops for ever. Colouring each node once is also what keeps a hostile file from costing a
+  quadratic pass, and the test that catches the regression builds the two-node cycle by hand.
+- **Clippy refuses `!(a > b)`** — `neg_cmp_op_on_partial_ord`, because the two values may be
+  incomparable. It is right: with a `NaN` time, every comparison is false and the negation is
+  what decides. `ascends` and `follows` are the one place the question is answered, for keypoint
+  positions and keyframe times alike.
+- **A unit test that puts one node kind under another has to account for the grandparent too.**
+  Testing *parent contains child* by building root → parent → child means the root's own pair
+  must be permitted, or the verdict carries a containment violation that has nothing to do with
+  the pair under test. The table-driven test in `validate.rs` states that condition rather than
+  working around it.
+
 **Assumptions:**
 
 - ~~Every JSON key name, the current version, the gravity default, the compression per entry kind
@@ -1175,6 +1339,23 @@ Task 5.
 - **Provisional figures will be wrong.** Each says in its own row which dimension it is missing,
   and `Basis::Provisional` is the thing to grep for when the measurement lands.
 
+Task 6.
+
+- **Keypoints are ordered strictly**, so two at one position are invalid. No fixture carries a
+  repeated position and no criterion names one; interpolating between two keypoints at the same
+  place has no defined result, which is the reading taken.
+- **A part may reference the reserved zero**, meaning no texture. See *Contradicts docs*.
+- **A mesh group with no mesh has no vertices**, so a deformation binding targeting one must
+  carry no offsets or be marked stale. No fixture carries that pair; task 5 established that an
+  absent mesh is an empty mesh.
+- **`validate(&Puppet)` re-checks none of the reader's three rule families.** An extension entry
+  with an empty name or version, an axis whose polarity was never declared, and a key the format
+  does not define are all facts about the text the reader has already judged, and an absence has
+  no typed inhabitant in a puppet assembled in memory. A save of a puppet whose
+  extension entry was emptied by a caller is therefore not refused for that.
+- **The puppet-level gravity is validated for finiteness and nothing else.** See
+  *Contradicts docs*.
+
 **Deferred:**
 
 Task 4 — what was in the task's scope and is not done, with why:
@@ -1219,6 +1400,15 @@ Task 5 — what is in the reader's scope and is not done, with why:
 | A limit on JSON nesting depth as a `LimitKind` | Reported above instead. Adding a variant changes `LimitKind::ALL`, which `LIM-1` and `LIM-8` are both driven over, and the kind is about the encoding rather than about the puppet |
 | `TotalLoadMemory` enforced against **resident** bytes | It counts bytes decompressed, which is the part of a load this crate controls. The resident half needs the counting allocator `stack.md` names, which is also what `LIM-3`'s memory half waits on |
 
+Task 6 — what is in the validator's scope and is not done, with why:
+
+| Left | Why |
+|---|---|
+| Every `ValidRange::max` | Still `[open]` in [format.md](../format.md), pending the integrator-stability sweep due with the evaluation pass. The validator reads the table, so a figure landing there is the whole change; `schema/README.md` says the same of the schema |
+| Running the committed schema over the corpus | Needs a JSON Schema implementation in the locked graph, bought to check files the acceptance suite already loads through the validator. What is held instead is the schema's member lists against the reader's. `VAL-14` is the human gate that runs it |
+| A rule about `output_source` and `output_scale` matching the parameter's axis count | Not stated in [format.md](../format.md) and not a criterion. Reported in *Contradicts docs* |
+| A rejection naming the entity that carried the reserved zero | `Puppet::identifiers` is a flat list, so the owner is not recoverable without a second walk written only for the message. Reported in *Contradicts docs* |
+
 **Tried and rejected:**
 
 The branch keeps these in [*Tried and rejected*](#tried-and-rejected) above, where tasks 1 to 3
@@ -1242,3 +1432,29 @@ Task 5 added these.
 - **Refusing a later-version file whose unknown member sits on an object with no identifier.** The
   honest failure, and it breaks the compatibility rule for exactly the addition that rule exists
   to carry — a later minor adding a field to a transform would make every file unopenable.
+
+Task 6 added these.
+
+- **Moving the keypoint-order rule into the reader.** Stored order is a fact about the source
+  text, which is the shape task 5 used for the three rule families it kept, and it would make
+  `identity::id_3`'s reversed-in-memory puppet valid with no demand on the writer at all. It
+  loses on a worse count: [format.md](../format.md)'s *Validation* list is the specification of
+  `validate`, and taking a rule out of it leaves `validate(&Puppet)` admitting a puppet the
+  document calls invalid — the exact drift the single-validator rule exists to stop. The writer
+  has to sort keypoints for `ID-3` either way, so the cost of keeping it is ordering a collection
+  the writer already orders. Recorded as a trap rather than taken.
+- **Pulling a JSON Schema implementation into the locked graph to run the committed schema in
+  CI.** It is the check that would make the schema certainly correct rather than probably. It
+  buys a second opinion about files the acceptance suite already loads through the validator,
+  against a dependency the `locked-graph.sh` gate exists to keep small, and it does not catch the
+  failure the schema actually has — drifting from the format. Holding its member lists against
+  `decode.rs` catches that, costs nothing, and runs with the suite.
+- **Stopping the verdict at the first rule broken.** Cheaper, and it makes every rejection
+  trivially bounded. It also makes the corpus's one-defect discipline load-bearing in a way it
+  was never meant to be: a fixture that happened to break a second rule would be attributed to
+  whichever check ran first, and a person repairing a file would get one line at a time.
+- **Giving `validate(&Puppet)` the reader's three rule families as well.** An extension entry
+  with an empty name reads like something a save should refuse. Two of the three are about a
+  member being **absent**, which has no inhabitant in a puppet, and the third is gated on a
+  declared version the puppet does not carry — so the version half would have to be dropped,
+  which is the inversion task 4 already recorded.

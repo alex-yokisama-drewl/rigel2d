@@ -107,9 +107,16 @@ struct Decoder {
 }
 
 // ------------------------------------------------------------ the key sets
+//
+// These are what [`Rule::UnmarkedData`] is judged against, and so they are also
+// what the committed JSON Schema must list — `crates/rigel-format/schema/`.
+// They are `pub(crate)` rather than private for exactly that: a unit test in
+// `crate::validate` holds the schema's member lists against them, so a member
+// added to one and not the other fails a test rather than waiting to be found
+// by whoever runs the schema next. Nothing outside this crate reads them.
 
 /// The members the core format defines on the puppet object.
-const PUPPET_KEYS: &[&str] = &[
+pub(crate) const PUPPET_KEYS: &[&str] = &[
     "id",
     "name",
     "high_water_mark",
@@ -124,8 +131,8 @@ const PUPPET_KEYS: &[&str] = &[
     "textures",
 ];
 /// What every node carries, whatever its kind.
-const NODE_KEYS: &[&str] = &["id", "parent", "name", "transform", "kind"];
-const PART_KEYS: &[&str] = &[
+pub(crate) const NODE_KEYS: &[&str] = &["id", "parent", "name", "transform", "kind"];
+pub(crate) const PART_KEYS: &[&str] = &[
     "mesh",
     "texture",
     "texture_flip",
@@ -133,8 +140,8 @@ const PART_KEYS: &[&str] = &[
     "provenance",
     "chain_deformer",
 ];
-const MESH_GROUP_KEYS: &[&str] = &["mesh"];
-const PHYSICS_KEYS: &[&str] = &[
+pub(crate) const MESH_GROUP_KEYS: &[&str] = &["mesh"];
+pub(crate) const PHYSICS_KEYS: &[&str] = &[
     "length",
     "gravity",
     "frequency",
@@ -144,26 +151,27 @@ const PHYSICS_KEYS: &[&str] = &[
     "output_source",
     "output_scale",
 ];
-const TRANSFORM_KEYS: &[&str] = &["translation", "rotation", "scale"];
-const MESH_KEYS: &[&str] = &["vertices", "uvs", "triangles"];
-const FLIP_KEYS: &[&str] = &["left_right", "top_bottom"];
-const PROVENANCE_KEYS: &[&str] = &["source_id", "content_hash"];
-const CHAIN_KEYS: &[&str] = &["id", "joints"];
-const JOINT_KEYS: &[&str] = &["id", "position"];
-const PARAMETER_KEYS: &[&str] = &["id", "name", "axes", "keypoints"];
-const AXIS_KEYS: &[&str] = &["range", "polarity"];
-const KEYPOINT_KEYS: &[&str] = &["id", "position", "neutral"];
-const BINDING_KEYS: &[&str] = &["id", "kind", "parameter", "target", "values", "stale"];
-const ANIMATION_KEYS: &[&str] = &["id", "name", "tracks"];
-const TRACK_KEYS: &[&str] = &["id", "parameter", "blend_duration", "keyframes"];
-const KEYFRAME_KEYS: &[&str] = &["time", "value"];
-const MAPPING_KEYS: &[&str] = &["id", "channel", "parameter", "source", "response_curve"];
-const CURVE_KEYS: &[&str] = &["points"];
-const TEXTURE_KEYS: &[&str] = &["id", "name", "authored_size", "crop"];
-const EXTENSION_KEYS: &[&str] = &["version", "name", "data"];
+pub(crate) const TRANSFORM_KEYS: &[&str] = &["translation", "rotation", "scale"];
+pub(crate) const MESH_KEYS: &[&str] = &["vertices", "uvs", "triangles"];
+pub(crate) const FLIP_KEYS: &[&str] = &["left_right", "top_bottom"];
+pub(crate) const PROVENANCE_KEYS: &[&str] = &["source_id", "content_hash"];
+pub(crate) const CHAIN_KEYS: &[&str] = &["id", "joints"];
+pub(crate) const JOINT_KEYS: &[&str] = &["id", "position"];
+pub(crate) const PARAMETER_KEYS: &[&str] = &["id", "name", "axes", "keypoints"];
+pub(crate) const AXIS_KEYS: &[&str] = &["range", "polarity"];
+pub(crate) const KEYPOINT_KEYS: &[&str] = &["id", "position", "neutral"];
+pub(crate) const BINDING_KEYS: &[&str] = &["id", "kind", "parameter", "target", "values", "stale"];
+pub(crate) const ANIMATION_KEYS: &[&str] = &["id", "name", "tracks"];
+pub(crate) const TRACK_KEYS: &[&str] = &["id", "parameter", "blend_duration", "keyframes"];
+pub(crate) const KEYFRAME_KEYS: &[&str] = &["time", "value"];
+pub(crate) const MAPPING_KEYS: &[&str] =
+    &["id", "channel", "parameter", "source", "response_curve"];
+pub(crate) const CURVE_KEYS: &[&str] = &["points"];
+pub(crate) const TEXTURE_KEYS: &[&str] = &["id", "name", "authored_size", "crop"];
+pub(crate) const EXTENSION_KEYS: &[&str] = &["version", "name", "data"];
 
 /// The node kinds this build has code for.
-const KNOWN_NODE_KINDS: &[&str] = &["part", "mesh_group", "composite", "physics"];
+pub(crate) const KNOWN_NODE_KINDS: &[&str] = &["part", "mesh_group", "composite", "physics"];
 
 // ------------------------------------------------------------- the helpers
 
