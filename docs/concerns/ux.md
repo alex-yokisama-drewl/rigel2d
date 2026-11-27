@@ -138,3 +138,24 @@ every cycle. Each entry carries its provenance. See README.md.
 - **Every term the interface shows is defined in `vocabulary.md` and explained where it first appears** — `script`
   → a lint over the string catalogue, beside the strict-vocabulary lint. The vocabulary places the onboarding cost on explaining a term at first appearance rather than on a second set of friendlier names, and nothing currently checks that the explanation is there. *Mirror*, *texture flip*, *bilateral* and *unipolar* are the terms this revision adds.
   Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+### A node that draws nothing, and a term the interface will show
+
+- **Every node kind that draws nothing is findable in the tree and identifiable as non-drawing, with its anchor and what it drives inspectable** — `judgment`
+  → `test` over a fixture containing a physics node: it has a tree row marked as drawing nothing, selecting it exposes its anchor and its output parameter, and it stays reachable with other kinds collapsed or hidden. Physics is the first kind with no pixels, so the canvas cannot show it and the tree is the only place it exists.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A physics node that can currently do nothing is reported at the moment it becomes so** — `judgment`
+  → `test`: fixtures with an anchor nothing moves, with a deleted output parameter, and with an edit that would put two drivers on one parameter. Assert the result names the node and the cause, and that a refused edit leaves the puppet unchanged. A silently inert pendulum is the authoring failure that shows up on stream.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A deletion report names a physics node as a node with its anchor, and names every animation track it removes** — `judgment`
+  → `test` over fixtures deleting a parameter that has both physics and tracks, and deleting a node that is a physics anchor. Assert the report names the physics node and its anchor, names each animation and its track, and that undo restores both.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Physics has a defined value on the first frame after a load, a replacement, a re-anchor and a timeline scrub, and no transform is non-finite at any of them** — `judgment`
+  → `test` at each event: every accumulated transform finite, and physics at its rest value on the first frame. The replacement case is the one a viewer sees, so it is also where [I2](../invariants.md) binds.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A mirror or a paste over a subtree containing physics names the physics nodes it reflected, copied, or left alone** — `judgment`
+  → `test` on the structured result: each physics node listed with its new anchor, and each refusal named. Extends the existing rule that a default the rigger did not choose is named in the result.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **"Track" is defined in `vocabulary.md` and explained where it first appears in the interface** — `judgment`
+  → `script` once the term is added to the first-appearance lint over the string catalogue. A new term the rigger has not met is exactly what that lint exists for.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.

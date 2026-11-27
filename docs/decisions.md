@@ -43,6 +43,54 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-27 — The puppet file has no separate authoring payload
+
+**Decided:** everything a puppet stores lives in one structural entry. Data only Studio acts on —
+import provenance, the mirror axes, axis polarity — sits beside the rest, and the player ignores
+what it cannot use. This withdraws the earlier rule that the format declares each kind runtime or
+authoring-only, and removes the `authoring.json` entry.
+**Because:** the authoring-only set is an import identifier and a content hash per part, plus two
+axes — tens of kilobytes against a stress workload budgeted at hundreds of megabytes of resident
+texture. The split was specified before anyone had measured the thing being split.
+**Rejected:** a separate entry the player skips, which is the obvious design and was this
+project's own position until today. It saves the player a rounding error and buys a category of
+complexity in exchange: data that is recognised but deliberately unread, a byte-for-byte carry
+path through every save Live makes, a validator that answers differently in Studio and in the
+player, and a second place anyone reading the format has to learn about.
+**Consequences:** the player loads fields it will never use, which looks like an oversight and is
+not. Anything genuinely worth skipping later has to earn its own entry on measured size rather
+than on category. The archive itself is untouched — binary payloads addressable without parsing
+the whole file was always the stronger half of that decision and stands without this one.
+
+## 2026-11-27 — Physics is a node that moves itself, and contains only physics
+
+**Decided:** physics is a fourth node kind. It anchors in the tree with its own local offset,
+reads its own node's accumulated transform from the previous frame, displaces that node's
+transform by the simulation result, and may drive one parameter — optionally, because a physics
+node is equally a link in a chain. It may contain physics nodes and nothing else. **What each
+kind may contain is declared per kind by the format**, rather than enforced by a rule that names
+physics.
+**Because:** a pendulum's pivot is rarely its parent's origin, so physics needs a parent and a
+local offset, which is exactly what a node is. Keeping it outside the tree means storing an
+anchor identifier and a local transform and resolving them against the parent chain —
+re-implementing a node in order to preserve the sentence that a part is the only leaf kind.
+Anchoring in the tree also asks nothing of a rigger: a physics node placed where the hair
+attaches works. Containing only physics is what makes a pendulum chain an ordinary subtree while
+keeping artwork out of reach of a cascade through one.
+**Rejected:** the Cubism model, in which physics is a transfer function from named input
+parameters to output parameters with no position in the tree. It is strictly forward — no cycle,
+no delay — and it was the recommendation this decision overrode. It lost on who pays: naming and
+weighting input parameters is a documented fiddly corner of Cubism, and this project is for
+beginners. Also rejected: physics containing any kind, which would let a parameter's deletion
+cascade through a physics node into artwork; and physics as a leaf, which makes a chain cost a
+parameter, a binding and a helper node per link.
+**Consequences:** physics is permanently one frame behind, which is worst on the weak hardware
+this project targets and will read as a bug to be fixed. A chain of any length is still one frame
+behind rather than one frame per segment, because each node reads a previous frame that already
+carried its parent's displacement. A node kind that draws nothing now exists in a draw-ordered
+tree. And the reference from a physics node to the parameter it drives is **incidental, not
+constitutive** — deleting that parameter leaves the node standing as a chain link.
+
 ## 2026-11-27 — We write the OBS plugin for Linux ourselves, rather than depending on one
 
 **Decided:** On Linux the player delivers frames through a plugin of our own, built so that it

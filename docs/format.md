@@ -8,22 +8,32 @@ A scene is a separate, much thinner file and is specified in [scene.md](scene.md
 
 ## The container is an archive with a manifest **[proposed]**
 
-A puppet is a zip archive. One entry carries the format version, one carries the structure as
-JSON, textures are separate entries, and authoring data is its own entry the runtime never
-reads.
+A puppet is a zip archive. One entry carries the format version, one carries the whole
+structure as JSON, and textures are separate entries.
 
 | Entry | Holds |
 |---|---|
 | `rigel2d.json` | The format name and version, and nothing else |
-| `puppet.json` | The node tree, parameters, bindings, physics, animations, channel mappings, texture records |
+| `puppet.json` | The node tree — parts, mesh groups, composites and physics — with parameters, bindings, animations, channel mappings, texture records, and the data only Studio acts on |
 | `textures/<identifier>.png` | One entry per distinct texture, cropped to its own content |
-| `authoring.json` | Import provenance and anything else only Studio acts on |
 
 **Because** the requirement is that a third party can inspect, change and generate a puppet with
-ordinary tooling. An archive delivers that literally: `unzip` gives a reader a JSON file a text
-editor opens and images any viewer displays. It also delivers the two structural requirements
-that plain JSON does not — binary payloads addressable without parsing the whole file, and
-authoring data the player can skip rather than load.
+ordinary tooling. An archive delivers that literally: `unzip` gives a reader one JSON file a text
+editor opens and images any viewer displays. It also delivers the structural requirement that
+plain JSON does not — binary payloads addressable without parsing the whole file.
+
+**There is no separate authoring entry.** An earlier draft of this table gave Studio-only data a
+payload of its own for the player to skip.
+[puppet.md](requirements/puppet.md#one-file-decided) withdraws that and
+[decisions.md](decisions.md) carries why. One structural entry is also the stronger form of the
+third-party claim: a reader opens one file rather than learning which of two holds what.
+
+**Still to be designed here**, as a consequence and not settled by this table: what a physics
+node stores — its local offset, its simulation constants, and an optional reference to the
+parameter it drives — and the per-kind containment declaration that
+[puppet.md](requirements/puppet.md#what-a-puppet-is-proposed) now requires, which is what keeps
+*a physics node contains only physics* a row in a table rather than a special case in the
+validator.
 
 What lost, and why, is in [decisions.md](decisions.md).
 

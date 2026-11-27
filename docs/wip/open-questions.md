@@ -30,9 +30,8 @@ needs and survives this file being deleted. This file adds only the grouping.
 |---|---|
 | Where the independent second list comes from that lets the custom-canvas test fail | `testing.md` — *The convention custom canvases need*. `concerns/accessibility.md` names the canvas's own hit-test list as the intended source; nothing is built. The other half of this question, how dense elements are summarised, was settled by the keyboard exemption — vertices are no longer registered at all |
 | What the cross-platform determinism tolerance is | `requirements/puppet.md` — the determinism section. Bit-exactness is claimed per platform; across platforms the figure is unset |
-| Which data the format declares authoring-only | `requirements/puppet.md` — *One file*. That the format declares it is settled; the membership is a format design question for the format subsystem. **The mirror axes are the first settled member**, declared authoring-only where they are introduced in *What a puppet is* |
-| Whether a `Physics nodes` row in a counter table makes physics a node | `requirements/platform.md`'s workload table counts them as nodes; `vocabulary.md` and the pieces list in `requirements/puppet.md` say the node kinds are parts, mesh groups and composites. The deletion rule no longer depends on the answer, but the two documents still disagree |
 | How a dormant scene entry is relocated in practice | `requirements/performing.md`. Shape settled, mechanism open |
+| How many tracks an animation carries, and how many keyframes a track carries | `requirements/platform.md`'s workload table. The corpus counted `.motion3.json` files rather than the curves inside them, so the dimension has no figures and no load limit covers it. Reading curve counts out of the same corpus is a research task, not a decision |
 | Composition modes for deformations | `requirements/puppet.md`. Waits on evidence about which are wanted |
 | Randomness, and first run | `requirements/authoring.md` |
 

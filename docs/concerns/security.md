@@ -115,7 +115,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
 ### Texture lifetime, copy, paste and symmetry
 
 - **Load limits bind every entry in a file, referenced or not and parsed or only carried** — `judgment`
-  → `test`: an oversized texture that no part references, and an authoring-only entry whose declared size and actual size disagree, each refused on Studio's path and on the player's carry-without-parsing path. Data nothing renders is where a limit evasion would be put, because it has no visible effect until it has been allocated.
+  → `test`: an oversized texture that no part references, and a structural entry whose declared size and actual size disagree, each refused on Studio's path and on the player's. Data nothing renders is where a limit evasion would be put, because it has no visible effect until it has been allocated. Revised 2026-11-27: there is no longer a carry-without-parsing path, since the player loads the whole structure.
   Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
 
 - **Data moved between puppets is renumbered, and no reference crosses by numeric coincidence** — `judgment`
@@ -125,3 +125,24 @@ Record the threat model, the roles, and anything exempt here on the first planni
 - **Finiteness is judged at the precision the runtime evaluates in, and after an operation rather than only at parse** — `judgment`
   → `test`: a literal finite as a 64-bit value and infinite once narrowed; and a mirror whose reflection of a finite coordinate about a distant axis overflows. The first makes two tools disagree about whether one file is valid; the second produces an unloadable puppet from a legal one.
   Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+### Physics, tracks and the limits they need
+
+- **Physics cannot produce a non-finite or out-of-range value from a finite file** — `judgment`
+  → `test`: fixtures with zero or negative simulation constants, extreme stiffness, a high-gain loop from output back to anchor, and a stalled frame interval. Run many frames and assert every parameter and transform stays finite and within the driven parameter's range. A non-finite state must reset to rest and never reach geometry, which is the cliff [I2](../invariants.md) guards.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Physics simulation constants are range-validated at load, before anything is allocated for them** — `judgment`
+  → `test`, one rejected fixture per constant that admits a degenerate value. A finite file does not imply a finite simulation, and nothing downstream re-checks.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A track's keyframe times are finite and strictly ordered, its values finite and within its parameter's range, and its blend durations finite and non-negative** — `judgment`
+  → `test`, one rejected fixture per defect. Ordering is load-bearing rather than cosmetic: animation lookup seeks rather than scans, so unordered times give wrong results silently instead of failing.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Every stored collection and string has a declared limit, and the limit set and the schema agree** — `judgment`
+  → `script`: walk the format definition and fail on any collection or string with no limit, and on any limit with no just-over fixture. Physics nodes, tree depth through a chain, animations, tracks and keyframes are all newly countable and none is currently bounded. A kind added later with no limit then fails the check rather than shipping unbounded.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **The archive's directory is bounded and sanity-checked before any entry is read** — `judgment`
+  → `test`: fixtures with an over-long entry name, duplicate entry names, overlapping local-header data, and an entry name the format does not define. Each is refused before anything is decompressed, with peak memory below the payload limit.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A saved file contains no path, username or machine name from the writing machine** — `judgment`
+  → `script`: save a fixture with the harness's home directory and user name set to unique strings, then scan every entry's decompressed bytes and fail on any occurrence. The rule is already stated for import provenance and for zip metadata; nothing checks it.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.

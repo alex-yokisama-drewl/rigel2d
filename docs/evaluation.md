@@ -9,8 +9,9 @@ commits to the order being specified rather than emergent. This document is that
 
 ## The order **[proposed]**
 
-One pass per frame, each stage reading only what the stages above it produced. Nothing here
-loops back.
+One pass per frame, each stage reading only what the stages above it produced. **The pass never
+iterates.** Its one backward read is backward in *time* rather than within the pass: a physics
+node reads the previous frame's transform, which stage 2 describes.
 
 | | Stage | Produces |
 |---|---|---|
@@ -18,7 +19,7 @@ loops back.
 | 2 | **Driving** | One value for every parameter |
 | 3 | **Binding evaluation** | For each binding, its interpolated contribution |
 | 4 | **Composition** | One accumulated transform and one accumulated deformation per node |
-| 5 | **Tree transform** | Each node's final transform, accumulated from its ancestors |
+| 5 | **Tree transform** | Each node's final transform, accumulated from its ancestors. A physics node's own simulated displacement is part of it |
 | 6 | **Group deformation** | Mesh groups and chain deformers applied to the geometry beneath them |
 | 7 | **Render** | The frame |
 
@@ -71,15 +72,25 @@ requires every transition into and out of a fallback behaviour to be continuous.
 animations target one parameter, the later-started one wins; it is stated here so that it is
 not discovered.
 
-Physics reads the previous frame's accumulated transforms, which is what makes hair follow a
-head turn. That is the one backward read in the pass, it is a frame old deliberately, and it is
-why the pass does not loop.
+Physics reads the previous frame's accumulated transform **of its own node**, which is what
+makes hair follow a head turn. That is the one backward read, it is a frame old deliberately,
+and it is why the pass never iterates. A physics node reads no node but its own, so physics adds
+no reference kind and leaves a deletion nothing to dangle.
+
+**A physics node's simulation also displaces its own node's transform**, and that displacement
+joins the componentwise sum at stage 4 like any other contribution. This is what makes a chain
+work: a physics node may contain only physics, so a child pendulum hangs from a parent that
+already swings. **A chain lags by one frame however long it is** — each node reads a previous
+frame in which its parent's displacement had already been applied, so the delay does not
+accumulate down the chain. On the first frame after a load or a replacement there is no previous
+frame, and every physics node reads its rest transform.
 
 **The pattern this forces, named because it is what riggers will reach for.** Inertia on a
 tracked value — a head turn that overshoots and settles — is not physics modulating the tracked
-parameter, because that would be two drivers on one parameter. It is physics reading the
-tracked parameter and driving a *second* one, with bindings combining the two. The extra
-parameter is the cost of every parameter's value having exactly one origin.
+parameter, because that would be two drivers on one parameter. It is a physics node anchored
+beneath a node the tracked parameter moves, driving a *second* parameter, with bindings
+combining the two. The extra parameter is the cost of every parameter's value having exactly one
+origin.
 
 ## 3. Binding evaluation **[proposed]**
 

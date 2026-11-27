@@ -33,8 +33,8 @@ NOT. The negative half is usually the useful half.
 
 | Term | Means | Not |
 |---|---|---|
-| **Puppet** | A complete rig: node tree, textures, parameters, bindings, physics, animations. The thing both applications work on | Not "model" — that word is doing other work. Not "character", which is the art |
-| **Node** | One entry in a puppet's tree. Part, mesh group and composite are kinds of node | Not "object" and not "layer" |
+| **Puppet** | A complete rig: node tree, textures, parameters, bindings, animations. The thing both applications work on | Not "model" — that word is doing other work. Not "character", which is the art |
+| **Node** | One entry in a puppet's tree. Part, mesh group, composite and physics are kinds of node. **Which kinds each kind may contain is declared per kind by the format**, so a kind added later arrives with a stated answer rather than a validator exception | Not "object" and not "layer" |
 | **Part** | A node that draws a mesh with a texture on it | Not the texture. A part *references* a texture, and several parts may reference one ([puppet.md](requirements/puppet.md)) |
 | **Texture** | An image a part draws with. An entity in its own right, referenced rather than owned | Not a part, not a sprite, not an atlas |
 | **Texture flip** | Stored state on a **part's** reference to a texture: the texture is sampled reversed along the left–right axis, the top–bottom axis, or both. What lets two parts share one drawing with one of them reversed | **Not a mirror**, which is an operation producing new independent data. A texture flip creates nothing and belongs to the part that holds it |
@@ -50,8 +50,9 @@ NOT. The negative half is usually the useful half.
 | **Mirror** | The operation that produces new, independent data reflected across a mirror axis. Applied to a mesh, to a binding, or to a whole subtree containing both. Mirroring a **binding** reflects *that binding's* stored values and, where the axis is bilateral, reverses which keypoint holds which value | **A mirror never writes a parameter.** It reads axis polarity and rewrites bindings, so mirroring one node cannot change how any other node bound to the same parameter behaves. Not a texture flip, which is stored state rather than an operation |
 | **Mirror axis** | A line in puppet space that a mirror reflects across. A puppet carries two — the **left–right mirror axis**, which swaps left and right, and the **top–bottom mirror axis**, which swaps top and bottom. Authoring-only data, defaulting to the puppet's centre | Named for **what it swaps**, never for whether the line itself is vertical or horizontal. Those two namings invert each other, and that inversion is what this entry exists to prevent |
 | **Stale** | Of a binding or a deformation: authored data kept although the mesh it applies to no longer matches it. A flagged state the rigger resolves at their own pace | **Not invalid.** A stale binding loads, renders and saves; a malformed one does not ([puppet.md](requirements/puppet.md)) |
-| **Animation** | Parameter values driven over time, on a timeline | |
-| **Physics** | Simulated motion that drives parameters, rather than input driving them | |
+| **Animation** | Parameter values driven over time, on a timeline. Composed of **tracks** | |
+| **Track** | The part of an animation that drives exactly one parameter over time. An animation is a set of tracks, at most one per parameter | **Not a channel**, which arrives from a source. Not a **response curve**, which shapes a channel onto an axis. Not a *lane*, which is inochi2d's word for the same thing |
+| **Physics** | A kind of node. Simulated motion anchored in the tree, which reads its own accumulated transform from the previous frame, displaces that node's own transform by the result, and may drive one parameter. **Contains only physics**, which is what makes a pendulum chain a subtree | Not something that lives beside the node tree — it is in it. **Not one frame behind per segment**: a chain of any length lags by one frame, because each node reads a previous frame that already carried its parent's displacement |
 | **Scene** | Live's saved document: a background, which puppets and images, and where each sits | Not a puppet, and deliberately thin. It holds placement, not behaviour — a scene references puppets, never contains one |
 | **Source** | A feed of input arriving over a port, supplying channels. A face tracker is one kind | Not a tracker specifically. Anything that can open a socket is a source |
 | **Channel** | One named value arriving from a source | Not a parameter. See above |
@@ -102,4 +103,5 @@ confusion than the table above, because it catches the terms nobody thought to d
 | Object | Too loose to name a tree entry, and it will collide with whatever the implementation calls its base type | **Node**, or the specific kind |
 | Layer | A PSD layer and a draw-order layer are different things, and import maps one onto the other | **PSD layer** on the import side, **part** on the puppet side |
 | Sprite | Conflates the part with the texture, which this project deliberately separates | **Part** or **texture**, whichever is meant |
+| Lane | inochi2d's word for the part of an animation that drives one parameter. Two vocabularies for one thing is the whole failure this document exists to prevent | **Track** |
 | Project | There is no project file — a puppet is one file (`decisions.md`), so the word invites a question with no answer | **Puppet**, or **the repository**, whichever is meant. *The project* as the undertaking, and *the project owner*, are sanctioned — what is banned is a project **file**, document or artifact |
