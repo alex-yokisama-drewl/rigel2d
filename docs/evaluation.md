@@ -85,6 +85,40 @@ frame in which its parent's displacement had already been applied, so the delay 
 accumulate down the chain. On the first frame after a load or a replacement there is no previous
 frame, and every physics node reads its rest transform.
 
+### Physics cannot run away **[proposed]**
+
+A simulation described by a file that strangers trade is a differential equation with
+arbitrary coefficients, and the only honest assumption is that some of them diverge. Every bound
+below is a **runtime constant, not puppet data** — a rigger never sets one and a file cannot
+raise one.
+
+| Bound | Rule |
+|---|---|
+| **Timestep** | Fixed, independent of the output rate. Determinism is claimed only under a fixed step ([requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed)) |
+| **Catch-up** | The simulated time a single frame may consume is capped. The excess is discarded, never simulated |
+| **Bob distance** | Clamped to a multiple of that node's `length` |
+| **Bob velocity** | Clamped to a multiple of `length` per second |
+| **Non-finite state** | That node resets to rest for the frame |
+| **Parameter output** | Clamped to the driven parameter's declared axis range |
+
+**Discarding time rather than simulating it is the bound that matters on stream.** A two-second
+stall must not produce two seconds of catch-up motion: that is a visible lurch, and it is
+unbounded work inside the frame loop, which [I5](invariants.md) exists to prevent. Hair that did
+not move is the right failure.
+
+**The feedback loop is bounded by construction rather than by a limit.** Physics is the one stage
+that reads backwards, and the only path from a physics node back to its own anchor runs through a
+parameter: physics drives one, a binding on an ancestor reads it, the ancestor moves, the anchor
+moves. **A parameter is clamped to its declared axis range**, so the gain around that loop has a
+ceiling the data model already carries and nothing additional has to enforce. A chain needs no
+equivalent, because a child never influences its parent — a chain is a cascade, not a loop.
+
+**What these bounds buy is the severity of a bad rig, not its absence.** A node whose constants
+are unstable at the fixed step still buzzes against its clamp. It does not produce a non-finite
+transform, it never reaches the render surface ([I2](invariants.md)), and it cannot cost
+unbounded time. That is why the upper bounds on the constants themselves can stay `[open]` in
+[format.md](format.md) without holding anything up.
+
 **The pattern this forces, named because it is what riggers will reach for.** Inertia on a
 tracked value — a head turn that overshoots and settles — is not physics modulating the tracked
 parameter, because that would be two drivers on one parameter. It is a physics node anchored

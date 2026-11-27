@@ -169,6 +169,19 @@ and because one field at zero stops every pendulum in the puppet, which is what 
 problem bisectable. A direction, and wind, are what a later minor version adds if they are ever
 wanted.
 
+**The arm rests along the node's own down-axis, so a pendulum's neutral direction is simply the
+node's own rotation.** There is no neutral-angle field: every node already carries a local
+transform, and a rigger already has a gizmo for it. The restoring spring pulls the arm back to
+that direction, gravity pulls it toward puppet-down, and where the two disagree the pendulum
+rests between them.
+
+**This is what makes a spike.** Set `gravity` to zero and the node returns exactly to the
+direction it was authored at — springing when its anchor moves, settling back where it started.
+Short hair, spikes, antennae, anything meant to read as stiff. Leave `gravity` at one with the
+node unrotated and the same model is ordinary long hair. Two rigging cases, one model, one knob
+between them, which is why neither gets a mode of its own. If decoupling the rest direction from
+the node's orientation is ever actually wanted, that is a field a later minor version adds.
+
 **There is one model, a spring pendulum.** inochi2d also stores a rigid-pendulum switch, and its
 rigid model ignores `frequency` and `length_damping` — a control that silently disables two
 others, which is the clearest beginner trap in either incumbent's field set. A high `frequency`
@@ -195,8 +208,13 @@ Two outputs, and the first is what makes a chain work with no chain mechanism in
 **Ranges are `[open]` beyond sign and finiteness.** The validator requires `length` and
 `frequency` above zero, `gravity` and both dampings at or above zero, and every value finite.
 Upper bounds are a question about integrator stability at the fixed timestep, and neither
-incumbent declares any — a sweep over frequency, damping and length settles them. That is a
-measurement due with the evaluation pass, not more research.
+incumbent declares any — a sweep over frequency, damping and length settles them, which is a
+measurement due with the evaluation pass rather than more research.
+
+**That they are open blocks nothing**, because the runtime bounds the simulation itself rather
+than trusting the constants: see
+[evaluation.md](evaluation.md#physics-cannot-run-away-proposed). A constant outside any range we
+would have set produces an ugly rig, not a crash.
 
 ## Textures **[proposed]**
 
