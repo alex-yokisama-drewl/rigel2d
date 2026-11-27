@@ -72,6 +72,12 @@ chains — and *animations* is `.motion3.json` files.
 
 ## How `platform.md` compares, dimension by dimension
 
+**The figures compared below are the ones `platform.md` carried on 2026-11-26.** That table was
+revised upward afterwards, in part because of this comparison, so the Reference and Stress
+columns here no longer match it. They are left as measured rather than re-synced: this is a
+dated finding, and rewriting it would destroy the record of what the comparison actually found.
+Read `platform.md` for the current dimensions.
+
 | Dimension | Reference | Where it sits | Stress | Where it sits |
 |---|---|---|---|---|
 | Nodes | 40 | **below the corpus minimum** | 160 | below the median |

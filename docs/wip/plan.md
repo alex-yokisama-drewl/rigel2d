@@ -89,13 +89,39 @@ different points.
 
 | Area | When | Why then |
 |---|---|---|
-| [puppet.md](../requirements/puppet.md) | **Done** — [puppet-acceptance.md](../requirements/puppet-acceptance.md) | Its `[open]` on the compatibility promise is a signal from the owner and changes no criterion |
+| [puppet.md](../requirements/puppet.md) | **Done**, and refreshed 2026-11-27 — [puppet-acceptance.md](../requirements/puppet-acceptance.md) | Its `[open]` on the compatibility promise is a signal from the owner and changes no criterion. The refresh was due because the physics, track and authoring-payload decisions moved the requirement under criteria already written |
 | [platform.md](../requirements/platform.md) | With S6 | The counter half can be commissioned now. The soak length is settled at four hours and the deadline-miss figures stand as written, provisional until the calibration sitting |
 | [performing.md](../requirements/performing.md) | **Due now** | S0 is done and the `[open]` that decides the output path is resolved |
 | [authoring.md](../requirements/authoring.md) | **Partly done** — the operations settled on 2026-11-26 are in [authoring-acceptance.md](../requirements/authoring-acceptance.md); the rest is next cycle | Studio is not in this phase |
 
 The planner's most useful output is the gaps it finds in the requirements. Those route back into
 `docs/requirements/` before the subsystem they affect starts.
+
+### The tests, and why they are not written yet **[decided]**
+
+[requirements/README.md](../requirements/README.md) draws the line: *a criterion is confirmed
+failing when its test is written, not when it is specified.* The criteria are design-blind and
+durable. The tests that implement them are not yet writable, and the reason is concrete rather
+than a matter of sequencing.
+
+`crates/rigel-format/src/lib.rs` is a doc comment. There is no type to call, no error to match
+on, and no `rigged` fixture — and `rigged` is a puppet archive, so building one by hand is the
+format's own job. An agent writing the tests today would have to invent the crate's public API
+and its encoding, which is the design and the implementation both, and would destroy the
+independence the tests exist to provide.
+
+**The tests are therefore written at the start of S2, before the implementer runs** — the
+ordinary `feature` shape, `acceptance-planner` and then `module-dev`. Two things have to hold,
+and both are easy to lose:
+
+- **The implementer never writes the acceptance tests.** Tests written by the author of the code
+  encode the code's assumptions ([testing.md](../testing.md)). The criteria are already written
+  design-blind, so the test-writing agent *implements* them rather than deriving them, and it
+  may read [format.md](../format.md) — a test that loads a file has to know the encoding.
+- **`rigged` is hand-authored and uses no project code.** A fixture produced by our writer and
+  then read by our reader asserts only that we agree with ourselves. This is the rule
+  [puppet-acceptance.md](../requirements/puppet-acceptance.md) already puts on the generated
+  workloads, and it holds here for the same reason.
 
 ### What blocked S2 — settled 2026-11-27
 

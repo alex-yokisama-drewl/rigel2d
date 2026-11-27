@@ -205,6 +205,14 @@ Two outputs, and the first is what makes a chain work with no chain mechanism in
   naming the source per axis covers all four, covers a one-dimensional parameter without a
   special case, and does not grow when a fifth quantity is wanted.
 
+**An animation stores its tracks as a list, each naming the parameter it drives**, and two
+tracks naming one parameter is a validation failure rather than a shape the format cannot
+express. The alternative — keying the collection by parameter identifier, which makes the
+duplicate inexpressible and needs no rule — loses on legibility: it makes the identifier serve as
+both key and reference, and a third party reading the JSON is the case this format exists to
+serve. **The puppet's gravity is absent when it is the default** and written only when it
+differs, which is the stored-form rule every other defaulted field here follows.
+
 **Ranges are `[open]` beyond sign and finiteness.** The validator requires `length` and
 `frequency` above zero, `gravity` and both dampings at or above zero, and every value finite.
 Upper bounds are a question about integrator stability at the fixed timestep, and neither
