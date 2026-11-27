@@ -99,8 +99,11 @@ if the document is untouched.
 
 ### While working
 
-- **A decision touches an invariant, or any `[proposed]` or `[open]` section** → stop and ask.
-- **Any other decision** → make it, proceed, record it with its reason.
+- **A decision changes what the software is** — behaviour a user sees, a trade-off, scope → ask.
+- **A decision touches an invariant** → stop and ask. Always.
+- **Any other decision, including one that touches a `[proposed]` or `[open]` section** → make
+  it, proceed, record it with its reason, and flag in the handoff that the section was touched.
+  See *Who decides what* in `CLAUDE.md`.
 - **An approach fails twice** → stop trying variants. Record it under *Tried and rejected* with
   one line on why. That section survives every cleanup and is what stops a fresh session
   re-proposing it.
