@@ -32,8 +32,28 @@ fi
 staged="$(git diff --cached --name-only 2>/dev/null)"
 [ -z "$staged" ] && exit 0
 
-wipdoc="$(find docs/wip -maxdepth 1 -name '*.md' ! -name 'plan.md' ! -name 'calibration.md' \
-  -printf '%p\n' 2>/dev/null | head -1)"
+# This branch's own feature document, derived from the branch name.
+#
+# It used to be whatever `find docs/wip` returned first, which is wrong three ways: it could
+# name another branch's document; once a finish commit staged the deletion of the real one
+# `find` stopped seeing it and the guard demanded `open-questions.md`, blocking the very commit
+# docs/documentation.md mandates; and on a branch with no feature document at all it demanded
+# one anyway. The rule itself is unchanged — a feature branch still cannot commit code without
+# its document — it now lands on the right file.
+case "$branch" in
+  feature/*|fix/*) slug="${branch#*/}" ;;
+  *)               slug="" ;;
+esac
+
+wipdoc=""
+if [ -n "$slug" ] && [ -f "docs/wip/$slug.md" ]; then
+  wipdoc="docs/wip/$slug.md"
+fi
+
+# A staged change to it satisfies the rule, including the deletion that retires it at finish.
+if [ -n "$slug" ] && printf '%s\n' "$staged" | grep -qFx "docs/wip/$slug.md"; then
+  wipdoc=""
+fi
 
 if [ -n "$wipdoc" ]; then
   # Is anything outside docs/ being committed?
