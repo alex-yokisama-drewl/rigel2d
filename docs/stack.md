@@ -23,8 +23,8 @@ and are not yet confirmed by use. [decisions.md](decisions.md) carries what lost
 Transparency was the first thing this choice was exposed to, and it has been measured rather
 than reasoned about ([research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md)).
 **A decoration-free winit window emits correct premultiplied alpha into a real compositor on
-Linux/X11, and alpha reaches OBS on both Linux and Windows. The stack survives.** Two conditions
-came out of it:
+Linux/X11, and alpha reaches OBS on both Linux and Windows. The stack survives.** What came out
+of it is a set of conditions:
 
 - **The backend must be pinned on Windows.** wgpu's default selection chose Vulkan on the machine
   tested, which crashes with an access violation — offscreen as well as windowed, so it is not a
@@ -36,12 +36,37 @@ came out of it:
   desktop transparency there needs DirectComposition or a layered window and wgpu exposes
   neither. **Output is unaffected** — `Opaque` ignores alpha for desktop compositing rather than
   discarding it from the buffer, and the capture route reads the buffer.
+- **The surface format and its colour space must be pinned explicitly, on every platform.** The
+  spike pinned `Bgra8Unorm`. An sRGB surface applies the transfer function a second time and
+  falsifies every measured value silently — a half-transparent white reads about 188 where the
+  reference table says 128, which looks like a plausible result rather than a bug. wgpu 30 added
+  `SurfaceConfiguration::color_space`, whose default `Auto` resolves to `Srgb`, so the hazard is
+  now reachable without anyone asking for an sRGB *format*. With a linear format the shader's
+  values still reach the surface unencoded — the colour space only tells the compositor how to
+  read them — but anyone carrying over the older two-field mental model will miss it.
 
 **What is affected is the editor's preview on Windows**, which cannot be transparent on the
 desktop. That is a platform difference in Studio and it is not yet designed for; it belongs to
 the Studio cycle.
 
 macOS is unobserved, and so is the windowing assumption there.
+
+### Moving to a new wgpu major **[decided]**
+
+First-hand from the spike's port to wgpu 30, and the support for the re-check note at the foot
+of this document. This note names its version so that it ages visibly.
+
+- **Read the vendored source in one pass before porting**, under
+  `~/.cargo/registry/src/*/wgpu-<major>*/src/api/`. wgpu 30's API differed from older versions
+  enough to make guesses worthless: `PipelineLayoutDescriptor` has `immediate_size` where it had
+  `push_constant_ranges`; `multiview` became `multiview_mask` and is now required on
+  `RenderPassDescriptor` too; `PollType::Wait` is a struct variant needing `submission_index` and
+  `timeout`; `get_mapped_range` returns a `Result`; `InstanceDescriptor` has no `Default`, though
+  `Instance::default()` exists. Reading settled all of it at once, where compiling and fixing one
+  error at a time would have taken several passes. **Do this before the port, not during it.**
+- **The one that fails silently:** `SurfaceTexture::present` is gone in wgpu 30; presentation
+  moved to `Queue::present`, and a frame that is merely dropped is *discarded* rather than shown.
+  A port that drops the call compiles and renders nothing, with no error.
 
 ### The render surface is a window the toolkit does not own **[proposed]**
 
@@ -172,4 +197,4 @@ should be built that assumes any of them has gone well.
    resource-creation counter after frame one, which is [I5](invariants.md) as stated.
 
 **Re-check this document at the start of each cycle.** wgpu's major versions move fast and the
-`wgpu-hal` internals the third point rests on are not a stable API.
+`wgpu-hal` internals the second point rests on are not a stable API.

@@ -69,7 +69,7 @@ There is no staging and no production service. What exists:
 | The maintainer's development machine, Linux | The only place the real-driver render path runs routinely |
 | Hosted CI, Linux | The push gates in [stack.md](../stack.md), with no GPU and a noop device |
 | Hosted CI, Windows and macOS | That it builds and that structural assertions pass, nothing more |
-| The maintainer's Windows laptop | Real-hardware checks, run by hand and occasionally. Reachable over SSH, so automating against it is open — see the caution below |
+| The maintainer's Windows laptop | Real-hardware checks, run by hand and occasionally. Reachable over SSH, which reaches building and structural assertions but not the render path — see the caution below |
 | A borrowed weak laptop, rarely, late | Counter-to-milliseconds calibration only |
 | The user's machine | **Production.** Uncountable, no operator, no console |
 
@@ -78,11 +78,19 @@ tested routinely because it is where development happens; Windows gets occasiona
 That is weaker than the Supported tier in [platform.md](../requirements/platform.md) reads, and
 is recorded here rather than left as an implication. It tightens when the work goes public.
 
-**Caution on automating against the Windows laptop.** A self-hosted runner reachable over SSH
-would let the structural assertions and the counter gate run on real Windows hardware, which no
-hosted runner can offer. It must not accept work from outside contributors: a self-hosted runner
-on a personal machine executing CI from a public repository runs a stranger's code on that
-machine. If it is set up, it is gated to the maintainer's own branches.
+**Limit on automating against the Windows laptop.** An SSH session on Windows is
+non-interactive and sits outside the desktop session, where a swapchain and OBS behave
+differently from what runs in the user's own session. Building and structural assertions could
+be automated over SSH. Anything touching a swapchain, the compositor or a capture route cannot,
+because measuring it there risks measuring the wrong thing entirely; the owner runs it by hand
+in their own desktop session, as S0's Windows leg was run as a self-asserting bundle. Established
+by S0, 2026-11-27.
+
+**Caution on a self-hosted runner.** One reachable over SSH would let the structural assertions
+and the counter gate run on real Windows hardware, which no hosted runner can offer. It must not
+accept work from outside contributors: a self-hosted runner on a personal machine executing CI
+from a public repository runs a stranger's code on that machine. If it is set up, it is gated to
+the maintainer's own branches.
 
 ### Deploy mechanism **[proposed]**
 

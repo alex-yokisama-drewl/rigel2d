@@ -1,8 +1,9 @@
 # Does transparent output actually work, and what does each route do to our frames?
 
 **Measured:** 2026-11-27 · **Feeds:** *Which platforms need an OBS plugin* in
-[performing.md](../requirements/performing.md), point 1 of *What this choice is still exposed to*
-in [stack.md](../stack.md), and the frame convention in [runtime.md](../runtime.md) ·
+[performing.md](../requirements/performing.md), *What the transparency spike settled* in
+[stack.md](../stack.md#what-the-transparency-spike-settled-decided), and the frame convention
+in [runtime.md](../runtime.md) ·
 **Verdict:** Transparency works, on Linux and on Windows, and has now been observed rather than
 inferred. Every route measured carries alpha correctly. **None of them carries colour correctly
 without being told what it is being sent**, and no host documents its assumption or reports a
@@ -179,3 +180,20 @@ reasoning for each. `compositor-test.py` measures a real compositor, `obs-test.p
 through its bundled websocket, and `probe-windows.py` scores images returned from a machine this
 session cannot reach. The sender takes `--backend`, `--adapter`, `--straight` and `--srgb`, each
 of which exists because some host's assumption had to be varied to be measured.
+
+Traps that would cost a future measurer real time again:
+
+- **A capture route that picks its own surface can grab the wrong window and return a frame that
+  is internally consistent.** `obs-vkcapture` captured the backdrop rather than the test window
+  and returned flat magenta that scored as coherent. Only a check on frame size caught it.
+  **Assert the captured frame's size before trusting any probe.** The sender's `--solo`
+  suppresses the backdrop for capture runs.
+- **Two consecutive probe runs returning byte-identical numbers mean a stale screenshot, not a
+  result.** A real capture of a changed scene cannot be identical. Distrust any measurement that
+  repeats exactly.
+- **`systemd-run --user --scope` does not escape a snap.** A scope stays in the caller's mount
+  namespace, and only appears to work for a command such as `--version` that never loads the
+  heavy libraries; OBS died with a `symbol lookup error` against the snap's `libpthread`. A
+  transient **service** — the same command without `--scope` — is started by the user's systemd
+  manager, outside the confinement, and works. Both sender and consumer must be outside it,
+  because a snap also has a private `/tmp`.
