@@ -47,6 +47,36 @@ rule](requirements/puppet.md#a-build-works-with-what-it-understands-and-preserve
 expressed as two numbers. A build must be able to render and save a structure it has no code
 for, so *can I render this* and *can I save this* are one question here and not two.
 
+### An unfamiliar value in a field this build knows **[proposed]**
+
+The hard case, and the one that is not extension data. A later minor version may add a value to
+an enumerated field the core format already defines — a physics node's `output_source`, a
+parameter axis's polarity, a deformation's composition mode. The field is one this build
+interprets; the value is one it has never heard of.
+
+**Every enumerated field the format defines therefore has one more inhabitant than it lists: the
+unfamiliar value, carrying the token verbatim.** It is not a parse failure and not a repair.
+
+| | |
+|---|---|
+| At the **current** version | **Invalid.** A writer at this version had the whole list and used something else, so a typo and an addition are indistinguishable — the same argument that makes unmarked data outside `x` invalid |
+| At a **later declared** version | **Loads.** Inert wherever it would have been interpreted, and written back verbatim |
+
+*Inert* is what [requirements/puppet-acceptance.md](requirements/puppet-acceptance.md)'s `EXT-7`
+asserts by removal: deleting the material from the file must change no evaluated geometry, no
+draw order and no reported entity. So a physics node whose `output_source` is unfamiliar drives
+nothing on that axis — it does not fall back to a default, because guessing is the one thing a
+build with no code for a value must not do.
+
+**Because** the alternative is a closed enum, and a closed enum forces a reader to choose between
+refusing a file a later build wrote and silently substituting a value nobody asked for. The first
+breaks [the compatibility rule](requirements/puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest-decided),
+which requires that a structure this build has no code for still renders and saves; the second
+corrupts a puppet quietly, which is worse. Carrying the token costs one variant per field.
+
+This is the same shape as extension data under `x` and is gated the same way — on the **declared
+version**, never on recognisability. What differs is only that the core format named the field.
+
 ### The upgrading save keeps the previous bytes **[proposed]**
 
 When a build opens a file declaring a lower minor and saves it, it writes the file at the current
@@ -355,7 +385,8 @@ rules it cannot:
   none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
 - binding value counts matching their mesh, or marked stale;
 - every number finite;
-- enumerated values known, or under `x`.
+- enumerated values known, or under `x`, or unfamiliar in a file declaring a later minor version
+  — see [an unfamiliar value in a field this build knows](#an-unfamiliar-value-in-a-field-this-build-knows-proposed).
 
 A generated puppet doubles as the conformance fixture proving a third party can write a valid
 one, which [platform.md](requirements/platform.md) already requires for its own reasons.
