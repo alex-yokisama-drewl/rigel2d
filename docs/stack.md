@@ -97,6 +97,10 @@ What follows is the reason for the split:
 | `rigel-studio` | The editor |
 | `rigel-live` | The player |
 
+The crates live under `crates/`, on edition 2024 with resolver 3. `Cargo.lock` is committed
+because [ops.md](concerns/ops.md) requires release builds to pass `--locked`, and a lockfile that
+is not in the repository cannot be locked against.
+
 `rigel-format` is separate so that the validator and the workload generator build and run without
 a GPU or a window — which is what lets CI exercise them, and what makes a standalone validator a
 thing a third party can run.
@@ -119,7 +123,7 @@ cargo run -p rigel-live
 rustup installs the pinned toolchain itself on the first `cargo` command, so no version is named
 here and none goes stale.
 
-**Three of those lines exist because the block failed without them**, and each is the kind of
+**Several of those lines exist only because the block failed without them**, and each is the kind of
 thing that survives being remembered rather than run: `apt-get update` because a bare image
 carries no package lists; `sh -s -- -y` because the installer is otherwise interactive; and
 sourcing `cargo/env` because rustup writes PATH into your login profile and the very next line
@@ -163,21 +167,38 @@ beginner will not find the per-user directory. The checks are in [ops.md](concer
 
 ## On push **[proposed]**
 
-In order, each blocking a merge:
+In order, each blocking a merge. They run as GitHub Actions, in
+`.github/workflows/push-gates.yml`: one ordered job for the Linux gates, and a separate matrix job
+for the Windows and macOS builds.
 
 | | Gate |
 |---|---|
-| 1 | `cargo fmt --check`, `cargo clippy -- -D warnings` |
+| 1 | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` |
 | 2 | `cargo test --workspace` — unit and acceptance tests, and the structural UI assertions |
 | 3 | The per-frame counters against their committed baseline, on the reference and stress puppets |
 | 4 | `scripts/docs-check.sh` |
 | 5 | The no-outbound-connection assertion over our own code |
 
 Gate 3 is the one that carries the frame budget, and it runs without a GPU — see
-[runtime.md](runtime.md#counters-are-the-requirement-proposed). Gates 1, 2 and 4 run on Linux;
-the build is additionally exercised on Windows and on a hosted macOS runner, which can say that
-it builds and that structural assertions pass and nothing more
+[runtime.md](runtime.md#counters-are-the-requirement-proposed). **It is not wired**, and the
+reason does not depend on schedule: it has no subject until the runtime produces a command stream
+and a committed counter baseline exists to compare against. The others run. Gates 1, 2, 4 and 5
+run on Linux; the build is additionally exercised on Windows and on a hosted macOS runner, which
+can say that it builds and that structural assertions pass and nothing more
 ([platform.md](requirements/platform.md) is explicit that no stronger macOS claim is founded).
+
+`scripts/no-outbound.sh` runs `--self-test` before every real scan, planting each forbidden and
+each allowed form and asserting the verdict. A deny-list verified only on the day it was written
+will one day be green for the wrong reason; on its first run the self-test caught a live bug in
+the script's own pattern table.
+
+**Trap: branch protection on `master` requires the CI checks by name, as strings.** Renaming a
+workflow job fails nothing — protection simply stops covering it, and the check quietly stops
+being required while every run still shows green. The matrix job's names embed the runner labels,
+so changing a runner label does the same. Rename and re-point together, or do not rename.
+Required today: `gates 1, 2, 4, 5`, `builds only — windows-latest` and
+`builds only — macos-latest`, with `strict` on and admins enforced. `required_linear_history` is
+**off**, deliberately: each subsystem lands as a merge commit, which linear history forbids.
 
 ### What a release requires **[proposed]**
 
@@ -196,6 +217,11 @@ Artifacts are published with checksums on the same public forge as the issue tra
 
 `.claude/test-cmd` holds it, which is what `scripts/test-record.sh` reads. The harness and the
 gates are [testing.md](testing.md).
+
+**CI does not go through either.** Gate 2 runs the cargo command directly, so no result is
+recorded in CI and the two can drift — they are kept identical by hand today. The consequence
+for the release job, which is specified to require a recorded result, is in
+[ops.md](concerns/ops.md)'s *Building and shipping*.
 
 ## What this choice is still exposed to **[open]**
 

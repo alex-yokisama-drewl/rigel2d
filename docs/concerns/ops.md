@@ -21,9 +21,12 @@ what it is doing.
 - **A deploy can be rolled back** — `judgment`
   And the step that cannot — usually a migration — is known in advance. Cross-reference
   `data.md`.
-- **The project runs locally from its documented setup** — `test`
-  The instructions in `docs/stack.md` are followed literally on a clean environment, not
-  remembered.
+- **The project runs locally from its documented setup** — `judgment`
+  The block in `docs/stack.md` is run verbatim in a bare environment, with no step supplied by
+  hand — no package index refresh, no elevated user, no exported PATH. A walk that quietly adds
+  any of them passes while being wrong, which is how a first attempt was labelled walked while
+  lines of the block failed a literal run. A scheduled or manual container job running the block
+  would restore a `script` tag; its cadence is undecided, and until it exists no check does.
 
 ### Failure
 
@@ -129,6 +132,9 @@ application open a connection, so it does not touch the rule in
   → `script`: the release job builds with `--locked`, fails without `rust-toolchain.toml`, and
   fails unless `scripts/test-record.sh` holds a passing result for the tag's commit SHA. A
   toolchain bump is its own commit and re-runs the counter gate.
+  **Nothing yet produces that record.** CI runs `cargo test --workspace --locked` directly, not
+  through `scripts/test-record.sh`, so no result is ever written there; whoever builds the release
+  job has to produce the record as well as check it.
   Seeded at planning, 2026-11-26.
 
 - **Each artifact runs on a clean machine with nothing installed beyond the platform's own components** — `judgment`
@@ -136,6 +142,10 @@ application open a connection, so it does not touch the rule in
   must not need the Visual C++ runtime, so the CRT is static; Linux must stay under the glibc
   symbol-version ceiling above; macOS must set its deployment target. A missing runtime on
   Windows is a silent no-start with no console, which is the worst failure to diagnose by hand.
+  **The push gates do not enforce the Linux floor and are not evidence of it**: they run on
+  `ubuntu-latest`, and the symbol-version check is what enforces it. Ubuntu 20.04 hosted runners
+  are retired, so the release job needs a container or another floor-compatible build
+  environment; it cannot reuse the gate job's runner choice.
   Seeded at planning, 2026-11-26.
 
 - **The built artifact reaches a first presented frame and exits cleanly, with an empty per-user directory and a read-only install location** — `judgment`
@@ -265,6 +275,14 @@ application open a connection, so it does not touch the rule in
   → `script`: a diff-aware check over the committed baseline file. *A stated reason* is
   unenforceable prose until something reads it.
   Seeded at planning, 2026-11-26.
+
+- **The required status checks match the workflow's job names exactly** — `script`
+  A check comparing GitHub's required-status-check names for `master` against the job names the workflow actually produces, including expanded matrix names, and asserting `strict` is on and admins are enforced. A renamed job otherwise silently stops being required while every run stays green.
+  Seeded at the S1 review, 2026-11-27.
+
+- **Gate 2 fails when the workspace runs zero tests** — `script`
+  CI reads `tests_run` from the recorded result, or counts the runner's summary lines, and fails on zero. Binds from the first subsystem that adds tests; until then an empty suite is the intended state. Without it a green gate 2 over an empty suite is indistinguishable from a passing one.
+  Seeded at the S1 review, 2026-11-27.
 
 ### Universal entries that do not apply here **[decided]**
 

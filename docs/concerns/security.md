@@ -94,14 +94,20 @@ Record the threat model, the roles, and anything exempt here on the first planni
   → `script` scanning platform manifests and entitlements, failing on any. **Revisit before plugins ship**: the scan covers our own manifests, and a plugin is not our code.
   Seeded at planning, 2026-11-26.
 - **No outbound network connection is opened** — `judgment`
-  → `script`. Same caveat as above: the assertion covers our code, so its scope needs restating before plugins ship. See `docs/decisions.md`.
+  → `script`: `scripts/no-outbound.sh`, run as gate 5. Same caveat as above: the assertion covers our code, so its scope needs restating before plugins ship. **It also reads first-party source and cannot see the dependency graph.** A crate that pulls in an HTTP client transitively is invisible to it, and that is the likeliest way this decision actually breaks. A pass means "we did not write one", never "none can happen". See `docs/decisions.md`.
   Seeded at planning, 2026-11-26.
 
 ### Supply chain
 
 - **Dependencies are locked with hashes, CI actions pinned to commit hashes, scan clean or triaged** — `judgment`
-  → `script` once there is a dependency manifest.
+  → `script`. The manifest now exists, and only part of this is covered: `--locked` on every cargo invocation in CI, `Cargo.lock` committed, and `actions/checkout` pinned to a commit hash by hand. Not covered: any check that the pinning stays, a vulnerability scan, and a place to record a triage decision. There are no registry dependencies yet, so the checksum half is satisfied vacuously.
   Seeded at planning, 2026-11-26.
+- **Every `uses:` in `.github/workflows/` is pinned to a 40-hex commit SHA** — `script`
+  A check over the workflow files failing on any action ref that is not a full commit hash. The pinning is a comment convention today, and one `@v4` would pass every gate. A tag can be moved; a hash cannot.
+  Seeded at the S1 review, 2026-11-27.
+- **The locked dependency graph contains no network-client crate, and no git or alternative-registry source** — `script`
+  `cargo deny check bans sources`, or a `cargo metadata` check against a deny-list, in CI. This is the only thing that can see what gate 5 cannot, and it binds from the first registry dependency.
+  Seeded at the S1 review, 2026-11-27.
 - **Signing keys and release tokens are unreachable from pull-request jobs** — `judgment`
   → `script` once releases exist.
   Seeded at planning, 2026-11-26.

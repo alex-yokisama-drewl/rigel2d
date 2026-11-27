@@ -18,6 +18,11 @@ specific to this one:** the harness, the idioms, and what is deliberately not te
 | Growth | The same counters on the stress workload, against the dimension that drives each | `tests/counters/`, beside the baseline gate |
 | Soak | Accelerated time, headless, synthetic input, over four hours of simulated stream | `tests/soak/` in `rigel-runtime`. **Ignored by default** — see below |
 
+**Trap: a bare nested test directory is silently skipped.** Cargo auto-discovers `tests/*.rs` and
+`tests/<dir>/main.rs` only, so `tests/acceptance/` or `tests/counters/` holding other files is not
+run by `cargo test --workspace`, and nothing reports it. Each such directory needs a `main.rs` or
+an explicit `[[test]]` entry.
+
 `.claude/test-cmd` holds `cargo test --workspace`. The counter gate runs as its own job: it
 compares against a committed baseline rather than passing or failing on its own terms, and
 [platform.md](requirements/platform.md#how-this-is-verified-proposed) explains why that half carries the

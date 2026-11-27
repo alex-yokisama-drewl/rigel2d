@@ -2,9 +2,9 @@
 
 The current phase: which subsystems get built, in what order where order matters.
 
-**Status:** agreed 2026-11-26. **S0 is done** (2026-11-27); every other subsystem is not
-started. No production code exists — `spike/alpha-sender/` is S0's throwaway instrument, and S1
-discards it.
+**Status:** agreed 2026-11-26. **S0 and S1 are done** (2026-11-27); S2 onward are not started.
+The workspace builds, the push gates run and block a merge, and no production code is
+implemented yet — the four crates are shells.
 
 ## Where this phase ends, and why there
 
@@ -27,7 +27,7 @@ Ordered. `Blocks on` names what genuinely must come first; everything else may m
 | | Subsystem | Done when | Blocks on |
 |---|---|---|---|
 | S0 | **Transparency and alpha-output spike** | **Done 2026-11-27** — measured on Linux and Windows, recorded in [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md). The `[open]` in [performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-decided) is resolved and the Game Capture capability tension answered. **macOS was not attempted** — no Mac was reachable — so Syphon alpha stays unobserved, which [platform.md](../requirements/platform.md) permits at its tier | Nothing |
-| S1 | **Workspace and the push gates** | Every crate in [stack.md](../stack.md#workspace-proposed)'s workspace table builds from a clean checkout, the push gates run, `scripts/test-record.sh` records a result, and [stack.md](../stack.md#running-locally-proposed)'s *Running locally* steps are corrected to what was actually walked — including the Linux package list it asks for, and `CLAUDE.md`'s *Running it* table with them | S0 |
+| S1 | **Workspace and the push gates** | **Done 2026-11-27** — the workspace builds from a clean clone with `--locked`, the gates that have a subject run and are required on `master`, `scripts/test-record.sh` records a result, and *Running locally* and *Running it* were corrected from a verbatim container walk. Gate 3 waits for a counter baseline; [stack.md](../stack.md#on-push-proposed) says which gates are live and why | S0 |
 | S2 | **`rigel-format`: read, validate, write** | A puppet archive round-trips byte-identically; the validator rejects a hand-written malformed corpus and accepts stale bindings as a state; load limits are enforced before allocating; extension data survives untouched; every write goes through the one atomic path | S1 |
 | S3 | **The workload generator and the fixture corpus** | The reference and stress puppets are generated from the committed dimension table in [platform.md](../requirements/platform.md), both validate, and the generated puppet doubles as the conformance fixture [puppet.md](../requirements/puppet.md) requires | S2 |
 | S4 | **The evaluation pass** | A generated puppet evaluates to a posed tree for given channel input, in the order [evaluation.md](../evaluation.md) sets; one parameter has one driver, enforced by the validator; stale bindings behave as specified; the name-resolution counter is zero | S2 |
@@ -63,13 +63,27 @@ that reads as a plausible picture rather than a fault. That is now the rule in
 [decisions.md](../decisions.md) went to a plugin of our own on Linux rather than to the one
 third-party route that was measured working end to end.
 
-### What S1 inherits
+### What S2 onward inherit
 
 | | |
 |---|---|
-| `spike/alpha-sender/` | **Throwaway scaffolding — S1 discards it.** A standalone crate and a set of Python probes, never a workspace member. S1's job is to formalise what S0 established, not to adopt its instrument. **Git keeps it**: the merge that lands S0 is where a later cycle recovers it from, and [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md) still points at it for reproduction — which matters, because macOS and a second Windows machine are both still unmeasured |
+| **Gate 2 is green over an empty suite** | Intended at S1 and wrong from S2. The recorded result carries `tests_run`, and the approved `ops` entry *Gate 2 fails when the workspace runs zero tests* is the check that makes it bind. **S2 writes that check**, because S2 is the first subsystem with tests to lose |
+| **Gate 5 cannot see the dependency graph** | It reads first-party source. The first registry dependency is the point at which "gate 5 green" and the claim in [decisions.md](../decisions.md) start to diverge, and the approved `security` entries — the SHA-pinning check and the locked-graph check — are what close it. **Due with the first dependency, not later** |
+| **The Linux package list is a floor** | Established against crates with no dependencies. Whichever subsystem first pulls in windowing or the GPU establishes its packages the same way and extends [stack.md](../stack.md#running-locally-proposed) — verbatim in a bare environment, which is the standard the `ops` entry now sets |
+| **A bare nested test directory is silently skipped** | [testing.md](../testing.md#harness-proposed) prescribes `tests/acceptance/` and `tests/counters/`; cargo discovers `tests/*.rs` and `tests/<dir>/main.rs` only. The first subsystem to add one needs a `main.rs` or an explicit `[[test]]` |
 | **The backend is pinned on Windows** | Never left to wgpu's default selection, which chose the one backend that crashed on the machine measured. [stack.md](../stack.md#what-the-transparency-spike-settled-decided) carries the reason, alongside the surface-format and colour-space condition from the same spike |
 | **Read the vendored wgpu source before porting** | Due in S5, where the render stage meets wgpu. The spike's port found the API differs across majors enough to make guesses worthless; [stack.md](../stack.md#moving-to-a-new-wgpu-major-decided) carries what it cost |
+| **The S0 instrument is in git, not the tree** | S1 discarded `spike/alpha-sender/` as planned. [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md) carries the commit and the commands to recover it, which matters because macOS and a second Windows machine are both still unmeasured |
+
+### Raised by the S1 review and not settled
+
+Neither blocks a subsystem. Both are the owner's.
+
+| | |
+|---|---|
+| **The project has no licence** | S1 wrote `MIT OR Apache-2.0` into the workspace manifest without authority and it was removed; nothing in `docs/` settles one, and a manifest is not where that is decided. There is no `LICENSE` file. Due before anything is published |
+| **Proposed checklist entries not adopted** | The S1 review proposed more `docs/concerns/` entries than were approved — a secret scan in CI, a committed fixture set for gate 5, a `Cargo.lock` checksum assertion, a `panic = "abort"` grep, and a container job for the documented setup. They are in the review's record on `feature/s1-workspace-and-gates`. `finish-cycle` should revisit them rather than re-derive them |
+| **`.claude/hooks/pre-commit-guard.sh` picks the wrong feature document** | It takes the first file in `docs/wip/` that is not `plan.md` or `calibration.md`. That can name another branch's document, and once a finish commit stages the deletion of the real one it demands `open-questions.md` instead — blocking the very commit [documentation.md](../documentation.md) mandates. S0 passed only because its finish commit touched nothing outside `docs/`; S1's had to be split in two to get round it. The fix is to derive the document from the branch name. **Left for the owner**: a guard against committing is not something an agent should quietly weaken |
 
 ## Acceptance criteria
 
