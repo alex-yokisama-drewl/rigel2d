@@ -50,7 +50,9 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   [below](#a-chain-deformer-is-a-permanent-structure-not-a-bulk-edit-tool-proposed);
 - **a gravity**, one magnitude for the whole puppet which every physics node scales by its own
   multiplier. Physics is the only thing that reads it, and one puppet-wide field is what lets a
-  rigger stop every pendulum at once;
+  rigger stop every pendulum at once. **A puppet that carries none uses the default rather than
+  being invalid**, which is what lets a generator that has never heard of physics write a valid
+  file;
 - **masks**, each a reference from one part to another restricting where the first draws, as
   [vocabulary.md](../vocabulary.md) defines;
 - **channel mappings**, each feeding one parameter from a named input channel. These are puppet
@@ -343,16 +345,22 @@ code, and the same validator gates loading and saving.
 | The tree is acyclic, with one root | |
 | Every texture, parameter and node reference resolves | A reference naming nothing is a malformed file. **Distinct from a texture whose payload is present but unreadable**, which loads with a visible placeholder ([authoring.md](authoring.md)) rather than failing the puppet  **A texture that nothing references is valid**, and there is deliberately no rule against one — a validator that invented one would reject files this format permits and the editor is required to preserve |
 | Keypoints are ordered and within range | The range is the one the parameter declares |
+| An animation carries at most one track per parameter | More than one is a malformed file. Two tracks driving one parameter over one timeline is the same ambiguity the one-driver rule refuses, arriving by another route |
+| A track's keyframes are ordered in time, and its values within its parameter's range | The keypoint rule above, applied to the other thing that stores values against a parameter. Animation lookup seeks rather than scans, so unordered times give wrong answers rather than slow ones |
 | Each of a parameter's axes declares an **axis polarity** | Bilateral, unipolar or unknown, per dimension. An unfamiliar value follows the enumerated-values row below. A **missing** polarity is invalid in a file whose declared version this build knows — *unknown* is how a file says nobody has decided, and it is a value that must be written rather than an absence that may be inferred. The distinction is what stops a guessed polarity from being indistinguishable from a declared one |
 | Every parameter has exactly one neutral keypoint | None and more than one are both invalid. *Easing to neutral* ([performing.md](performing.md)) has no meaning without it, and a rule stated and never checked is a hope |
-| No part has children | A part is a leaf ([What a puppet is](#what-a-puppet-is-proposed)). Mesh groups and composites are the kinds that contain |
+| Each node's children are of a kind its own kind may contain | Declared **per kind** ([What a puppet is](#what-a-puppet-is-proposed)): a part contains nothing, a mesh group or a composite contains any kind, a physics node contains only physics. A rule written as prose naming kinds is one a fifth kind escapes silently; a declaration is one it has to answer |
+| Every parameter has at most one **base driver** | A channel mapping, a physics output, or none ([decisions.md](../decisions.md)). Two is a malformed file rather than a precedence question, which is what [evaluation.md](../evaluation.md) relies on. **A track is not a base driver** — an animation overrides temporarily and blends out, which is why a parameter may carry one alongside its driver |
 | A binding's stale mark agrees with its value counts: counts that match the mesh topology it applies to and no mark, or counts that mismatch and the mark | Staleness is the flagged outcome of [artwork changing under a rig](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) — a state the rigger resolves, not a malformed file. **The derived state is authoritative and the mark must agree with it**, so a mismatch that is unmarked is invalid, and so is a match that is marked. A file from a stranger can lie; a derivation cannot. The mark stays useful as the cheap thing a loader reads first |
 | Every number is finite | NaN and infinity are rejected, not clamped silently. **Finiteness is judged at the precision the runtime evaluates in**, not only at the precision the file was parsed in: a literal that is finite as a 64-bit value and infinite once narrowed is rejected, or two tools reading one file disagree about whether it is valid. **This rule does not carry the version gate the row below does**, and the difference matters: it applies to every value this build interprets as a number, in a file of any declared version, so a later version's NaN in a node transform is still rejected rather than preserved into the frame loop. What it does not reach is material preserved opaquely — in data whose shape we do not know there is nowhere to look for a number, and almost any eight bytes read as one are a NaN |
 | Enumerated values are known, or explicitly marked as extensions | In a file whose declared version this build knows. A later version's unfamiliar value is preserved, under the [version gate](#unrecognised-data-is-marked-as-such-by-whoever-wrote-it-decided) |
 
 Every size and count the loader trusts has a **load limit**, declared in one place, checked
-**before allocating** — decompressed payload size, texture dimensions, vertex and node and parameter
-counts, tree depth, string length, total load memory. **They bind every entry in the file** — one nothing
+**before allocating** — decompressed payload size, texture dimensions, the count of every kind
+the file stores (vertices, nodes with physics nodes among them, parameters, animations, tracks
+and keyframes), tree depth, string length, total load memory. **The enumeration is the format's,
+not this list's**: a kind added later with no limit is the failure this rule exists to prevent,
+so what binds is that every stored collection has one. **They bind every entry in the file** — one nothing
 references, and one this build only carries without parsing — because data nothing renders is exactly where
 a limit evasion would be put, and it would have no visible effect until it had already been allocated.
 Exceeding one fails the load with a readable error in bounded time and memory. These limits are a defence against a corrupt or
@@ -503,7 +511,7 @@ chosen on what it costs the rigger rather than on validity.
 | The reference is | Then | Examples |
 |---|---|---|
 | **Constitutive** — the dependent cannot exist without it | The dependent is removed, and the closure continues through it | A **part** without its **texture**; a **binding** or a **channel mapping** without its **parameter**; a **track** without the parameter it drives |
-| **Incidental** — the dependent is whole without it | The reference drops and the dependent stays. The closure stops here, because nothing was removed | A part that was **masked** by a removed part, which survives unmasked; an **animation** whose track for a deleted parameter went, which survives driving the rest; a **physics node** whose driven parameter went, which survives as a link in its chain |
+| **Incidental** — the dependent is whole without it | The reference drops and the dependent stays. The closure stops here, because nothing was removed | A part that was **masked** by a removed part, which survives unmasked; a **physics node** whose driven parameter went, which survives as a link in its chain |
 
 **A part without its texture stays declared constitutive although nothing can now delete a
 texture.** The declaration is what the closure is computed from, and the kind is still exercised
@@ -536,11 +544,16 @@ yet.
 because the part masking it was deleted, or destroying an animation because one of the
 parameters it drives went, would lose authored work that nothing requires us to lose.
 
-**An incidental dependent left empty still survives.** An animation whose only parameter was
-deleted remains, driving nothing. Removing it would be a deletion the user never confirmed,
-which is the quiet cascade this whole rule refuses — and an empty animation is visible, so the
-rigger can remove it themselves. The rule takes no exception for a dependent becoming empty,
-because every such exception returns once per entity kind.
+**A container left empty still survives.** An animation whose only track went — because the
+parameter that track drove was deleted — remains, driving nothing. Removing it would be a
+deletion the user never confirmed, which is the quiet cascade this whole rule refuses, and an
+empty animation is visible, so the rigger can remove it themselves.
+
+**An animation is a container here, not a dependent.** The reference to the parameter belonged to
+the **track**, and the track was constitutive and went with it; the animation never held a
+reference to drop. That is the same asymmetry a mesh group has with its children, and it is why
+the rule takes no exception for a container becoming empty — every such exception returns once
+per entity kind.
 
 **The channel mapping is the case to be careful with.** Live writes mappings into a puppet file,
 so a deletion in the editor discards work the player wrote. That is a report the user must see
