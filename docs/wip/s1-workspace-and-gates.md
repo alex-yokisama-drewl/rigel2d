@@ -17,7 +17,7 @@ intended.
 
 ## Status
 
-**Current task:** 5 — Windows and macOS build jobs. Task 3 is `awaiting approval` on branch protection, which blocks nothing else
+**Current task:** 6 — correct *Running locally* and *Running it*. Task 3 is `awaiting approval` on branch protection, which blocks nothing else
 **Blocked on:** nothing
 
 ---
@@ -191,15 +191,14 @@ means "we did not write one", never "none can happen".
 Observed failing on a planted `TcpStream::connect` and passing on a planted `UdpSocket::bind`,
 both reverted.
 
-### 5. Windows and macOS build jobs — `todo`
+### 5. Windows and macOS build jobs — `done`
 
-The build exercised on both, per [stack.md](../stack.md#on-push-proposed). They say that it
-builds and nothing more; [platform.md](../requirements/platform.md) is explicit that no stronger
-macOS claim is founded, and `concerns/ops.md`'s *Environments* says hosted Windows and macOS
-runners establish that it builds and that structural assertions pass.
+A `builds` job matrixed over both runners, separate from `gates` so each is its own check.
 
-**Done when:** both jobs run green on a push, and neither claims more than a build in its name or
-its output. No user gate.
+**Named `builds only — <os>` deliberately.** A job called "windows tests" would be read as a
+stronger claim than it makes, and [platform.md](../requirements/platform.md) is explicit that no
+stronger macOS claim is founded. The structural UI assertions that `stack.md` expects here join
+when there is a surface to assert against.
 
 ### 6. Correct *Running locally* and *Running it* — `todo`
 

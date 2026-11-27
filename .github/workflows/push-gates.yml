@@ -53,3 +53,29 @@ jobs:
 
       - name: Gate 5 — no outbound connection
         run: ./scripts/no-outbound.sh
+
+  # docs/stack.md: the build is additionally exercised on Windows and on a hosted
+  # macOS runner, "which can say that it builds and that structural assertions pass
+  # and nothing more". The structural UI assertions need a surface to assert against
+  # and there is none yet, so this says only that it builds — and is named for that,
+  # because a job called "windows tests" would be read as a stronger claim than it is.
+  #
+  # docs/requirements/platform.md is explicit that no stronger macOS claim is founded,
+  # and docs/concerns/ops.md records that real Windows checking is by hand on the
+  # maintainer's own machine until the work is public.
+  builds:
+    name: builds only — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Show the toolchain the pin selected
+        run: rustc --version && cargo --version
+
+      - name: Build
+        run: cargo build --workspace --locked
