@@ -28,13 +28,6 @@ payload of its own for the player to skip.
 [decisions.md](decisions.md) carries why. One structural entry is also the stronger form of the
 third-party claim: a reader opens one file rather than learning which of two holds what.
 
-**Still to be designed here**, as a consequence and not settled by this table: what a physics
-node stores — its local offset, its simulation constants, and an optional reference to the
-parameter it drives — and the per-kind containment declaration that
-[puppet.md](requirements/puppet.md#what-a-puppet-is-proposed) now requires, which is what keeps
-*a physics node contains only physics* a row in a table rather than a special case in the
-validator.
-
 What lost, and why, is in [decisions.md](decisions.md).
 
 ### The version is readable on its own **[proposed]**
@@ -119,6 +112,92 @@ The last two are also how a machine's identity leaks into a delivered file, whic
 [the requirement](requirements/puppet.md#the-same-puppet-saves-to-the-same-bytes-proposed) rules out for
 its own reasons.
 
+## The node tree **[proposed]**
+
+Four kinds of node — **part**, **mesh group**, **composite** and **physics**. Every node carries
+an identifier, a name and a local transform. What separates the kinds is what each draws and what
+each may contain.
+
+**What a kind may contain is a property of the kind, declared in one table**, and the validator
+reads that table rather than carrying rules that name kinds.
+
+| Kind | Draws | May contain |
+|---|---|---|
+| Part | A mesh with a texture | Nothing — a part is a leaf |
+| Mesh group | Nothing of its own | Any kind |
+| Composite | Its children, to an offscreen buffer | Any kind |
+| Physics | Nothing | Physics only |
+
+**Because** a containment rule spelled out in code has to be found and edited by whoever adds a
+fifth kind, and whoever forgets leaves a kind that may contain anything. A table turns that
+omission into a missing row, which a check can refuse. It is the same shape as the
+constitutive-or-incidental declaration carried per reference kind, and exists for the same reason
+([requirements/puppet.md](requirements/puppet.md#deletion-is-report-then-a-confirmed-cascade-decided)):
+a kind added later arrives with a stated answer instead of inheriting a default nobody chose.
+
+**The root is a kind that contains** — a mesh group or a composite. **Because** adding artwork to
+a configured puppet must preserve its configuration
+([requirements/puppet.md](requirements/puppet.md#one-file-decided)), and a puppet rooted at a part
+would have to be re-rooted the moment a second part arrived. Refusing the one-node case costs a
+rigger nothing and removes a re-rooting path from every import.
+
+**Physics containing only physics is what keeps a deletion cascade off artwork.** A pendulum
+chain is an ordinary subtree, so nesting supplies it with no new mechanism; and because no part
+can sit beneath a physics node, no cascade that reaches one can reach a part through it.
+
+## A physics node **[proposed]**
+
+One node is one anchor and one bob; a chain is nesting, so every constant here is **per node**.
+The parameterisation is inochi2d's, pruned — what was taken, what was dropped, and the evidence
+for each is in
+[research/2026-11-27-physics-parameterisation.md](research/2026-11-27-physics-parameterisation.md).
+
+| Field | Meaning | Unit | Default |
+|---|---|---|---|
+| `length` | Rest distance from the anchor to the bob | puppet pixels | 100 |
+| `gravity` | Multiplier on the puppet's gravity; zero turns it off for this node alone | ratio | 1.0 |
+| `frequency` | Resonant frequency of the restoring spring — the stiffness knob | Hz | 1.0 |
+| `angle_damping` | Damping of swinging motion | ratio | 0.5 |
+| `length_damping` | Damping of stretch | ratio | 0.5 |
+| `output` | The parameter this node drives, or the reserved zero for none | identifier | 0 |
+| `output_source` | Per axis of that parameter, which simulated quantity drives it — `angle`, `length`, `x` or `y` | enum, per axis | `angle` |
+| `output_scale` | Gain from that quantity onto that axis | ratio, per axis | 1.0 |
+
+**The puppet carries one gravity**, a magnitude along puppet-down, which every node's `gravity`
+multiplies. **Because** a rigger sets the world once and then says only which strands are heavy;
+and because one field at zero stops every pendulum in the puppet, which is what makes a physics
+problem bisectable. A direction, and wind, are what a later minor version adds if they are ever
+wanted.
+
+**There is one model, a spring pendulum.** inochi2d also stores a rigid-pendulum switch, and its
+rigid model ignores `frequency` and `length_damping` — a control that silently disables two
+others, which is the clearest beginner trap in either incumbent's field set. A high `frequency`
+approximates the rigid case closely enough.
+
+**Both dampings are stored, although a hair rig rarely wants stretch.** Whether a rigger sees one
+damping or two is Studio's question, and Studio may derive the radial one from the tangential
+one. Whether the file carries both is this document's, and it carries both: removing a stored
+field later is a format break, while hiding one in the editor is not.
+
+### What the simulation drives **[proposed]**
+
+Two outputs, and the first is what makes a chain work with no chain mechanism in the format.
+
+- **The node's own transform is displaced** — rotated about its anchor by the bob's angle, and
+  translated along the arm by the difference between the current length and `length`. A child
+  physics node therefore hangs from a parent that is already swinging, which is the whole of
+  chaining ([evaluation.md](evaluation.md)).
+- **One parameter may be driven.** Each axis of that parameter names the quantity that drives it
+  and the gain onto it. inochi2d spends an enum on the four orderings of angle, length, x and y;
+  naming the source per axis covers all four, covers a one-dimensional parameter without a
+  special case, and does not grow when a fifth quantity is wanted.
+
+**Ranges are `[open]` beyond sign and finiteness.** The validator requires `length` and
+`frequency` above zero, `gravity` and both dampings at or above zero, and every value finite.
+Upper bounds are a question about integrator stability at the fixed timestep, and neither
+incumbent declares any — a sweep over frequency, damping and length settles them. That is a
+measurement due with the evaluation pass, not more research.
+
 ## Textures **[proposed]**
 
 One archive entry per distinct texture, PNG, cropped to its own content. PNG because it is
@@ -176,7 +255,8 @@ without our code — a committed JSON Schema for what a schema can express, plus
 rules it cannot:
 
 - identifiers unique, and none above the high-water mark;
-- the tree acyclic with one root;
+- the tree acyclic with one root, and that root a kind that contains;
+- every node's children of a kind its parent's kind may contain, read from the table above;
 - every reference resolves, or is the reserved zero;
 - keypoints ordered and within their parameter's range;
 - **every parameter carrying at most one base driver** — a channel mapping, a physics output, or
