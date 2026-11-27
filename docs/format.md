@@ -157,6 +157,18 @@ default and one that spells it out produce different bytes for the same puppet. 
 deliberate exception is `composition_mode`, under
 [an animation and its tracks](#an-animation-and-its-tracks-proposed).
 
+**The rule binds exactly the fields this document gives a default**, and no others — the physics
+constants, the puppet's gravity. A field with no stated default is **always written**, even where
+its value looks like one: a node's transform carries its rotation and scale whether or not they
+are the identity, and a channel mapping carries its `source` whether or not it is empty.
+
+**Because** "omit the default" is only a rule a stranger can follow if the defaults are written
+down. Left to each writer's judgement about what looks default-ish, it produces exactly the
+divergence it was introduced to prevent — and the divergence is invisible, because both files
+load to the same puppet and only the bytes differ. Giving a field a default is therefore a
+deliberate act with a cost: it is a statement about the stored form, not a convenience for the
+reader.
+
 **The archive is the half that goes wrong**, because a zip writer's defaults are all
 non-canonical. Every one of these must be pinned, and a writer that forgets one produces a file
 that churns in version control for no reason:
