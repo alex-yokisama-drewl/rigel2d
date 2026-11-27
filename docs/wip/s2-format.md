@@ -18,9 +18,9 @@ untouched.
 
 ## Status
 
-**Current task:** 1 `done` and committed. **Next: the encoding promotion below, then task 2.**
-**Blocked on:** nothing — but *see "Before task 3" under Tasks*. Task 3 cannot be dispatched
-until the encoding the fixture builder settled is in [format.md](../format.md).
+**Current task:** 1 `done`. The encoding promotion that stood between tasks 1 and 3 is `done`
+too — see the section above the task list. **Next: task 2 or task 3, either order.**
+**Blocked on:** nothing.
 
 **The branch is expected to be red from task 3 until task 7.** Acceptance tests are written
 before the implementation and are confirmed failing by being written
@@ -182,33 +182,37 @@ What the user caught that automation did not. **Each becomes a checklist entry i
 
 ---
 
-## Before task 3 — the encoding must land in `format.md`
+## The encoding went into `format.md` — **done**
 
-**Read this before dispatching anything.** Task 1 turned up the one thing that changes this
-plan, and it is recorded here rather than inside a task because it sits between them.
+Task 1 turned up the one thing that changed this plan, and it is recorded here rather than
+inside a task because it sat between them. It is **closed**; this entry stays so nobody reopens
+it.
 
-[format.md](../format.md) names JSON keys for the physics fields and for extension data **and
-for nothing else**. Encoding `rigged` therefore meant settling the key names, the tree encoding,
-the collection orders, the current version number, the compression per entry kind and the gravity
-default. Those are now settled — by a fixture builder, in `crates/rigel-fixtures/README.md`,
-which is not a document anybody is told to read.
+[format.md](../format.md) named JSON keys for the physics fields and for extension data **and for
+nothing else**, so encoding `rigged` meant settling the key names, the tree encoding, the
+collection orders, the current version number, the compression per entry kind and the gravity
+default — and they got settled in `crates/rigel-fixtures/README.md`, which is not a document
+anybody is told to read. That is the failure [vocabulary.md](../vocabulary.md) describes: terms
+invented by an implementer do not propagate, they collide.
 
-That is the wrong home for them, for the reason [vocabulary.md](../vocabulary.md) gives about
-terms invented by an implementer: they do not propagate, they collide. The next agent to touch
-this subsystem reads `format.md`, finds no key names, and invents a second set.
+They now live in [format.md](../format.md), under the `[proposed]` sections they belong to, and
+the builder's README points at it. These were gaps rather than promotions, and were decided here
+rather than carried across:
 
-**So the next commit on this branch promotes that table into [format.md](../format.md)**, under
-the `[proposed]` sections it belongs to, and the builder's README becomes a pointer. It is a
-`doc-writer` job with the routing done first; the full list is in *Decisions made* and
-*Assumptions* below.
+| Settled | Where |
+|---|---|
+| A puppet file's extension is `.rigel2d` | *The container is an archive with a manifest* |
+| An upgrading save keeps the previous bytes as a `.bak-<major>.<minor>` sibling | *The upgrading save keeps the previous bytes*, a new subsection. `VER-4` and `VER-5` required one and the document described none |
+| The canonical-zip list asked for "no external attributes", which no Unix-written entry can satisfy | *Canonical serialisation* — now pinned to `0644`, which is what the rule was protecting |
 
-It is listed before task 2 only because task 3 depends on it — a test that loads a file has to
-know the encoding, so the acceptance tests cannot be commissioned until this lands. Task 2 is
-independent of it and may go either side.
+The animation and track rules also moved out of *What the simulation drives*, a physics
+subsection they did not belong in, into a section of their own.
+
+**Task 3 is unblocked.** It could not be commissioned before this landed, because a test that
+loads a file has to know the encoding. Task 2 is independent and may go either side.
 
 **The other `Contradicts docs` findings are routed at task 10, not now**, with one exception
-already closed: every member crate now inherits the workspace `license`, so that entry is fixed
-rather than outstanding.
+already closed: every member crate now inherits the workspace `license`.
 
 ---
 
@@ -360,9 +364,9 @@ and its one distinguishing feature, so a test reaches a fixture by name rather t
   order; every other collection is ordered by identifier, keypoints by position.
 - **Every JSON key not named by `format.md` is the term `vocabulary.md` sanctions, in
   `snake_case`.** `format.md` names keys for the physics fields and for extension data and for
-  nothing else, so encoding `rigged` meant choosing the rest. The full list is the table in
-  `crates/rigel-fixtures/README.md` and **it belongs in `format.md`** — nobody but this builder
-  has settled any of it. This touches `format.md`'s `[proposed]` sections throughout.
+  nothing else, so encoding `rigged` meant choosing the rest. **Now promoted into
+  [format.md](../format.md)**, which is where it governs; the builder's README points at it. This
+  touched `format.md`'s `[proposed]` sections throughout, and none was promoted to `[decided]`.
 - **Compression is Deflate for JSON and Stored for PNG**, at the zip crate's default level pinned
   by `Cargo.lock`; modification times are 1980-01-01; external attributes are a pinned `0644`.
   `format.md` requires each of these fixed and names a value for none.
@@ -462,9 +466,9 @@ and its one distinguishing feature, so a test reaches a fixture by name rather t
 
 **Assumptions:**
 
-- Every JSON key name, the current version, the gravity default, the compression per entry kind
-  and the canonical collection orders, as *Decisions made* records. All unresolved: they belong
-  in `format.md` and were settled by this builder alone.
+- ~~Every JSON key name, the current version, the gravity default, the compression per entry kind
+  and the canonical collection orders.~~ **Resolved** — promoted into [format.md](../format.md),
+  which now specifies them. They remain `[proposed]` there, as every section of that document is.
 - `uvs` are in the texture's **authored** pixel space, which is the reading that makes
   `format.md`'s cropping paragraph — the record carrying the crop rectangle and the authored
   dimensions so the runtime can reconstruct the space — do its stated work.

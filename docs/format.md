@@ -9,7 +9,7 @@ A scene is a separate, much thinner file and is specified in [scene.md](scene.md
 ## The container is an archive with a manifest **[proposed]**
 
 A puppet is a zip archive. One entry carries the format version, one carries the whole
-structure as JSON, and textures are separate entries.
+structure as JSON, and textures are separate entries. A puppet file's extension is **`.rigel2d`**.
 
 | Entry | Holds |
 |---|---|
@@ -34,7 +34,7 @@ What lost, and why, is in [decisions.md](decisions.md).
 
 `rigel2d.json` exists so that deciding whether to refuse a file costs one small bounded read,
 before any load limit is at risk and before the manifest is parsed. It carries a major and a
-minor number and nothing a reader needs to interpret.
+minor number and nothing a reader needs to interpret. The current format version is **1.1**.
 
 | | |
 |---|---|
@@ -46,6 +46,21 @@ This is the whole of [the compatibility
 rule](requirements/puppet.md#a-build-works-with-what-it-understands-and-preserves-the-rest-decided)
 expressed as two numbers. A build must be able to render and save a structure it has no code
 for, so *can I render this* and *can I save this* are one question here and not two.
+
+### The upgrading save keeps the previous bytes **[proposed]**
+
+When a build opens a file declaring a lower minor and saves it, it writes the file at the current
+version and preserves the bytes it read as a sibling file in the same directory, named by
+appending `.bak-<major>.<minor>` to the original file name. The suffix is the version the backup
+*holds*, not the version written: `hero.rigel2d` upgraded from 1.0 becomes `hero.rigel2d` at 1.1
+beside `hero.rigel2d.bak-1.0`.
+
+**Because** an upgrade is the one save that cannot be undone by saving again — the previous build
+can no longer open what replaced it — and [I7](invariants.md) makes losing the puppet worse than
+a bad frame. A sibling rather than a hidden location, because the person has to be able to find
+it. It is also what `FILE-2` in [puppet-acceptance.md](requirements/puppet-acceptance.md) means
+when it says the directory afterwards holds the puppet "and nothing else but the version-upgrade
+backup".
 
 ## Identifiers are integers, not UUIDs **[proposed]**
 
@@ -88,6 +103,12 @@ the extension's own identifier:
 | A key the core format does not define, outside `x`, is **invalid** | Without this a typo and an extension are indistinguishable and the validator can reject neither |
 | `x` survives a save untouched, byte for byte | Including through Live, which writes puppets for channel mappings |
 
+**A puppet that declares it carries data for a named extension does so with an ordinary `x`
+entry.** The marker already carries the extension's identifier, the version it expects and a
+human-readable name, and the format defines no second mechanism. [I6](invariants.md) permits a
+file to declare what it needs and never to install it, so a declaration is exactly this and
+nothing more.
+
 The loader therefore keeps the parsed source alongside its typed structures rather than
 discarding it. That is a cost paid on every load, and it is the mechanism the whole
 preserve-what-you-do-not-understand rule rests on.
@@ -97,15 +118,28 @@ preserve-what-you-do-not-understand rule rests on.
 The same puppet must save to the same bytes. JSON is the easy half: keys sorted, no insignificant
 whitespace, a fixed number format, UTF-8.
 
+**Ordering is part of the canonical form.** `nodes` is in depth-first preorder, and order among
+siblings is draw order — the one thing order is allowed to decide. Every other collection is
+ordered by identifier, and keypoints by position along their axis.
+
+**A defaulted field is absent when it holds its default.** Without the rule a writer that omits a
+default and one that spells it out produce different bytes for the same puppet. The one
+deliberate exception is `composition_mode`, under
+[an animation and its tracks](#an-animation-and-its-tracks-proposed).
+
 **The archive is the half that goes wrong**, because a zip writer's defaults are all
 non-canonical. Every one of these must be pinned, and a writer that forgets one produces a file
 that churns in version control for no reason:
 
 - entry order fixed, sorted by path;
-- modification times fixed to a constant, never the clock;
+- modification times fixed to 1980-01-01 00:00:00 — the earliest a zip date field expresses, so
+  there is no question of it having come from a clock;
 - no directory entries;
-- compression method and level fixed per entry kind;
-- no extra fields, and no external attributes carrying the writing machine's umask;
+- compression fixed per entry kind: Deflate for JSON, Stored for PNG. A PNG is already deflated
+  inside its own container, and storing it keeps the payload extractable in one step, which is
+  what `TOOL-3` rests on. The Deflate level is fixed by the locked dependency set;
+- no extra fields, and external attributes pinned to a fixed value, `0644`, which carries no
+  umask — an entry written through a Unix version-made-by cannot have none;
 - file names UTF-8, with no platform path separators.
 
 The last two are also how a machine's identity leaks into a delivered file, which
@@ -135,6 +169,12 @@ constitutive-or-incidental declaration carried per reference kind, and exists fo
 ([requirements/puppet.md](requirements/puppet.md#deletion-is-report-then-a-confirmed-cascade-decided)):
 a kind added later arrives with a stated answer instead of inheriting a default nobody chose.
 
+**The tree is stored as a flat `nodes` array, each node carrying `parent`, with a top-level
+`root` naming one node.** **Because** a nested tree cannot express a cycle or a second root, so
+the acyclicity and one-root rules in [Validation](#validation-proposed) would have nothing to
+reject and no file could carry the defect. Containment becomes a reference by identifier, which
+is what [I3](invariants.md) asks for anyway.
+
 **The root is a kind that contains** — a mesh group or a composite. **Because** adding artwork to
 a configured puppet must preserve its configuration
 ([requirements/puppet.md](requirements/puppet.md#one-file-decided)), and a puppet rooted at a part
@@ -144,6 +184,14 @@ rigger nothing and removes a re-rooting path from every import.
 **Physics containing only physics is what keeps a deletion cascade off artwork.** A pendulum
 chain is an ordinary subtree, so nesting supplies it with no new mechanism; and because no part
 can sit beneath a physics node, no cascade that reaches one can reach a part through it.
+
+### A part's mesh **[proposed]**
+
+A part's mesh carries `vertices`, `uvs` and `triangles`. **`uvs` are in the texture's authored
+pixel space**, not the cropped bitmap's. That is the statement about texture coordinates that
+makes the paragraph on cropping in [Textures](#textures-proposed) do its work: the runtime
+reconstructs the authored space from the crop rectangle and the authored dimensions, and these
+coordinates are what it reconstructs it for.
 
 ## A physics node **[proposed]**
 
@@ -164,7 +212,9 @@ for each is in
 | `output_scale` | Gain from that quantity onto that axis | ratio, per axis | 1.0 |
 
 **The puppet carries one gravity**, a magnitude along puppet-down, which every node's `gravity`
-multiplies. **Because** a rigger sets the world once and then says only which strands are heavy;
+multiplies. It defaults to `1.0`, matching the per-node multiplier's default, and is absent when
+it holds that, by [the stored-form rule](#canonical-serialisation-and-where-zip-fights-it-proposed).
+**Because** a rigger sets the world once and then says only which strands are heavy;
 and because one field at zero stops every pendulum in the puppet, which is what makes a physics
 problem bisectable. A direction, and wind, are what a later minor version adds if they are ever
 wanted.
@@ -205,13 +255,6 @@ Two outputs, and the first is what makes a chain work with no chain mechanism in
   naming the source per axis covers all four, covers a one-dimensional parameter without a
   special case, and does not grow when a fifth quantity is wanted.
 
-**An animation stores its tracks as a list, each naming the parameter it drives**, and two
-tracks naming one parameter is a validation failure rather than a shape the format cannot
-express. The alternative — keying the collection by parameter identifier, which makes the
-duplicate inexpressible and needs no rule — loses on legibility: it makes the identifier serve as
-both key and reference, and a third party reading the JSON is the case this format exists to
-serve. **The puppet's gravity is absent when it is the default** and written only when it
-differs, which is the stored-form rule every other defaulted field here follows.
 
 **Ranges are `[open]` beyond sign and finiteness.** The validator requires `length` and
 `frequency` above zero, `gravity` and both dampings at or above zero, and every value finite.
@@ -223,6 +266,25 @@ measurement due with the evaluation pass rather than more research.
 than trusting the constants: see
 [evaluation.md](evaluation.md#physics-cannot-run-away-proposed). A constant outside any range we
 would have set produces an ugly rig, not a crash.
+
+## An animation and its tracks **[proposed]**
+
+**An animation stores its tracks as a list, each naming the parameter it drives**, and two
+tracks naming one parameter is a validation failure rather than a shape the format cannot
+express. The alternative — keying the collection by parameter identifier, which makes the
+duplicate inexpressible and needs no rule — loses on legibility: it makes the identifier serve as
+both key and reference, and a third party reading the JSON is the case this format exists to
+serve.
+
+A track carries a **`blend_duration`**. [security.md](concerns/security.md), by way of `VAL-26`,
+requires a track's keyframe times, values and blend durations to be validated, and nothing
+defined one until here.
+
+**`composition_mode` is always written, even though it holds the only value the format
+defines.** It is the single exception to the absent-when-default rule, and deliberate: a mode
+added in a later version must not change how a puppet authored before it composes. Further modes
+are [what the format does not define yet](#what-the-format-does-not-define-yet-proposed), which
+owns that question.
 
 ## Textures **[proposed]**
 
@@ -273,6 +335,10 @@ unchanged, and is reported to the rigger.
 The validator treats staleness as legal and a value-count mismatch *without* the mark as
 malformed. That distinction is the whole reason the mark exists: without it, retained work and
 a corrupt file look identical.
+
+**A binding carries `values`, one entry per keypoint of its parameter, and a `stale` mark written
+only when set.** **Because** the value-count rule needs a count to exist before it can be
+compared.
 
 ## Validation **[proposed]**
 
