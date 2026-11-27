@@ -3,11 +3,12 @@
 Every document in the project is listed here. If it is not on this list, it does not exist —
 see [documentation.md](documentation.md).
 
-**Status: nothing is built yet, beyond one throwaway spike.** Requirements are complete across
-every area listed below, and technical design has settled the format, the evaluation pass, the
-scene, the runtime's boundaries and the stack. A phase plan exists in `docs/wip/`, and
-`spike/alpha-sender/` holds the S0 instrument, which is scaffolding and is expected to be
-discarded.
+**Status: the workspace builds and the push gates run; no production code is implemented yet.**
+Requirements are complete across every area listed below, and technical design has settled the
+format, the evaluation pass, the scene, the runtime's boundaries and the stack. A phase plan
+exists in `docs/wip/`. The S0 spike's instrument has been discarded as the plan said it would
+be; [research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md) says
+where in git to recover it from.
 
 What is settled is in [decisions.md](decisions.md), which is the list to read rather than one
 restated here — it supersedes its own entries in place, so a summary elsewhere goes stale.

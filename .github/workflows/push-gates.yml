@@ -1,0 +1,83 @@
+# The push gates in docs/stack.md's *On push* table, in the order it sets.
+#
+# One job, ordered steps, rather than parallel jobs: the ordering is the point.
+# .claude/rules/testing.md puts the cheapest and most reliable check first, so a
+# formatting mistake fails in seconds instead of after the suite. Any step failing
+# fails the job, which is the check that blocks a merge.
+#
+# Gate 3, the per-frame counters, is absent deliberately. It has no subject until
+# the runtime produces a command stream and a committed counter baseline exists.
+# docs/stack.md's *On push* carries the reason.
+#
+# Third-party actions are pinned to a commit hash, not a tag, per the supply-chain
+# entry in docs/concerns/security.md. A tag can be moved; a hash cannot.
+name: push gates
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keyed so a branch push and that branch's pull_request land in the same group: otherwise
+  # every PR branch runs the whole workflow twice, concurrently, on metered runners.
+  group: push-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: gates 1, 2, 4, 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # rust-toolchain.toml pins the compiler, and rustup on the runner honours it.
+      # No toolchain action, so there is one less third-party dependency to pin.
+      - name: Show the toolchain the pin selected
+        run: rustc --version && cargo --version
+
+      - name: Gate 1 — formatting
+        run: cargo fmt --all --check
+
+      - name: Gate 1 — lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Gate 2 — tests
+        run: cargo test --workspace --locked
+
+      - name: Gate 4 — documentation
+        run: ./scripts/docs-check.sh
+
+      - name: Gate 5 — no outbound connection
+        run: ./scripts/no-outbound.sh
+
+  # docs/stack.md: the build is additionally exercised on Windows and on a hosted
+  # macOS runner, "which can say that it builds and that structural assertions pass
+  # and nothing more". The structural UI assertions need a surface to assert against
+  # and there is none yet, so this says only that it builds — and is named for that,
+  # because a job called "windows tests" would be read as a stronger claim than it is.
+  #
+  # docs/requirements/platform.md is explicit that no stronger macOS claim is founded,
+  # and docs/concerns/ops.md records that real Windows checking is by hand on the
+  # maintainer's own machine until the work is public.
+  builds:
+    name: builds only — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Show the toolchain the pin selected
+        run: rustc --version && cargo --version
+
+      - name: Build
+        run: cargo build --workspace --locked

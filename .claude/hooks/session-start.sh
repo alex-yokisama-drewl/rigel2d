@@ -32,7 +32,14 @@ if [ -d .test-results ]; then
   if [ -n "$latest" ]; then
     sha="$(basename "$latest" .json)"
     if [ "$sha" = "$head_sha" ]; then
-      echo "- Tests: recorded for HEAD ($sha) — read \`$latest\`, do not re-run to find out"
+      ran="$(sed -n 's/.*"tests_run": *\([^,]*\).*/\1/p' "$latest" 2>/dev/null | head -1)"
+      case "$ran" in
+        0)    note=" — **0 tests ran**, so a pass means nothing was checked" ;;
+        null) note=" — test count unreadable; open the file before trusting it" ;;
+        "")   note="" ;;
+        *)    note=" — $ran tests ran" ;;
+      esac
+      echo "- Tests: recorded for HEAD ($sha)$note — read \`$latest\`, do not re-run to find out"
     else
       echo "- Tests: last record is for $sha, HEAD is $head_sha — **stale**"
     fi

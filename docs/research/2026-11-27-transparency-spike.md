@@ -18,7 +18,7 @@ path that nothing in the documentation anticipated.
 ## How this was measured
 
 A test frame of six vertical bands at fixed alphas, with every expected value **written down
-before any route was built** ([the reference table](../../spike/alpha-sender/REFERENCE.md)).
+before any route was built** (`REFERENCE.md`, in the instrument — see *Reproducing it*).
 The alphas are 0, 64, 128, 192 and 255 so that no value lands on a rounding boundary. Nothing
 here was judged by eye; each result is named pixels compared as integers.
 
@@ -175,11 +175,25 @@ the per-platform conversion rather than compensating for it.
 
 ## Reproducing it
 
-`spike/alpha-sender/` carries the instrument. `REFERENCE.md` holds the expected values and the
-reasoning for each. `compositor-test.py` measures a real compositor, `obs-test.py` drives OBS
-through its bundled websocket, and `probe-windows.py` scores images returned from a machine this
-session cannot reach. The sender takes `--backend`, `--adapter`, `--straight` and `--srgb`, each
-of which exists because some host's assumption had to be varied to be measured.
+**The instrument is not in the working tree.** It was throwaway scaffolding and S1 discarded it,
+as [plan.md](../wip/plan.md) said it would. It is in git, at `spike/alpha-sender/` in the S0
+merge — commit `dafc348`, or the branch `feature/s0-transparency-spike`:
+
+```
+git show dafc348:spike/alpha-sender/REFERENCE.md
+git checkout dafc348 -- spike/alpha-sender      # to run it again
+```
+
+`REFERENCE.md` holds the expected values and the reasoning for each. `compositor-test.py`
+measures a real compositor, `obs-test.py` drives OBS through its bundled websocket, and
+`probe-windows.py` scores images returned from a machine the session cannot reach. The sender
+takes `--backend`, `--adapter`, `--straight` and `--srgb`, each of which exists because some
+host's assumption had to be varied to be measured.
+
+**Recovering it is expected rather than exceptional**: macOS is unmeasured and the Windows
+findings rest on one machine, and *What is still unknown* above says what a second run would
+settle. Add the missing band described at the foot of `REFERENCE.md` before measuring anything
+new with it.
 
 Traps that would cost a future measurer real time again:
 

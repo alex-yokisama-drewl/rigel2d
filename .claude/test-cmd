@@ -1,1 +1,1 @@
-cargo test --workspace
+cargo test --workspace --locked
