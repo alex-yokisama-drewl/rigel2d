@@ -31,7 +31,7 @@ attempted is project configuration, not an agent's judgment call.
 
 | | |
 |---|---|
-| Install | `cargo build --workspace`, with rustup installed; the compiler is the one `rust-toolchain.toml` pins. Linux needs `curl build-essential` and nothing else yet |
+| Install | `cargo build --workspace`, with rustup installed; the compiler is the one `rust-toolchain.toml` pins. Debian-family Linux needs `curl build-essential` and nothing else yet — the walked steps are in `docs/stack.md` |
 | Run locally | `cargo run -p rigel-studio`, `cargo run -p rigel-live` — both are shells that print and exit |
 | Tests | `scripts/test-record.sh` (reads `.claude/test-cmd`) |
 | Documentation check | `scripts/docs-check.sh` |

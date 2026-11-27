@@ -17,7 +17,7 @@ intended.
 
 ## Status
 
-**Current task:** all tasks done. Resume at **C. Finish, step 1** in the `feature` skill — review has not been run yet
+**Current task:** all tasks done, and the review of 2026-11-27 is applied. Resume at **C. Finish, step 2** — routing the handoff
 **Blocked on:** nothing
 
 ---
@@ -129,7 +129,13 @@ cleanup.
 Approaches discarded during this branch. Not worth a permanent record; worth keeping until the
 branch ends so nobody re-proposes them.
 
-- *(none yet)*
+- **`|` as the field separator in `no-outbound.sh`'s pattern table.** Half the regexes contain
+  alternation, so `${entry%%|*}` split them through the middle of themselves and two patterns
+  silently matched nothing. The gate's own self-test is what caught it. The delimiter is `###`.
+- **A `license` key in the workspace manifest.** `MIT OR Apache-2.0` was written in without
+  authority — nothing in `docs/` settles a licence, and a manifest is not where that gets
+  decided. Removed, with the reason in the file. **For the owner**: this is a real open
+  question, not a tidy-up.
 
 ## Caught at gate
 
@@ -283,6 +289,19 @@ macOS that claims only a build. `scripts/no-outbound.sh` is gate 5.
   needs a decision about cadence.
 
 **Traps:**
+- **A `set -e` script died on a `grep` that matched nothing, and so wrote no record at all.**
+  `scripts/test-record.sh` has `pipefail` set and `set -e` restored before the parse, so when
+  `cargo` emitted no `test result:` line — which is exactly what a compile error does — the
+  assignment aborted the script before the record was written. The previous commit's record then
+  stood, saying `passed: true`, and the session-start hook reported it as merely stale, which is
+  indistinguishable from nobody having run anything. **A broken build read as last known good.**
+  Every stage of the pipeline is now neutralised, not just the first — the second and third
+  greps can match nothing too, which is how the first attempt at this fix still failed.
+- **A deny-list gate decays silently, so it needs its own test.** `no-outbound.sh --self-test`
+  plants every forbidden form and every allowed one and asserts the verdict, and runs before the
+  real scan on every invocation. It immediately caught a delimiter bug that had disabled two
+  patterns. A gate that is only verified the day it is written is a gate that will one day be
+  green for the wrong reason.
 - **The documented build needed a package nobody had written down.** `cargo build` on a clean
   Ubuntu fails with `linker cc not found`; `build-essential` was never in `stack.md` because
   every machine that had ever run the command already had it. This is the whole argument for the
@@ -295,9 +314,18 @@ macOS that claims only a build. `scripts/no-outbound.sh` is gate 5.
   covered — reached through the result file rather than through a checklist entry. The record
   now carries `assertions_run`. **Anything reading a result reads that field too.**
 
+- **"Walked" is a claim that has to mean *verbatim*.** The first version of `stack.md`'s
+  *Running locally* was labelled as walked while the walk had quietly used `apt-get update`, run
+  as root, and exported PATH by hand — none of which were in the block. Three of its lines failed
+  on a literal run. It is now executed verbatim in a bare container, with only a `sudo` shim,
+  and the lines that exist solely because it failed without them say so.
+
 **Assumptions:**
 - **The package list is a floor established against a workspace with no dependencies.** It is
   correct today and will be incomplete the moment windowing or GPU crates land.
+- **Gate 5 sees source, never the dependency graph.** Once anything is depended on, "gate 5
+  green" and the claim in `decisions.md` start to diverge, and nothing currently measures the
+  gap. The script says so on every run.
 
 **Deferred:**
 - **The Linux package list beyond `curl build-essential`**, to whichever subsystem first depends

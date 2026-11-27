@@ -15,8 +15,9 @@ members = [
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.95"
-license = "MIT OR Apache-2.0"
 publish = false
+# No `license` key: nothing in docs/ settles one, and `publish = false` means cargo does not
+# need it. Declaring a licence here would be inventing a project-level answer in a manifest.
 
 [workspace.dependencies]
 rigel-format = { path = "crates/rigel-format" }

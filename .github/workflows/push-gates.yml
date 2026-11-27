@@ -23,7 +23,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: push-gates-${{ github.ref }}
+  # Keyed so a branch push and that branch's pull_request land in the same group: otherwise
+  # every PR branch runs all three jobs twice, concurrently, on metered runners.
+  group: push-gates-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

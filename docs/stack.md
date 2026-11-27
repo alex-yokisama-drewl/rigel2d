@@ -103,18 +103,28 @@ thing a third party can run.
 
 ## Running locally **[proposed]**
 
-**Walked on a clean Ubuntu 24.04 container with nothing preinstalled**, rather than remembered.
+**Run verbatim on a bare `ubuntu:24.04` container**, rather than remembered. Debian-family
+package names; another distribution needs its own equivalents.
 
 ```
-sudo apt install curl build-essential   # rustup arrives over https; cargo needs a linker
-curl -sSf https://sh.rustup.rs | sh     # installs the toolchain rust-toolchain.toml pins
-cargo build --workspace
+sudo apt-get update
+sudo apt-get install -y curl build-essential   # rustup arrives over https; cargo needs a linker
+curl -sSf https://sh.rustup.rs | sh -s -- -y   # the defaults are what we want
+. "$HOME/.cargo/env"                           # rustup edits your login profile, not this shell
+cargo build --workspace                        # the first cargo run installs the pinned toolchain
 cargo run -p rigel-studio
 cargo run -p rigel-live
 ```
 
 rustup installs the pinned toolchain itself on the first `cargo` command, so no version is named
 here and none goes stale.
+
+**Three of those lines exist because the block failed without them**, and each is the kind of
+thing that survives being remembered rather than run: `apt-get update` because a bare image
+carries no package lists; `sh -s -- -y` because the installer is otherwise interactive; and
+sourcing `cargo/env` because rustup writes PATH into your login profile and the very next line
+runs `cargo`. The container has no `sudo`, so the walk supplied a shim that execs its arguments
+and the text above ran unmodified.
 
 **That package list is a floor and it will grow.** It was established against a workspace whose
 crates have no dependencies at all. The Wayland or X11 development headers and the Vulkan loader

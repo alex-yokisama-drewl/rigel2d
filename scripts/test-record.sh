@@ -35,13 +35,23 @@ set -e
 
 end="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# How many assertions actually ran. A green result over an empty suite is not evidence, and
-# without this the record says "passed" where it means "nothing was checked" — which is the
-# failure docs/concerns/README.md names: a check that does not exist reads as covered.
-# Parsed from the runner's own summary lines; null when the runner is not one we can read.
-ran="$(grep -oE '^test result: [a-zA-Z]+\. [0-9]+ passed; [0-9]+ failed' "$out" \
-        | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' \
-        | awk '{s+=$1} END {if (NR) print s; else print "null"}')"
+# How many tests actually ran. A green result over an empty suite is not evidence, and without
+# this the record says "passed" where it means "nothing was checked" — the failure
+# docs/concerns/README.md names: a check that does not exist reads as covered.
+#
+# Counts passed + failed + ignored, not passed alone: a run where one test fails must not read
+# as a run where one test vanished.
+#
+# `|| true` is load-bearing. set -e is back on by here and pipefail is set, so a grep that
+# matches nothing would abort the script BEFORE the record is written — which is exactly the
+# compile-error case, the one result most worth having. Null means the runner is not one we can
+# read; it never means the script gave up.
+# Every stage can legitimately match nothing, and under pipefail any of them would abort the
+# script, so the whole pipeline is neutralised rather than just its first stage.
+ran="$( { grep -oE '^test result: [a-zA-Z]+\. [0-9]+ passed; [0-9]+ failed; [0-9]+ ignored' "$out" \
+          | grep -oE '[0-9]+ (passed|failed|ignored)' \
+          | grep -oE '^[0-9]+' \
+          | awk '{s+=$1} END {if (NR) print s; else print "null"}'; } || true )"
 [ -n "$ran" ] || ran=null
 tail_out="$(tail -40 "$out" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk '{printf "%s\\n", $0}')"
 
@@ -52,7 +62,7 @@ cat > ".test-results/$sha.json" <<JSON
   "command": "$(printf '%s' "$cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')",
   "status": $status,
   "passed": $([ "$status" -eq 0 ] && echo true || echo false),
-  "assertions_run": $ran,
+  "tests_run": $ran,
   "started": "$start",
   "finished": "$end",
   "tail": "$tail_out"
@@ -64,4 +74,5 @@ echo
 echo "recorded: .test-results/$sha.json (status $status)"
 [ "$dirty" = true ] && echo "note: working tree was dirty — this result does not describe $sha alone"
 [ "$ran" = "0" ] && echo "note: the suite is empty — a pass here means nothing was checked, not that anything works"
+[ "$ran" = "null" ] && echo "note: could not read a test count from this runner's output — the record says null, not zero"
 exit "$status"
