@@ -171,6 +171,15 @@ cleanup.
   registry dependencies, whose licences must stay compatible with it.
 - **A red gate 2 between tasks 3 and 7 is expected**, for the reason under *Status*. If it is
   still red at task 8, that is a defect.
+- **The fuzz gate's anti-vacuity floor was coupled to a wall-clock budget, and CI caught it.**
+  The campaign stopped at a 0.5s deadline and then asserted that at least 64 inputs had run; a
+  hosted runner managed 49 and the gate failed, having found nothing wrong with the code. The
+  deadline now binds only once the floor is met. **A gate whose verdict depends on how loaded the
+  runner is is not a gate** — it teaches people to re-run CI until it passes, which is how a real
+  failure gets re-run away. Worth an `ops` checklist entry at `finish-cycle`; it is the kind of
+  defect that recurs. It cannot hang in exchange: the floor is small and every input is bounded
+  by the loader's own limits.
+
 - **`CANON-3`'s test was reordering the one collection whose order is meaning.** It reversed
   `nodes` and asserted the saved bytes were unchanged, while `ID-3` reverses the same array and
   asserts that draw order **does** follow — *the one thing order is allowed to decide*. The two

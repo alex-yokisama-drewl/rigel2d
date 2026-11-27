@@ -24,7 +24,7 @@
 //!
 //! | Variable | Default | What it sets |
 //! |---|---|---|
-//! | `RIGEL_FUZZ_SECONDS` | `0.5` | The wall-clock budget. The loop stops at the deadline whatever it has reached, so this cannot hang CI |
+//! | `RIGEL_FUZZ_SECONDS` | `0.5` | The wall-clock budget. The loop stops at the deadline once it has run `MIN_INPUTS`, so a slow runner cannot fail the gate and a hang cannot outlive it |
 //! | `RIGEL_FUZZ_INPUTS` | `512` | The number of inputs, if the budget does not run out first |
 //! | `RIGEL_FUZZ_SEED` | a fixed constant | The generator's seed |
 //!
@@ -62,6 +62,9 @@ static ALLOCATOR: counting::Counting = counting::Counting;
 /// Changed only when a run should explore different ground; a fixed seed is what
 /// makes a green run mean the same thing twice.
 const DEFAULT_SEED: u64 = 0x5249_4745_4c32_4446;
+/// The floor an honest run must reach, whatever the clock says. The budget
+/// below stops the loop only once this many inputs have been tried.
+const MIN_INPUTS: usize = 64;
 const DEFAULT_SECONDS: f64 = 0.5;
 const DEFAULT_INPUTS: usize = 512;
 
@@ -539,7 +542,13 @@ fn exec_5_a_fuzz_run_over_the_puppet_parser() {
     let mut by_kind = [0usize; 9];
 
     for index in 0..inputs {
-        if Instant::now() >= deadline {
+        // The deadline binds only once the floor is met. Coupling the two the
+        // other way made this gate fail on a hosted runner that is slower than
+        // the machine it was written on — 49 inputs in 0.5s, tripping the floor
+        // below. A gate whose verdict depends on how loaded the runner is is not
+        // a gate. The floor is small and every input is bounded by the loader's
+        // own limits, so reaching it cannot hang CI either.
+        if ran >= MIN_INPUTS && Instant::now() >= deadline {
             break;
         }
         let mut rng = Rng::for_input(seed, index);
@@ -595,7 +604,7 @@ fn exec_5_a_fuzz_run_over_the_puppet_parser() {
     );
 
     assert!(
-        ran >= 64,
+        ran >= MIN_INPUTS,
         "only {ran} inputs ran in {seconds}s: the budget is too small to be a \
          regression gate, and a fuzz run nobody notices passing is one nobody \
          notices doing nothing"
