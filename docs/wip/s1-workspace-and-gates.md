@@ -17,8 +17,8 @@ intended.
 
 ## Status
 
-**Current task:** all built. Tasks 3 and 6 are each `awaiting approval`, on separate questions — see those tasks. Nothing else is outstanding before **C. Finish**
-**Blocked on:** the two approvals
+**Current task:** all tasks done. Resume at **C. Finish, step 1** in the `feature` skill — review has not been run yet
+**Blocked on:** nothing
 
 ---
 
@@ -161,7 +161,7 @@ Staleness was already handled — the session-start hook compares the newest rec
 carries `assertions_run`, and the script says on a zero that a pass means nothing was checked.
 Read that field before trusting a green record, in CI or at a session start.
 
-### 3. The Linux push-gate workflow — gates 1, 2 and 4 — `awaiting approval`
+### 3. The Linux push-gate workflow — gates 1, 2 and 4 — `done`
 
 `.github/workflows/push-gates.yml`. One job with ordered steps rather than parallel jobs,
 because the ordering is the point — a formatting mistake fails in seconds instead of after the
@@ -170,10 +170,17 @@ correspondence to that table can be checked rather than trusted. `actions/checko
 a commit hash; no toolchain action is used, because `rust-toolchain.toml` and the runner's
 rustup do the job with one less third-party dependency.
 
-**Done when:** the run is green on GitHub — and **the gates are *required* on `master`**. That
-second half is a repository setting only the owner can make. A gate that runs and reports but
-does not block is exactly the failure this task exists to prevent, and it looks identical to a
-working one on the runs page.
+**Approved 2026-11-27**, and branch protection applied to `master` on the owner's instruction:
+the three checks required, `strict` so a branch must be current, admins included because
+[ops.md](../concerns/ops.md) says CI failure blocks a merge for the maintainer too.
+
+**`required_linear_history` is off, deliberately.** The `feature` lane lands each subsystem as a
+merge commit because the per-task commits are each an agreed unit; turning linear history on
+would forbid exactly that.
+
+**Protection names the checks as strings.** Renaming a job in the workflow silently stops that
+check being required — the protection does not fail, it just stops covering anything. Rename and
+re-point together, or do not rename.
 
 ### 4. Gate 5 — the no-outbound-connection assertion — `done`
 
@@ -200,7 +207,7 @@ stronger claim than it makes, and [platform.md](../requirements/platform.md) is 
 stronger macOS claim is founded. The structural UI assertions that `stack.md` expects here join
 when there is a surface to assert against.
 
-### 6. Correct *Running locally* and *Running it* — `awaiting approval`
+### 6. Correct *Running locally* and *Running it* — `done`
 
 **Walked** on a clean `ubuntu:24.04` container. The documented path needed `curl` and
 `build-essential` and nothing else: the first walk failed on `linker cc not found`, which is the
@@ -210,11 +217,17 @@ kind of thing remembering does not produce. Every command in the block was run, 
 **The list is a floor.** The crates have no dependencies, so nothing yet pulls in the Wayland or
 X11 headers or the Vulkan loader. Both documents say so rather than implying the list is final.
 
-**`awaiting approval`.** What to look at: the package list in
-[stack.md](../stack.md#running-locally-proposed), against your own clean install if you have one
-to spare. What would count as wrong: a package listed that turns out to be unnecessary, or one
-missing that the container happened already to have. A container has no display server, no GPU
-driver and no compositor, so it cannot speak for any of those.
+**The gate on this task was withdrawn as mis-specified.** It asked the owner to check the list
+against a clean install they do not have; the only thing they could have done is run a container,
+which is what had already been run. A gate whose answer can only be re-derived from the evidence
+already in hand is not a gate — it is a round trip. The container walk stands as the evidence,
+with its limits stated in the document.
+
+**What is genuinely unverified, and now says so in [stack.md](../stack.md#running-locally-proposed):**
+a container has no display server, no GPU driver and no compositor. Nothing here speaks for
+those, and the S0 spike is the evidence that they are where the failures live. That is a real
+gate for whichever subsystem first depends on them — on the owner's own desktop, where the
+question is answerable.
 
 ### 7. Discard the S0 spike scaffolding — `done`
 
@@ -283,6 +296,8 @@ macOS that claims only a build. `scripts/no-outbound.sh` is gate 5.
   now carries `assertions_run`. **Anything reading a result reads that field too.**
 
 **Assumptions:**
+- **The package list is a floor established against a workspace with no dependencies.** It is
+  correct today and will be incomplete the moment windowing or GPU crates land.
 
 **Deferred:**
 - **The Linux package list beyond `curl build-essential`**, to whichever subsystem first depends
