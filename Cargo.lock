@@ -216,6 +216,11 @@ dependencies = [
 [[package]]
 name = "rigel-format"
 version = "0.0.0"
+dependencies = [
+ "flate2",
+ "serde_json",
+ "zip",
+]
 
 [[package]]
 name = "rigel-live"

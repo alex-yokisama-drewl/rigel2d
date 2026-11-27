@@ -18,9 +18,12 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 and 2 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 3, the acceptance tests.**
+**Current task:** tasks 1, 2 and 3 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 4, the core types.**
 **Blocked on:** nothing.
+
+**Gate 2 is red from here**, as designed: task 3 wrote the acceptance tests against a declared
+surface whose every body is `unimplemented!()`, and they fail. Tasks 4 to 7 turn them green.
 
 **Deferred out of task 1 and now closed:** `scripts/fixtures-check.sh` is wired into gate 2.
 
@@ -169,6 +172,15 @@ branch ends so nobody re-proposes them.
   `rigged:two-roots` and `rigged:no-root` would have no fixture and *the tree is acyclic with one
   root* nothing to reject. The tree is a flat `nodes` array, each node naming its parent by
   identifier, with the puppet naming its root.
+- **A fault-injection point behind a cargo feature.** `VER-5` needs the save to fail at each
+  step, and a `#[cfg(feature = "…")]` hook reads as the tidier shape. It is not: the acceptance
+  suite is a separate crate target, so the feature would have to be on for an ordinary
+  `cargo test --workspace` — at which point it is a public function with extra ceremony.
+  `save_with_injected_failure` is public and says in its doc comment why.
+- **Asserting `VAL-13`'s standalone command on its exit status alone.** A panicking stub exits
+  non-zero, which is the correct verdict for every rejected fixture in the corpus — so half the
+  assertions would pass against nothing at all. The command's verdict goes to stdout and the test
+  reads that.
 - **Hand-rolling the whole archive writer to keep the `zip` crate out of the locked graph.** It
   would shrink the dependency set, and it would remove the only independent check that these
   files are real zips — which is exactly what task 9's gate rests on. The `zip` crate writes
@@ -260,7 +272,7 @@ notes nothing yet produces.
 **Still open in those entries, deliberately:** a vulnerability scan and a place to record a triage
 decision. Both are `finish-cycle`'s, not this task's.
 
-### 3. Acceptance tests — `todo`
+### 3. Acceptance tests — `done`
 
 Dispatched to `acceptance-planner`, **which must not be shown an implementation** — there is
 none, which is why this task is here rather than after task 7. It implements the in-scope
@@ -274,14 +286,35 @@ Also the `ops` check that gate 2 fails on zero tests — it has a subject from t
 **Done when:** every in-scope criterion has a test or a stated reason it has none; the suite
 compiles; the tests **fail**, which is what confirms them. No user gate.
 
+**Done:** `crates/rigel-format/src/` is the declared surface, `tests/acceptance/` the suite. The
+tests that have no criterion behind them, and the criteria that have no test, are both in the
+handoff below. `scripts/tests-ran.sh` already had its subject from task 2; it now has tests to
+lose as well as a record to read.
+
 ### 4. Core types, identifiers and the containment table — `todo`
 
-The in-memory puppet: entities, the unsigned 64-bit identifier with its high-water mark and
-reserved zero, handles, and the per-kind containment declaration as **data the validator reads**
-rather than rules naming kinds. Mutation sufficient for `ID-2`, `ID-3` and `ID-4` and no more.
+**This task's shape changed at task 3.** It no longer designs the in-memory puppet — task 3
+declared it, because tests cannot compile against nothing. What is in `crates/rigel-format/src/`
+is a **contract**: types, errors and signatures, doc-commented with the criterion that drives
+each, and every body `unimplemented!()`. Task 4 implements the contract it was handed.
+
+Implement: the entities, the unsigned 64-bit identifier with its high-water mark and reserved
+zero, the per-kind containment declaration as **data the validator reads** rather than rules
+naming kinds, and mutation sufficient for `ID-2`, `ID-3` and `ID-4` and no more.
+
+**A signature may be wrong, and changing one is allowed** — it was derived from the criteria by
+an agent that had implemented nothing. What is *not* allowed is changing a **test** to fit the
+code. If a test is wrong, that is a finding and it goes in the handoff.
 
 **Done when:** `VAL-24` passes — a node kind with no containment declaration fails a check rather
-than inheriting a default. No user gate.
+than inheriting a default — and the identity tests in `tests/acceptance/identity.rs` pass. No
+user gate.
+
+**Why `may_contain`, `may_be_root`, `declared_range` and `declared_limit` return `Option`**, which
+looks over-engineered until you need it: `VAL-24`, `VAL-25` and `LIM-1` each require an
+*undeclared* answer to fail a check rather than default to false. A `bool` cannot distinguish
+"declared, and forbidden" from "nobody declared this", which is the whole point of each of the
+criteria named above.
 
 ### 5. The reader — `todo`
 
@@ -368,6 +401,35 @@ that nothing but `rigged:ext-hostile` carries a path-, URL- or command-shaped st
 also carries `catalogue.json`, mapping each catalogue name to its file, the expected load outcome
 and its one distinguishing feature, so a test reaches a fixture by name rather than by path.
 
+Task 3. The **public surface of `rigel-format` as a contract** — `puppet`, `version`, `load`,
+`validate`, `save`, `limits` and `containment`, plus the `rigel-validate` binary `VAL-13` asks
+for. Every body is `unimplemented!()`; every item carries what it must do and the criterion that
+drives it. Derived from the criteria, not from the fixtures and not from convenience: where a
+criterion asks a rejection to name the rule broken and at least one offending identifier, the
+error type carries both.
+
+The **acceptance suite** at `crates/rigel-format/tests/acceptance/`, with the `main.rs` that stops
+cargo silently skipping the directory. One module per group of the criteria document, and every
+test names the criterion it implements in its name and in a comment above it. Fixtures are reached through `catalogue.json` **by name**, never
+by path, so the `:`-to-`.` renaming on disk lives in one place. `zip`, `flate2` and `serde_json`
+are dev-dependencies of `rigel-format` at the versions and features `rigel-fixtures` already
+pins, so the locked graph gained nothing.
+
+**Under `cargo test --workspace --locked`, 83 of the suite's 84 tests fail, every one at an
+`unimplemented!()` in the crate** — not at an assertion
+about what a stub does, which is the failure mode that would make them worthless. The one that
+passes is `version::the_corpus_and_the_build_agree_on_the_current_version`, and it is not a
+criterion: it asserts that `catalogue.json`, `rigged`'s `rigel2d.json` and
+`FormatVersion::CURRENT` name one version. That is the premise `VER-1` … `VER-6`, `EXT-7`,
+`EXT-8` and `VAL-20` all rest on — the gate those criteria test *is* the declared version — so a
+drift there would make them silently vacuous rather than fail.
+
+The two criteria [puppet-acceptance.md](../requirements/puppet-acceptance.md) recorded as
+writable and unwritten are written: **`VAL-27`**, an animation carrying two tracks for one
+parameter, beside the other validation criteria; **`PHYS-10`**, a puppet carrying no gravity,
+beside `PHYS-6`'s one-gravity rule. Their rows are gone from *Criteria not written*. No existing
+criterion was touched.
+
 **Decisions made:**
 
 - **The current format version is `1.1`.** `rigged:old-version` must declare "an earlier version
@@ -398,6 +460,62 @@ and its one distinguishing feature, so a test reaches a fixture by name rather t
   map is a `BTreeMap`, which is `format.md`'s sorted keys for free), `crc32fast` (the
   hand-assembled archives). The locked graph gained no network-client crate, no git source and no
   alternative registry — which is task 2's check, now with a subject.
+
+- **`Rule` is a closed enum, one variant per rule the specification or a criterion states**, and
+  a `Rejection` carries the `Violation`s that name them. **Because** a corpus of one-defect
+  fixtures is only worth having if a rejection can be *attributed*: a test asserting nothing but
+  *some error* passes against a build that refuses every file, and `VAL-12` exists to make the
+  rule nameable. The granularity is a guess an implementer may want to change — if so that is a
+  finding against these tests, not an obstacle to route around.
+- **Rejections split into the faults reached before any entity exists and the rules broken after**
+  — `Archive`, `IncompatibleVersion`, `LimitExceeded`, `Malformed`, and `Invalid(Vec<Violation>)`.
+  **Because** `VAL-12` asks every rejection to name an offending identifier, and a container or
+  JSON fault is refused before there is one. The split makes that a property of the variant rather
+  than an exception in prose, and it is what lets `rigged:nan` be asserted honestly.
+- **`may_contain`, `may_be_root`, `declared_range` and `declared_limit` all return `Option`.**
+  **Because** `VAL-24`, `VAL-25` and `LIM-1` each say in terms that *no stated answer* must fail a
+  check rather than inherit a default — and a `bool` cannot tell *declared false* from *nobody
+  decided*.
+- **`Violation` carries `field: Option<String>`** beside its offenders, because `VAL-25` asks the
+  rejection to name the **constant** and `VAL-26` the rule, the animation and the track: an
+  identifier list alone cannot say which field of a node was out of range.
+- **`Rejection::MAX_MESSAGE_BYTES` is 4096**, an invented figure. `VAL-12` requires *bounded*
+  output and names no bound; a message that grows with the file is a second denial-of-service
+  route through the error path. Change it in one place if it is wrong.
+- **`save_with_injected_failure` is public.** `VER-5` and [I7](../invariants.md) are claims about
+  **every step** of a write, and the only way to assert them is to make each step fail. The
+  acceptance suite is a separate crate target, so a `#[cfg(test)]` hook cannot reach it.
+- **`rigel-validate` is the standalone command, and its contract is declared in its own doc
+  comment**: one path argument, `accepted` or `rejected: …` on stdout, exit `0` or `1`, `2` on
+  misuse. Nothing in `docs/` named the command `VAL-13` requires or said what it prints, and a
+  test that asserted only the exit status would pass by accident against a panicking stub —
+  a panic is a non-zero exit, which is the right answer for half the corpus.
+- **`save_as(&mut Puppet, …)` exists and issues a fresh puppet identifier.** `ID-9` requires it
+  and no document says where it lives; the format crate is the only place in S2 that can.
+- **A save decides whether it is upgrading by reading the file it is replacing**, rather than the
+  puppet carrying the version it was loaded at. **Because** [format.md](../format.md) describes
+  the backup as *the bytes it read*, and a puppet assembled in memory has no version to carry.
+- **`NodeBody` is closed over the four kinds**, and a node of a kind this build does not know is
+  **not** in `Puppet::nodes`. `EXT-7` says removing it from the fixture changes *no reported
+  entity*, so it is opaque material rather than a tree entry. `TOOL-4` and `EXT-7` both assert it,
+  and both are the tests to re-read if an implementer disagrees.
+- **`ExtensionEntry::data` is `Vec<u8>`, verbatim.** Holding it as parsed JSON would re-emit a
+  stranger's numbers through our own formatter, which is what *Already ruled out* says must not
+  happen — and it keeps a JSON crate out of the library's dependencies entirely.
+- **`CANON-2` varies the environment in child processes**, re-running the test binary with
+  `--exact`, rather than calling `std::env::set_var` and `set_current_dir`. Both are
+  process-global: mutating the environment of a running test binary races every other test in it
+  (the panic handler reads `RUST_BACKTRACE`), and changing the working directory changes it for
+  all of them. The environment *is* this criterion's subject, so it has to vary somewhere it
+  cannot hurt anything.
+- **`EXEC-5` is a seeded mutation loop, not a fuzzer.** A time-boxed fuzz run is task 8's and does
+  not belong in the default suite; the regression form of the same claim — a fixed seed, 256
+  single-byte mutations of `rigged`, every one refused rather than panicked on — does, and it
+  fails today for the right reason.
+- **`LimitKind` covers every stored collection and string in the model**, not only the sizes the
+  requirement enumerates. `LIM-8` says the governing sentence is *every size and count the loader
+  trusts* and that driving the check from the format is what bounds a kind added later. The
+  figures are S3's; the **set** is not.
 
 **Contradicts docs:**
 
@@ -460,6 +578,66 @@ and its one distinguishing feature, so a test reaches a fixture by name rather t
   this branch opened, found here because `rigel-fixtures` matched the existing crates rather than
   introducing an inconsistency. Nothing to route at task 10.
 
+Task 3. Found while writing tests from the criteria against the fixtures, and **reported rather
+than fixed** — an acceptance criterion written without sight of the implementation is not an
+implementer's to edit.
+
+- **`TRACK-1` still points at *Criteria not written* for the duplicate-track question**, which
+  `VAL-27` now answers. The sentence is stale. Left alone, because it is an existing criterion.
+- **`ID-3` asks for the keypoint list to be reversed, and that has no defined meaning on its
+  own.** A binding carries `values`, one entry per keypoint, indexed positionally — so reversing
+  the keypoints without reversing the values against them is a change of *meaning*, not a
+  reorder, and the criterion does not say which is intended. The test reverses both, which is the
+  meaning-preserving reading; the criterion should say so.
+- **An unfamiliar enumerated value in a *known* field of a later-version file has no stated
+  in-memory representation.** `rigged:future-minor` carries `"output_source": ["torque"]` on a
+  physics node. `VAL-20` and `EXT-7` say such a value is *preserved opaquely*, but the field is
+  one this build interprets and the typed model has nowhere to put it: `OutputSource` is a closed
+  enum, as `AxisPolarity` is. `TOOL-4` and `EXT-7` exclude that node and say so in a comment. This
+  is the gap most likely to bite task 5.
+- **`FLIP-2` has no fixture for a top–bottom flip on its own.** `rigged:flipped-pair` carries
+  none, left–right, and both-set. The criterion asks that all three round-trip and be
+  distinguishable; the test builds the third in memory. A fourth part in the fixture would be
+  better, and the corpus is regenerable.
+- **`POL-1` and `VAL-21`'s acceptance halves depend on `rigged:paired`**, which this subsystem's
+  *Deferred* list puts out of scope because it serves `authoring-acceptance.md`. Both criteria are
+  listed as in scope here. The tests set an axis to *unknown* in memory and round-trip it, which
+  is the same claim without the fixture.
+- **`CANON-7` compares a decoded payload against *the imported artwork*, and there is no import
+  path in S2** and no separate source artwork beside `rigged`. Only the storage half — payloads
+  carried through a round trip without re-encoding, and stored at the content rectangle the record
+  declares — is assertable here.
+- **`LIM-3`, `LIM-2` and `LIM-7` all want peak resident bytes bounded during a failed load.** The
+  acceptance suite has no counting allocator. [stack.md](../stack.md) names one for the
+  CPU-allocation budget; if it lands it serves these too, and until then *checked before
+  allocating* is asserted only as *refused as a limit*.
+- **`EXEC-1` needs a harness that fails on process spawn, dynamic library load, outbound
+  connection and filesystem access outside the container.** None exists. What the test carries is
+  the observable half: every fixture reaches its catalogued outcome, and the directory the puppet
+  sits in is unchanged, gains nothing and keeps its modification time. The rest belongs with task
+  8's hostile-input work.
+- **[format.md](../format.md) never says what `composition_mode`'s one value is.** It says the
+  field is always written and that the format defines one mode, and names neither. The fixtures
+  use `"sum"` and the contract declares `CompositionMode::Sum`; the document should carry it,
+  since `DET-6` asserts *its value is the one meaning the fixed order specified now*.
+- **Which fields have defaults is stated only for a physics node and for the puppet's gravity.**
+  *A defaulted field is absent when it holds its default* is a rule with no list behind it, and
+  `rigged` writes `"source": ""` on its channel mapping and an identity `rotation`/`scale` on
+  every transform. Either those are defaults and the fixtures break the rule, or they are not and
+  the document should say so. This decides whether
+  `canonical::saving_an_unmodified_puppet_reproduces_the_file_it_came_from` can pass at all.
+- **[format.md](../format.md)'s *Validation* list does not mention four rules the criteria
+  require**: exactly one neutral keypoint per parameter (`VAL-15`), each axis declaring a polarity
+  (`VAL-17`), a track's keyframe times, values and blend duration (`VAL-26`), and extension data
+  declaring a version and a name (`EXT-3`). The last three live elsewhere in the document; the
+  neutral-keypoint rule is nowhere in it.
+- **A mesh group's mesh carries `uvs` in the corpus**, and a mesh group references no texture.
+  [format.md](../format.md) specifies `uvs` under *A part's mesh* and says they are in the
+  texture's authored pixel space, which a mesh group has none of. Either the field is meaningful
+  there and the document should say in what space, or it should not be written.
+- **`one-part`'s catalogue row and the criteria document still disagree**, as task 1 reported.
+  Unchanged by this task; the tests use the fixture as built.
+
 **Traps:**
 
 - **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
@@ -477,6 +655,21 @@ and its one distinguishing feature, so a test reaches a fixture by name rather t
 - **A `:` in a fixture file name fails at checkout on Windows, not at build.** The catalogue's
   `rigged:<defect>` becomes `rigged.<defect>` on disk. A test asserts it.
 
+Task 3.
+
+- **A test that sets the panic hook silences every other test in the binary.** `EXEC-5` uses
+  `catch_unwind` over 256 mutations, and an early version installed an empty panic hook to keep
+  the output readable. The hook is process-global: 80-odd concurrent failures lost their
+  `panicked at …` lines and the suite looked like it had failed for no stated reason. The hook is
+  gone; the noise is the price.
+- **`zip`'s `"deflate-flate2"` feature does not choose a flate2 backend.** Adding `zip` alone as a
+  dev-dependency fails to build with *You need to choose a zlib backend* — it only works in
+  `rigel-fixtures` because that crate also depends on `flate2` with `rust_backend`, and the
+  workspace build unifies them. Building `-p rigel-format` on its own does not. `flate2` with
+  `rust_backend` is therefore a dev-dependency here too.
+- **`zip` 9's `ZipFile::name()` returns a `Result<Cow<str>, _>`**, not a `&str`. Worth knowing
+  before the writer in task 7 reads an archive back.
+
 **Assumptions:**
 
 - ~~Every JSON key name, the current version, the gravity default, the compression per entry kind
@@ -489,7 +682,38 @@ and its one distinguishing feature, so a test reaches a fixture by name rather t
 - `PROVISIONAL_NODE_LIMIT`, the figure `rigged:near-limit` sits under, is invented and will be
   wrong. The builder is committed so the fixture regenerates when the real figure lands.
 
+Task 3.
+
+- **A rejection carries its broken rules as typed `Violation`s**, which is what
+  `support::assert_rejected_naming` matches on — not the rendered message. `Rejection::rule_name`
+  is asserted only to be non-empty, by `VAL-12`, so how a rule reads to a person stays the
+  implementer's.
+- **`rigged:nan` may be refused as malformed JSON rather than for finiteness**, and `VAL-6`'s test
+  accepts either for that one fixture while requiring finiteness by name for the infinity pair.
+  Assumed per the task 1 finding above.
+- **An unknown node kind is not a member of `Puppet::nodes`.** Read out of `EXT-7`'s *no reported
+  entity*. See *Contradicts docs*.
+- **A physics node's stored object carries only the keys
+  [format.md](../format.md)'s table defines**, plus the keys every node carries and the `x`
+  marker. `PHYS-1` and `PHYS-8` assert the key set against that list, which is written out in
+  `tests/acceptance/stored_shape.rs`; a field added to the format is added there too.
+- **`rigged:no-gravity` saves back byte-identically**, which assumes the gravity default is
+  `1.0` and the absent-when-default rule applies to it. Both are stated in
+  [format.md](../format.md); the fixture assumed the first before the document did.
+
 **Deferred:**
+
+Task 3 — the in-scope criteria with no test, and what each needs:
+
+| Criterion | Why there is no test, and what it needs |
+|---|---|
+| `ID-7`, `VAL-14`, `TOOL-2`, `TOOL-3`, `MSG-2`, `LIM-5`, `EXEC-4`, `CHAIN-4`, `PHYS-5` | Not `test` in the criteria document — `judgment` at review, or the human gate task 9 already sets out. Nothing missing |
+| `LIM-1` (second half), `LIM-2`, `LIM-6`, `LIM-7`, `LIM-8` | A fixture just over each declared limit, and the figures do not exist until S3 generates `stress`. `LIM-1`'s first half — every limit declared in one place — **is** tested. `LIM-8`'s walk of the format definition is `script` and needs the definition to be walkable |
+| `EXEC-3`, `VAL-24` | `script` in the criteria document. `VAL-24` has a behavioural half here — the declaration is total over the kinds — and the script is task 4's |
+| `EXEC-1` (the interception half), `EXT-5` (the same) | A harness that fails on spawn, `dlopen`, connect and out-of-container filesystem access. Task 8 |
+| `LIM-3` (the memory half) | A counting allocator the acceptance suite can read |
+| `CANON-7` (the artwork half) | The import path, which is Studio's |
+| `VER-2`, `PHYS-6`, `PHYS-8`, `FLIP-1`, `FLIP-2`, `TEX-4`, `CHAIN-1` — the second half of each | Evaluation or a render surface: S4 and S5. Each test carries the stored-shape half and says in its comment where the other lives |
 
 - **A just-over fixture per declared load limit** (`LIM-1`, `LIM-2`, `LIM-7`). The limits do not
   exist yet and `LIM-4` ties them to a workload S3 generates; a fixture built against a guessed

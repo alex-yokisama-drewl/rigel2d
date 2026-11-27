@@ -5,3 +5,16 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
+
+# Used only by the acceptance suite, which reads the archives this crate writes
+# and the fixtures it is tested against. Deliberately not dependencies: the
+# library itself must not reach for a JSON or zip crate on the strength of what a
+# test wanted, and these versions and features match crates/rigel-fixtures so the
+# locked graph gains nothing.
+[dev-dependencies]
+zip = { version = "9.8.2", default-features = false, features = ["deflate-flate2"] }
+# zip's "deflate-flate2" brings flate2 without choosing a backend; rust_backend is
+# the pure-Rust one, so no C toolchain and no system zlib. Same selection as
+# crates/rigel-fixtures.
+flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
+serde_json = "1.0.154"
