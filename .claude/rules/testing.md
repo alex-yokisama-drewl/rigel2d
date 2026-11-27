@@ -67,6 +67,12 @@ Rules:
   functional changes after that point.
 - **Say what to look at.** A gate that says "please check the page" wastes the gate. Name the
   thing, and name what would count as wrong.
+- **Gate only what a person can actually settle.** If the owner could answer only by re-running
+  what you already ran, or by owning hardware they do not have, it is not a gate — it is a round
+  trip, and the evidence you already hold is the answer. Say what remains genuinely unverified
+  instead, and gate it on someone who can verify it.
+- **A gate is not for approving a technical choice.** Those are the agent's (`CLAUDE.md`,
+  *Who decides what*) and are reported, not submitted.
 - **Every catch at a gate becomes a checklist entry before the phase closes.** This is the rule
   that makes the process improve rather than merely run. A bug found twice is a process failure.
 

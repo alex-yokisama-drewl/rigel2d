@@ -27,6 +27,27 @@ not guess a lane, and do not skip to implementation because a request sounds sim
 **visual-checks: `automated`.** Whether automated visual verification is
 attempted is project configuration, not an agent's judgment call.
 
+## Who decides what
+
+**Technical decisions are the agent's.** Data model, gates, dependencies, test strategy, when
+to commit, when to merge, how quality is assured. Decide them, implement them, and say plainly
+what was chosen and why. A technical choice is **announced, not submitted** — a decision
+recorded with its reason is reversible, and one deferred to the owner is only a slower decision.
+
+**Product decisions are the owner's**, and are worth interrupting for: how something should
+feel to use, which trade-off to take, what is in scope, anything that changes what the software
+is. The `requirements` and `tech-design` lanes are where that time is spent.
+
+Still the owner's, inside technical work:
+
+- **An invariant.** Changing one is never an agent's call.
+- **A question only they can answer** — hardware, accounts, money, or a fact not on disk.
+- **A human gate**, which exists for what a person must look at. It is not a way to get a
+  technical choice approved, and a gate the owner can only answer by re-running what the agent
+  already ran is a defect in the gate. See `.claude/rules/testing.md`.
+
+**Do not open a question the code, the documents or a measurement can answer.** Go and find out.
+
 ## Running it
 
 | | |
