@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/rigel-format",
+    "crates/rigel-runtime",
+    "crates/rigel-studio",
+    "crates/rigel-live",
+]
+
+# Shared across every crate. See docs/stack.md for what each crate owns, and why
+# rigel-format is separate: it must build and run with no GPU, no window and no
+# toolkit, which is what lets CI exercise the validator and makes a standalone
+# validator something a third party can run.
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+rigel-format = { path = "crates/rigel-format" }
+rigel-runtime = { path = "crates/rigel-runtime" }

@@ -1,0 +1,6 @@
+# Pinned, not floating. docs/concerns/ops.md requires a release to build from the
+# locked dependency set and the pinned toolchain, and a floating channel breaks CI
+# on someone else's schedule. A bump is its own commit and re-runs the counter gate.
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]

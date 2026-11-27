@@ -17,7 +17,7 @@ intended.
 
 ## Status
 
-**Current task:** 1 — the workspace, the toolchain pin, and four crates that build
+**Current task:** 2 — `scripts/test-record.sh` records a result
 **Blocked on:** nothing
 
 ---
@@ -145,20 +145,11 @@ document is deleted at merge, so anything here is routed before that happens.
 
 One commit each. Status: `todo` / `awaiting approval` / `done`.
 
-### 1. The workspace, the toolchain pin, and four crates that build — `todo`
+### 1. The workspace, the toolchain pin, and four crates that build — `done`
 
-Root `Cargo.toml` with the members [stack.md](../stack.md#workspace-proposed) names, each crate a
-shell, and the dependency graph that document specifies wired rather than left to S2:
-`rigel-runtime` on `rigel-format`, both applications on `rigel-runtime`. `rust-toolchain.toml`
-pins the compiler. `Cargo.lock` is committed. `.gitignore` gains `__pycache__/`, which the S0
-spike committed a `.pyc` through.
-
-`rigel-format` must build with no GPU, no window and no toolkit — that is what lets CI exercise
-the validator and makes a standalone validator something a third party can run.
-
-**Done when:** `cargo build --workspace` succeeds from a clean clone with nothing cached, and
-`cargo tree` shows the specified graph and no GPU or windowing dependency reachable from
-`rigel-format`. No user gate.
+The crates live under `crates/`. `rigel-format` has no dependencies at all, which is the
+property [stack.md](../stack.md#workspace-proposed) asks for and the thing to re-check whenever
+something is added to it.
 
 ### 2. `scripts/test-record.sh` records a result — `todo`
 
@@ -223,6 +214,19 @@ have one to spare — a container cannot tell you whether a real desktop needs s
 had. What would count as wrong: a package that turns out to be unnecessary, or a missing one that
 the container happened not to need.
 
+### 7. Discard the S0 spike scaffolding — `todo`
+
+[plan.md](plan.md) records `spike/alpha-sender/` as throwaway scaffolding S1 discards. Deleting
+it is only half the task: [README.md](../README.md)'s status paragraph and the *Reproducing it*
+section of
+[research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md) both
+point at the directory, and macOS and a second Windows machine are still unmeasured, so the
+pointer has to become one a future measurer can follow rather than simply vanish.
+
+**Done when:** the directory is gone, both documents name the branch and the merge commit the
+instrument lives in instead of a path that no longer resolves, and `scripts/docs-check.sh` is
+clean. No user gate.
+
 ---
 
 ## Handoff
@@ -231,6 +235,9 @@ Filled as work proceeds; routed to the project documentation at finish. Leave a 
 than deleting it.
 
 **Built:**
+The workspace: `Cargo.toml` at the root, `rust-toolchain.toml` pinning 1.95.0, a committed
+`Cargo.lock`, and the four crates [stack.md](../stack.md#workspace-proposed) names, each a shell
+with the specified dependency graph wired and nothing implemented.
 
 **Decisions made:**
 - **Gate set, glibc deferral, toolchain pin, committed lockfile and CI provider** — all five are
