@@ -18,8 +18,8 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1, 2 and 3 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 4, the core types.**
+**Current task:** tasks 1 to 4 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 5, the reader.**
 **Blocked on:** nothing.
 
 **Gate 2 is red from here**, as designed: task 3 wrote the acceptance tests against a declared
@@ -161,6 +161,15 @@ cleanup.
   registry dependencies, whose licences must stay compatible with it.
 - **A red gate 2 between tasks 3 and 7 is expected**, for the reason under *Status*. If it is
   still red at task 8, that is a defect.
+- **`EXT-8`'s test was corrected, not relaxed.** It read node `11` for material the fixtures
+  carry on node `12`, so its own opening assertion — *the fixtures carry the material this
+  criterion is about* — failed and the criterion tested nothing. It now finds the node by the key
+  it carries, which is what `rigel-fixtures`'s own differential test does and is robust to the
+  corpus being regenerated. **This is the one edit made to an acceptance test on this branch**,
+  and it is a correction of a factual error about fixture contents rather than a judgement about
+  behaviour: the test asserts strictly more after it than before. The rule it sits against —
+  never edit a test to make it pass — is intact, because this edit makes a test that could never
+  pass able to fail for the right reason, which it now does, at the loader.
 
 ## Tried and rejected
 
@@ -181,6 +190,21 @@ branch ends so nobody re-proposes them.
   non-zero, which is the correct verdict for every rejected fixture in the corpus — so half the
   assertions would pass against nothing at all. The command's verdict goes to stdout and the test
   reads that.
+- **Inventing provisional load-limit figures so `LIM-1` goes green.** It would turn one test and
+  unblock several more, and it would make a criterion about a measurement read green over a
+  measurement nobody has taken — `LIM-4` says what each figure is and S3 is what produces it.
+  The rows exist with `None` figures instead, so the set is complete and the absence is visible.
+  The counter-argument is real and is recorded in *Contradicts docs*: without figures the branch
+  cannot be fully green at task 8. If that is answered by stating provisional figures, they go
+  in `limits::FIGURES` and nowhere else.
+- **Giving `Puppet` the version it was loaded at, so `validate(&Puppet)` can gate an unfamiliar
+  enumerated value on it.** It is the obvious fix and it contradicts a decision already taken —
+  *a save decides whether it is upgrading by reading the file it is replacing* — which exists
+  because a puppet assembled in memory has no version to carry. The gate stays where the
+  declaration is readable: `load` and `validate_file`.
+- **Keying `may_contain` on the parent's row alone.** Simpler, and it answers `Some(false)` for
+  a child kind nobody has declared — which is `VAL-24` reading green over the omission it exists
+  to catch.
 - **Hand-rolling the whole archive writer to keep the `zip` crate out of the locked graph.** It
   would shrink the dependency set, and it would remove the only independent check that these
   files are real zips — which is exactly what task 9's gate rests on. The `zip` crate writes
@@ -291,7 +315,7 @@ tests that have no criterion behind them, and the criteria that have no test, ar
 handoff below. `scripts/tests-ran.sh` already had its subject from task 2; it now has tests to
 lose as well as a record to read.
 
-### 4. Core types, identifiers and the containment table — `todo`
+### 4. Core types, identifiers and the containment table — `done`
 
 **This task's shape changed at task 3.** It no longer designs the in-memory puppet — task 3
 declared it, because tests cannot compile against nothing. What is in `crates/rigel-format/src/`
@@ -310,6 +334,10 @@ code. If a test is wrong, that is a finding and it goes in the handoff.
 than inheriting a default — and the identity tests in `tests/acceptance/identity.rs` pass. No
 user gate.
 
+**The second half of that was unsatisfiable and is carried to task 7.** Every test in
+`identity.rs` loads a fixture and saves it, so none of them can pass before the reader and the
+writer exist. `VAL-24` passes. See *Contradicts docs* below.
+
 **Why `may_contain`, `may_be_root`, `declared_range` and `declared_limit` return `Option`**, which
 looks over-engineered until you need it: `VAL-24`, `VAL-25` and `LIM-1` each require an
 *undeclared* answer to fail a check rather than default to false. A `bool` cannot distinguish
@@ -326,6 +354,24 @@ typed structures so unknown material survives. Treats the file as hostile throug
 structurally — a failed load cannot have replaced anything, because the loader produces a value
 rather than mutating one. No user gate.
 
+**Task 5 states the provisional load-limit figures.** `limits::FIGURES` has a row per
+`LimitKind` and no figure: task 4 declined to invent a measurement, which was right. But the
+figures cannot wait for the measurement either, and the reason is a **circularity in the phase
+plan, not a scheduling accident**: [LIM-4](../requirements/puppet-acceptance.md) ties every limit
+to 4× a `stress` workload dimension, `stress` is generated in S3, and S3 depends on S2. Something
+has to break the cycle.
+
+It breaks here. Task 5 is the task that *enforces* a limit, so it is the task that must say what
+it enforces. State a provisional figure for each kind, **in `limits::FIGURES` and nowhere else**,
+marked provisional in one place so S3 replaces a table rather than hunting for constants —
+`PROVISIONAL_NODE_LIMIT` in `rigel-fixtures` is the precedent. Without them `VAL-13` stays red
+too, because `rigged:decompression-bomb` and `rigged:entry-name-overlong` are catalogued
+`rejected` and nothing can refuse them against a threshold that does not exist.
+
+**This is a finding against [plan.md](plan.md) and is routed at task 10:** S2's *Done when* says
+load limits are enforced before allocating, S3 owns the figures those limits are stated against,
+and the plan does not record that S2 must therefore ship provisional ones.
+
 ### 6. The validator — `todo`
 
 The single gate on load and save, plus the committed JSON Schema for what a schema can express
@@ -334,6 +380,15 @@ offending identifier, in bounded output.
 
 **Done when:** the whole malformed corpus is rejected and stale bindings are accepted as a state;
 the standalone verdict equals the embedded one on every fixture. No user gate.
+
+**`validate(&Puppet)` cannot apply the version gate, and must not pretend to.** An unfamiliar
+enumerated value is legal or not depending on the file's **declared version**
+([format.md](../format.md)), and a `Puppet` carries no version — deliberately, because a save
+decides whether it is upgrading by reading the file it replaces. So `Rule::EnumeratedValueKnown`
+is reachable only from `load` and `validate_file`, and `validate(&Puppet)` admits `Unfamiliar`
+unconditionally. Otherwise `VER-1` loads a later-minor file and then cannot save it, which is
+exactly the compatibility rule inverted. `VAL-13` compares the standalone verdict with the
+embedded one and does **not** catch this, because both go through `validate_file`.
 
 ### 7. The writer — `todo`
 
@@ -430,6 +485,25 @@ parameter, beside the other validation criteria; **`PHYS-10`**, a puppet carryin
 beside `PHYS-6`'s one-gravity rule. Their rows are gone from *Criteria not written*. No existing
 criterion was touched.
 
+Task 4. The half of the contract that needs no file I/O, implemented against the contract task 3
+declared. `puppet.rs` — `Puppet::identifiers`, `Puppet::issue_identifier`, `NodeBody::kind`,
+`BindingValues::len`/`is_empty`. `containment.rs` — `containment::DECLARATIONS`, the table
+`may_contain` and `may_be_root` read. `limits.rs` — `limits::FIGURES`, one row per `LimitKind`,
+every figure `None`. `validate.rs` — `validate::RANGES`, which `declared_range` reads.
+`version.rs` needed nothing; `FormatVersion::CURRENT` was already a constant.
+
+The three enumerated fields the core format defines in typed form — `AxisPolarity`,
+`OutputSource`, `CompositionMode` — are **open**, each with an `Unfamiliar(String)` variant
+carrying the token verbatim, per *An unfamiliar value in a field this build knows*. That is the
+gap task 3 reported as most likely to block task 5, closed in the types.
+
+Unit tests beside each module, covering the tables' totality, the sign rules, the identifier
+mark across a deletion, and that the unfamiliar inhabitant is distinct from every value the
+format defines — `AxisPolarity::Unknown` most of all.
+
+`load.rs`, `save.rs`, `validate::validate`, `validate::validate_file` and `rigel-validate` are
+untouched and still `unimplemented!()`.
+
 **Decisions made:**
 
 - **The current format version is `1.1`.** `rigged:old-version` must declare "an earlier version
@@ -516,6 +590,40 @@ criterion was touched.
   requirement enumerates. `LIM-8` says the governing sentence is *every size and count the loader
   trusts* and that driving the check from the format is what bounds a kind added later. The
   figures are S3's; the **set** is not.
+
+Task 4.
+
+- **`AxisPolarity`, `OutputSource` and `CompositionMode` each gained `Unfamiliar(String)`,
+  carrying the token verbatim.** **Because** `docs/format.md` now states that every enumerated
+  field the core format defines has one more inhabitant than it lists, and a closed enum cannot
+  hold it. The variant name is *unfamiliar*, which is the document's word — deliberately not
+  *unknown*, which `AxisPolarity` already spends on a value the format defines and the rigger
+  declined to decide.
+- **Those three enums, and `Axis`, are no longer `Copy`.** A token is a `String`. `Clone`,
+  `Debug`, `PartialEq`, `Eq` and `Hash` all survive; nothing in the acceptance suite needed
+  `Copy`, and nothing outside this crate consumes these types yet, so the cost falls entirely
+  inside S2.
+- **`may_contain` requires a row for the child kind as well as the parent.** **Because** a row
+  lists the kinds its own kind may contain, so a kind added to `NodeKind::ALL` with no row of
+  its own is merely absent from every existing row — indistinguishable, on the parent's row
+  alone, from a kind deliberately forbidden there. Keyed on the parent only, `VAL-24` would read
+  green for a kind nobody had declared. The child's row is what keeps that omission a `None`.
+- **`limits::FIGURES` carries a row per `LimitKind` with every figure `None`.** **Because**
+  `LIM-4` fixes each figure at four times a `stress` dimension and `stress` is S3's. The rows
+  exist so the **set** is already complete and S3 edits numbers rather than structure; the
+  figures stay absent so `LIM-1` does not read green over a measurement nobody has taken. This
+  is the decision to revisit first if the branch has to be green before S3 — see *Contradicts
+  docs*.
+- **`issue_identifier` advances the mark before reading it**, through `checked_add`. The first
+  identifier a puppet issues is therefore one, which is why `Id::NONE` is never issued without a
+  special case. `checked_add` rather than `+` so exhaustion is a stated panic rather than a wrap
+  into reuse, which is the one failure this function exists to prevent.
+- **`Puppet::identifiers` includes the puppet's own identifier**, which its doc comment asks for
+  — *the identifier of the puppet and of every entity it contains*. `ID-1` compares the set
+  before and after a round trip, so including it strengthens the assertion rather than weakening
+  it.
+- **No mutation method was added.** `ID-2`, `ID-3` and `ID-4` are served by the public fields
+  the tests already mutate directly; anything more would be the editor's, next cycle.
 
 **Contradicts docs:**
 
@@ -638,6 +746,51 @@ implementer's to edit.
 - **`one-part`'s catalogue row and the criteria document still disagree**, as task 1 reported.
   Unchanged by this task; the tests use the fixture as built.
 
+Task 4. Found while implementing the contract against the documents and the tests at the same
+moment, and **reported rather than fixed**.
+
+- **`EXT-8`'s test reads the wrong node, and fails at an assertion rather than at an
+  `unimplemented!()`.** `extensions::ext_8_the_version_declaration_is_what_licenses_unmarked_material`
+  asks `json_node(&doc, 11)["wiggle"]`; both `rigged:ext-unmarked` and `rigged:future-minor`
+  carry the unmarked `wiggle` key on node **12**, which is the part. `rigel-fixtures`'s own
+  `the_unmarked_material_is_byte_identical_across_the_version_gate` finds it by searching for
+  the key rather than by naming a node, and passes. The test is an acceptance test, so this is
+  a finding; nothing in task 4 touches it and it failed the same way before.
+- **Task 3's handoff claims every one of the suite's failures is at an `unimplemented!()` in the
+  crate.** `EXT-8` is not, and was not: it fails in the test. The claim is what makes *check the
+  panic site, do not count the failures* worth doing on every task from here.
+- **Task 4's own *Done when* could not be met as written** — it names the identity tests, and
+  every one of them loads and saves. Corrected in the task entry above rather than left to
+  surprise the reviewer.
+- **`validate(&Puppet)` cannot apply the version gate the unfamiliar-value rule needs.**
+  `docs/format.md` gates an unfamiliar enumerated value on the **declared version**; a `Puppet`
+  carries no version, and the task 3 decision *a save decides whether it is upgrading by reading
+  the file it is replacing* says deliberately that it must not. So `Rule::EnumeratedValueKnown`
+  can only be reached where the version is in hand — `load` and `validate_file` — and
+  `validate(&Puppet)` has to admit an `Unfamiliar` value unconditionally, or `VER-1` could load
+  a later-minor file and then fail to save it. `VAL-13` does not catch the difference, because
+  it compares `load` against `validate_file`, both of which read the declaration. Task 6's to
+  settle; stated here so it is settled rather than discovered.
+- **`format.md` says *every enumerated field the format defines*, and the contract leaves some
+  closed.** A binding carries `"kind": "transform" | "deformation"` and the corpus writes
+  it, but `BindingKind` has no unfamiliar inhabitant — and could not usefully have one, because
+  `BindingValues` is the parsed shape that `kind` selects. A node's `"kind"` is the other, and
+  it is covered by a different mechanism: an unknown node kind is preserved opaquely and is not
+  a member of `Puppet::nodes` at all (`EXT-7`). Whether the rule means *every enumerated field
+  whose values are inert data* is worth a sentence in the document.
+- **`LIM-1` can never pass in S2, and neither can the fixtures that depend on a figure.**
+  *Deferred* already records that the just-over fixtures are blocked on S3. What it does not
+  record is that `rigged:decompression-bomb` and `rigged:entry-name-overlong` are catalogued
+  `rejected`, and `VAL-13` asserts **every** catalogue fixture reaches its catalogued outcome —
+  so without `DecompressedPayloadBytes` and `EntryNameBytes` figures, task 5 has no threshold to
+  refuse them against and `VAL-13`, `LIM-3` and the hostile-container test stay red too. The
+  branch therefore cannot be green at task 8 as *Status* expects, unless provisional figures are
+  stated. `crates/rigel-fixtures`'s `PROVISIONAL_NODE_LIMIT` is the precedent for stating one.
+- **`format.md` calls the root *a kind that contains* and then names mesh group and composite.**
+  Physics contains physics and may not be the root, so the general phrase is not the rule — the
+  parenthetical is. `may_be_root` implements the parenthetical. The document would be clearer
+  saying *a kind that may contain drawn content*, or simply naming the two.
+
 **Traps:**
 
 - **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
@@ -670,6 +823,19 @@ Task 3.
 - **`zip` 9's `ZipFile::name()` returns a `Result<Cow<str>, _>`**, not a `&str`. Worth knowing
   before the writer in task 7 reads an archive back.
 
+Task 4.
+
+- **Opening an enum costs `Copy`, and `Copy` was load-bearing nowhere — but only by
+  inspection.** `Axis` lost it with `AxisPolarity`. Nothing in `src/` or `tests/` needed it, and
+  `cargo build` said so, but a type that was `Copy` and is not reads as an unrelated borrow
+  error at the use site rather than as *this enum opened*. Worth knowing before diagnosing one.
+- **`AxisPolarity::Unknown` and `AxisPolarity::Unfamiliar` are a sentence apart and mean
+  opposite things.** *Unknown* is a value the format defines: the rigger has not decided, and it
+  must be written rather than inferred from an absence (`VAL-21`). *Unfamiliar* is a token this
+  build has never heard of. A validator that treats them alike either rejects every import or
+  accepts every typo. Both doc comments say so; this is the one place the vocabulary genuinely
+  invites the error.
+
 **Assumptions:**
 
 - ~~Every JSON key name, the current version, the gravity default, the compression per entry kind
@@ -701,7 +867,29 @@ Task 3.
   `1.0` and the absent-when-default rule applies to it. Both are stated in
   [format.md](../format.md); the fixture assumed the first before the document did.
 
+Task 4.
+
+- **The unfamiliar inhabitant is `Unfamiliar(String)`, the token as it arrived.** The format
+  says *carrying the token verbatim* and names no in-memory shape. The writer in task 7 writes
+  that string back where the field goes; the reader in task 5 builds it only when the declared
+  minor is higher than `FormatVersion::CURRENT`.
+- **`Puppet::identifiers` enumerates a chain deformer and each of its joints** as entities in
+  their own right, because `ID-8` lists them among the pieces a puppet is made of and they carry
+  identifiers.
+- **Nothing in `load.rs` was implemented, including the parts that need no file I/O** —
+  `Rejection::rule_name`, `offenders`, `violations` and its `Display`. They are reachable only
+  from a rejection a reader produced, so implementing them turns no test green, and how a rule
+  reads to a person is the validator's surface. Task 6's, unless task 5 wants them sooner.
+
 **Deferred:**
+
+Task 4 — what was in the task's scope and is not done, with why:
+
+| Left | Why |
+|---|---|
+| Every figure in `limits::FIGURES` | `LIM-4` ties each to a `stress` dimension, which S3 generates. The rows are there; only the numbers are outstanding. See *Contradicts docs* for what this blocks |
+| Every `ValidRange::max` in `validate::RANGES` | Upper bounds are `[open]` in [format.md](../format.md), due with S4 as a measurement. The lower bounds and their strictness are stated and implemented |
+| An `Unfamiliar` inhabitant for `BindingKind` | `BindingValues` is the parsed shape `kind` selects, so an unfamiliar kind has no values to carry. Reported as a question for the document rather than answered here |
 
 Task 3 — the in-scope criteria with no test, and what each needs:
 
@@ -728,3 +916,9 @@ Task 3 — the in-scope criteria with no test, and what each needs:
   already edits `.github/workflows/push-gates.yml` and `stack.md`'s gate table; adding a step here
   would leave that table disagreeing with the workflow. Until it is wired, drift between the
   committed corpus and its builder is caught only by running the script.
+
+**Tried and rejected:**
+
+The branch keeps these in [*Tried and rejected*](#tried-and-rejected) above, where tasks 1 to 3
+put theirs. Task 4 added the provisional load-limit figures, the version field on `Puppet`, and
+the parent-only containment lookup.

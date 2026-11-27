@@ -209,8 +209,8 @@ fn ext_7_a_later_versions_unmarked_material_is_preserved_and_never_interpreted()
 fn ext_8_the_version_declaration_is_what_licenses_unmarked_material() {
     let unmarked = puppet_json(&fixture("rigged:ext-unmarked"));
     let later = puppet_json(&fixture("rigged:future-minor"));
-    let from_unmarked = crate::support::json_node(&unmarked, 11)["wiggle"].clone();
-    let from_later = crate::support::json_node(&later, 11)["wiggle"].clone();
+    let from_unmarked = crate::support::json_node_carrying(&unmarked, "wiggle")["wiggle"].clone();
+    let from_later = crate::support::json_node_carrying(&later, "wiggle")["wiggle"].clone();
     assert!(
         !from_unmarked.is_null(),
         "the fixtures carry the material this criterion is about"

@@ -212,6 +212,24 @@ pub fn json_node(doc: &serde_json::Value, id: u64) -> serde_json::Value {
         .clone()
 }
 
+/// The node carrying a given top-level key, whatever its identifier.
+///
+/// Used where a criterion is about *the node that carries this material* rather
+/// than about a particular node. Searching for the key rather than naming an
+/// identifier keeps the test pointed at the material when the corpus is
+/// regenerated — a hard-coded identifier silently stops finding it, and an
+/// assertion that the fixture carries the material then fails for a reason that
+/// has nothing to do with the criterion.
+pub fn json_node_carrying(doc: &serde_json::Value, key: &str) -> serde_json::Value {
+    doc["nodes"]
+        .as_array()
+        .expect("a nodes array")
+        .iter()
+        .find(|n| n.get(key).is_some())
+        .unwrap_or_else(|| panic!("puppet.json carries no node with a {key} key"))
+        .clone()
+}
+
 /// Every string value anywhere in a JSON document, as a sorted multiset.
 ///
 /// The shape `EXT-5` needs: *preserved verbatim* over values this build has no

@@ -142,13 +142,77 @@ pub struct ValidRange {
     pub max: Option<f64>,
 }
 
+/// One constant's stated range.
+#[derive(Clone, Copy, Debug)]
+pub struct RangeDeclaration {
+    /// The constant this row declares.
+    pub constant: PhysicsConstant,
+    /// What the validator enforces for it.
+    pub range: ValidRange,
+}
+
+/// The one place a physics constant's range is declared (`VAL-25`).
+///
+/// `docs/format.md`, *What the simulation drives*: `length` and `frequency`
+/// above zero, `gravity` and both dampings at or above zero, every value finite.
+/// Upper bounds are `[open]` there pending the integrator-stability sweep due
+/// with the evaluation pass, so every [`ValidRange::max`] is `None` — which is
+/// an upper bound nobody has stated, not an upper bound of infinity. Finiteness
+/// is [`Rule::NumbersFinite`]'s and is enforced for every number in the file
+/// rather than only for these five.
+pub const RANGES: &[RangeDeclaration] = &[
+    RangeDeclaration {
+        constant: PhysicsConstant::Length,
+        range: ValidRange {
+            min: 0.0,
+            min_inclusive: false,
+            max: None,
+        },
+    },
+    RangeDeclaration {
+        constant: PhysicsConstant::Gravity,
+        range: ValidRange {
+            min: 0.0,
+            min_inclusive: true,
+            max: None,
+        },
+    },
+    RangeDeclaration {
+        constant: PhysicsConstant::Frequency,
+        range: ValidRange {
+            min: 0.0,
+            min_inclusive: false,
+            max: None,
+        },
+    },
+    RangeDeclaration {
+        constant: PhysicsConstant::AngleDamping,
+        range: ValidRange {
+            min: 0.0,
+            min_inclusive: true,
+            max: None,
+        },
+    },
+    RangeDeclaration {
+        constant: PhysicsConstant::LengthDamping,
+        range: ValidRange {
+            min: 0.0,
+            min_inclusive: true,
+            max: None,
+        },
+    },
+];
+
 /// The declared range for one constant.
 ///
 /// `None` means no range has been stated, which fails the check: validating only
 /// finiteness is what `VAL-6` already does, and a finite file does not imply a
 /// finite simulation (`VAL-25`).
-pub fn declared_range(_constant: PhysicsConstant) -> Option<ValidRange> {
-    unimplemented!()
+pub fn declared_range(constant: PhysicsConstant) -> Option<ValidRange> {
+    RANGES
+        .iter()
+        .find(|row| row.constant == constant)
+        .map(|row| row.range)
 }
 
 /// The verdict on a puppet already in memory.
@@ -167,4 +231,58 @@ pub fn validate(_puppet: &Puppet) -> Result<(), Vec<Violation>> {
 /// which is why it returns a [`Rejection`] rather than a list of [`Violation`]s.
 pub fn validate_file(_path: &Path) -> Result<(), Rejection> {
     unimplemented!()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every constant the format defines has a stated range, which is the half
+    /// of `VAL-25` that holds before a file is read.
+    #[test]
+    fn every_constant_has_a_range() {
+        for constant in PhysicsConstant::ALL {
+            assert!(
+                declared_range(*constant).is_some(),
+                "{constant:?} has no stated range"
+            );
+            let rows = RANGES.iter().filter(|r| r.constant == *constant).count();
+            assert_eq!(rows, 1, "{constant:?} has {rows} rows in RANGES");
+        }
+        assert_eq!(
+            RANGES.len(),
+            PhysicsConstant::ALL.len(),
+            "RANGES carries a row for every constant and no others"
+        );
+    }
+
+    /// The sign rules `docs/format.md` states: two constants must be **above**
+    /// zero and three may be zero. Conflating them rejects a rig that turns
+    /// gravity off for one strand, which is the documented way to make a spike.
+    #[test]
+    fn the_lower_bounds_are_what_the_format_states() {
+        let above_zero = [PhysicsConstant::Length, PhysicsConstant::Frequency];
+        for constant in PhysicsConstant::ALL {
+            let range = declared_range(*constant).expect("a range");
+            assert_eq!(range.min, 0.0, "{constant:?}'s lower bound is zero");
+            assert_eq!(
+                range.min_inclusive,
+                !above_zero.contains(constant),
+                "{constant:?}: whether zero itself is admitted"
+            );
+        }
+    }
+
+    /// Upper bounds are `[open]` in `docs/format.md`. An invented one would be a
+    /// measurement nobody took, presented as a rule.
+    #[test]
+    fn no_upper_bound_is_stated_yet() {
+        for constant in PhysicsConstant::ALL {
+            assert_eq!(
+                declared_range(*constant).expect("a range").max,
+                None,
+                "{constant:?} has an upper bound the format does not state"
+            );
+        }
+    }
 }

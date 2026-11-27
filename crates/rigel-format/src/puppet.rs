@@ -82,7 +82,28 @@ impl Puppet {
     ///
     /// Order is unspecified; callers compare as sets.
     pub fn identifiers(&self) -> Vec<Id> {
-        unimplemented!()
+        let mut out = vec![self.id];
+        for node in &self.nodes {
+            out.push(node.id);
+            if let NodeBody::Part(part) = &node.body
+                && let Some(chain) = &part.chain_deformer
+            {
+                out.push(chain.id);
+                out.extend(chain.joints.iter().map(|joint| joint.id));
+            }
+        }
+        out.extend(self.textures.iter().map(|texture| texture.id));
+        for parameter in &self.parameters {
+            out.push(parameter.id);
+            out.extend(parameter.keypoints.iter().map(|keypoint| keypoint.id));
+        }
+        out.extend(self.bindings.iter().map(|binding| binding.id));
+        for animation in &self.animations {
+            out.push(animation.id);
+            out.extend(animation.tracks.iter().map(|track| track.id));
+        }
+        out.extend(self.channel_mappings.iter().map(|mapping| mapping.id));
+        out
     }
 
     /// Issues an identifier that has never been issued for this puppet.
@@ -90,8 +111,19 @@ impl Puppet {
     /// Takes the next value from [`Puppet::high_water_mark`] and advances it, so
     /// that no identifier is reused after a deletion, within one run and across a
     /// save and reload (`ID-4`).
+    ///
+    /// The mark is the **highest value ever issued**, not a count of what the
+    /// puppet holds: advancing it before reading is what makes a deletion
+    /// invisible here, and `docs/format.md` requires a writer to take it from
+    /// the file it read rather than from what it found. [`Id::NONE`] is
+    /// therefore never issued, because the first identifier a puppet issues is
+    /// one.
     pub fn issue_identifier(&mut self) -> Id {
-        unimplemented!()
+        self.high_water_mark = self
+            .high_water_mark
+            .checked_add(1)
+            .expect("a puppet has not issued 2^64 identifiers");
+        Id(self.high_water_mark)
     }
 }
 
@@ -100,10 +132,16 @@ impl Puppet {
 /// One value today. A mode added in a later version must not change how a puppet
 /// authored before it composes, which is why the field is written even when it
 /// holds its default (`DET-6`, `docs/format.md`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+///
+/// **Open**, per *An unfamiliar value in a field this build knows* — see
+/// [`AxisPolarity::Unfamiliar`] for what that variant means and when it is
+/// legal.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CompositionMode {
     /// Summation, the order specified now.
     Sum,
+    /// A mode this build has never heard of, carrying its token verbatim.
+    Unfamiliar(String),
 }
 
 /// One entry in a puppet's tree.
@@ -143,7 +181,12 @@ pub enum NodeBody {
 impl NodeBody {
     /// Which kind this is, for the containment table ([`crate::may_contain`]).
     pub fn kind(&self) -> NodeKind {
-        unimplemented!()
+        match self {
+            NodeBody::Part(_) => NodeKind::Part,
+            NodeBody::MeshGroup(_) => NodeKind::MeshGroup,
+            NodeBody::Composite => NodeKind::Composite,
+            NodeBody::Physics(_) => NodeKind::Physics,
+        }
     }
 }
 
@@ -202,12 +245,19 @@ pub struct PhysicsNode {
 }
 
 /// Which simulated quantity drives one axis of a physics node's parameter.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+///
+/// **Open**, per *An unfamiliar value in a field this build knows* — see
+/// [`AxisPolarity::Unfamiliar`]. An axis whose source is unfamiliar is driven by
+/// nothing: it does not fall back to `angle`, because guessing is the one thing
+/// a build with no code for a value must not do (`docs/format.md`, `EXT-7`).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OutputSource {
     Angle,
     Length,
     X,
     Y,
+    /// A quantity this build has never heard of, carrying its token verbatim.
+    Unfamiliar(String),
 }
 
 /// A node's own placement, before any binding or simulation touches it.
@@ -277,7 +327,10 @@ pub struct Parameter {
 }
 
 /// One dimension of a parameter.
-#[derive(Clone, Copy, Debug, PartialEq)]
+///
+/// Not [`Copy`], because [`AxisPolarity`] is not: an unfamiliar polarity carries
+/// its token verbatim and a token is a `String`.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Axis {
     /// What the axis spans. Not its polarity.
     pub range: [f64; 2],
@@ -287,9 +340,23 @@ pub struct Axis {
 
 /// What a parameter declares about an axis — what reversing it would mean.
 ///
-/// Three values, and the third is a value that must be **written**, never an
-/// absence to be read as one (`VAL-21`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Three values the format defines, and the third is a value that must be
+/// **written**, never an absence to be read as one (`VAL-21`).
+///
+/// # The fourth inhabitant
+///
+/// `docs/format.md`, *An unfamiliar value in a field this build knows*: every
+/// enumerated field the core format defines has one more inhabitant than it
+/// lists — the unfamiliar value, carrying the token verbatim. A closed enum
+/// would force a reader to choose between refusing a file a later build wrote
+/// and silently substituting a value nobody asked for.
+///
+/// [`AxisPolarity::Unknown`] and [`AxisPolarity::Unfamiliar`] are **different
+/// things** and the pair is easy to conflate. *Unknown* is a value this format
+/// defines, meaning the rigger has not decided; *unfamiliar* is a token this
+/// build has never heard of, which a later minor version defined and this one
+/// carries through without interpreting.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AxisPolarity {
     /// The negative half mirrors the positive half.
     Bilateral,
@@ -298,6 +365,17 @@ pub enum AxisPolarity {
     /// Nobody has decided. Valid, and the value an import records rather than
     /// guessing.
     Unknown,
+    /// A value this build has never heard of, carrying the token verbatim.
+    ///
+    /// **Invalid at [`crate::FormatVersion::CURRENT`]** — a writer at this
+    /// version had the whole list and used something else, so a typo and an
+    /// addition are indistinguishable ([`crate::Rule::EnumeratedValueKnown`]).
+    /// In a file declaring a **later** minor version it loads, is inert
+    /// wherever it would have been interpreted, and is written back verbatim.
+    ///
+    /// The gate is the **declared version**, never recognisability, which is
+    /// the same gate extension data under `x` carries.
+    Unfamiliar(String),
 }
 
 /// A position on a parameter's axes at which binding values are stored.
@@ -351,12 +429,15 @@ impl BindingValues {
     /// How many keypoints' worth of values are stored. The count `VAL-5`
     /// compares against the parameter's keypoints.
     pub fn len(&self) -> usize {
-        unimplemented!()
+        match self {
+            BindingValues::Transform(values) => values.len(),
+            BindingValues::Deformation(values) => values.len(),
+        }
     }
 
     /// Whether no values are stored at all.
     pub fn is_empty(&self) -> bool {
-        unimplemented!()
+        self.len() == 0
     }
 }
 
@@ -457,4 +538,281 @@ pub struct ExtensionEntry {
     /// through our own number formatter and never re-emitted, because values we
     /// do not understand would be damaged silently (`EXT-4`, `EXT-5`, `EXT-9`).
     pub data: Vec<u8>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transform() -> Transform {
+        Transform {
+            translation: [0.0, 0.0],
+            rotation: 0.0,
+            scale: [1.0, 1.0],
+        }
+    }
+
+    fn mesh() -> Mesh {
+        Mesh {
+            vertices: vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]],
+            uvs: vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]],
+            triangles: vec![[0, 1, 2]],
+        }
+    }
+
+    /// A puppet carrying one of every piece *What a puppet is* lists, so that
+    /// [`Puppet::identifiers`] is asserted against a subject that has something
+    /// of each kind to forget.
+    fn one_of_everything() -> Puppet {
+        Puppet {
+            id: Id(1),
+            name: "subject".to_owned(),
+            high_water_mark: 20,
+            root: Id(2),
+            gravity: 1.0,
+            composition_mode: CompositionMode::Sum,
+            nodes: vec![
+                Node {
+                    id: Id(2),
+                    parent: Id::NONE,
+                    name: "root".to_owned(),
+                    transform: transform(),
+                    body: NodeBody::Composite,
+                    extensions: Extensions::default(),
+                },
+                Node {
+                    id: Id(3),
+                    parent: Id(2),
+                    name: "group".to_owned(),
+                    transform: transform(),
+                    body: NodeBody::MeshGroup(MeshGroup { mesh: mesh() }),
+                    extensions: Extensions::default(),
+                },
+                Node {
+                    id: Id(4),
+                    parent: Id(3),
+                    name: "part".to_owned(),
+                    transform: transform(),
+                    body: NodeBody::Part(Part {
+                        mesh: mesh(),
+                        texture: Id(7),
+                        texture_flip: TextureFlip::default(),
+                        mask: Id::NONE,
+                        provenance: None,
+                        chain_deformer: Some(ChainDeformer {
+                            id: Id(5),
+                            joints: vec![Joint {
+                                id: Id(6),
+                                position: [0.0, 0.0],
+                            }],
+                        }),
+                    }),
+                    extensions: Extensions::default(),
+                },
+                Node {
+                    id: Id(20),
+                    parent: Id(3),
+                    name: "strand".to_owned(),
+                    transform: transform(),
+                    body: NodeBody::Physics(PhysicsNode {
+                        length: 100.0,
+                        gravity: 1.0,
+                        frequency: 1.0,
+                        angle_damping: 0.5,
+                        length_damping: 0.5,
+                        output: Id::NONE,
+                        output_source: Vec::new(),
+                        output_scale: Vec::new(),
+                    }),
+                    extensions: Extensions::default(),
+                },
+            ],
+            parameters: vec![Parameter {
+                id: Id(8),
+                name: "parameter".to_owned(),
+                axes: vec![Axis {
+                    range: [-1.0, 1.0],
+                    polarity: AxisPolarity::Bilateral,
+                }],
+                keypoints: vec![Keypoint {
+                    id: Id(9),
+                    position: vec![0.0],
+                    neutral: true,
+                }],
+            }],
+            bindings: vec![Binding {
+                id: Id(10),
+                kind: BindingKind::Transform,
+                parameter: Id(8),
+                target: Id(4),
+                values: BindingValues::Transform(vec![transform()]),
+                stale: false,
+            }],
+            animations: vec![Animation {
+                id: Id(11),
+                name: "animation".to_owned(),
+                tracks: vec![Track {
+                    id: Id(12),
+                    parameter: Id(8),
+                    blend_duration: 0.0,
+                    keyframes: vec![Keyframe {
+                        time: 0.0,
+                        value: vec![0.0],
+                    }],
+                }],
+            }],
+            channel_mappings: vec![ChannelMapping {
+                id: Id(13),
+                channel: "head_turn".to_owned(),
+                parameter: Id(8),
+                source: String::new(),
+                response_curve: ResponseCurve {
+                    points: vec![[0.0, 0.0], [1.0, 1.0]],
+                },
+            }],
+            textures: vec![TextureRecord {
+                id: Id(7),
+                name: "face".to_owned(),
+                authored_size: [16, 16],
+                crop: [0, 0, 16, 16],
+                payload: Vec::new(),
+            }],
+            extensions: Extensions::default(),
+        }
+    }
+
+    /// `ID-1` and `ID-8`: every piece is enumerated, the chain deformer and its
+    /// joints and each animation's tracks included. A kind dropped from
+    /// [`Puppet::identifiers`] is a kind no reload can be checked against.
+    #[test]
+    fn identifiers_enumerate_every_piece() {
+        let subject = one_of_everything();
+        let mut found = subject.identifiers();
+        found.sort();
+        assert_eq!(
+            found,
+            (1..=13)
+                .chain(std::iter::once(20))
+                .map(Id)
+                .collect::<Vec<_>>(),
+            "the puppet, every node, the chain deformer and its joint, the \
+             texture, the parameter and its keypoint, the binding, the \
+             animation and its track, and the channel mapping"
+        );
+    }
+
+    #[test]
+    fn identifiers_include_the_puppets_own() {
+        let subject = one_of_everything();
+        assert!(subject.identifiers().contains(&subject.id));
+    }
+
+    /// `ID-4`: the mark advances, so a deleted identifier is never reissued.
+    #[test]
+    fn issuing_never_repeats_and_never_goes_back() {
+        let mut subject = one_of_everything();
+        let before = subject.identifiers();
+        let first = subject.issue_identifier();
+        let second = subject.issue_identifier();
+
+        assert_ne!(first, second);
+        assert!(first < second, "the mark only ever advances");
+        assert!(!before.contains(&first), "{first:?} is in use already");
+        assert!(!before.contains(&second), "{second:?} is in use already");
+        assert_eq!(subject.high_water_mark, second.0);
+    }
+
+    /// Deleting the whole puppet and then issuing must still not hand back an
+    /// identifier that was in use, which is what makes the mark a mark rather
+    /// than a count.
+    #[test]
+    fn a_deletion_does_not_lower_the_mark() {
+        let mut subject = one_of_everything();
+        let retired: Vec<Id> = subject.identifiers();
+        subject.nodes.clear();
+        subject.parameters.clear();
+        subject.bindings.clear();
+        subject.animations.clear();
+        subject.channel_mappings.clear();
+        subject.textures.clear();
+
+        for _ in 0..8 {
+            let issued = subject.issue_identifier();
+            assert!(!retired.contains(&issued), "{issued:?} came back");
+        }
+    }
+
+    /// The reserved zero means *no reference* and is never handed out, even by a
+    /// puppet that has issued nothing.
+    #[test]
+    fn the_reserved_zero_is_never_issued() {
+        let mut fresh = one_of_everything();
+        fresh.high_water_mark = 0;
+        assert_ne!(fresh.issue_identifier(), Id::NONE);
+    }
+
+    #[test]
+    fn a_body_reports_its_kind() {
+        let subject = one_of_everything();
+        let kinds: Vec<NodeKind> = subject.nodes.iter().map(|n| n.body.kind()).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                NodeKind::Composite,
+                NodeKind::MeshGroup,
+                NodeKind::Part,
+                NodeKind::Physics
+            ]
+        );
+    }
+
+    /// `VAL-5` compares this count against the parameter's keypoints, so it
+    /// counts keypoints' worth of values rather than vertices.
+    #[test]
+    fn binding_values_count_keypoints() {
+        let transforms = BindingValues::Transform(vec![transform(), transform()]);
+        assert_eq!(transforms.len(), 2);
+        assert!(!transforms.is_empty());
+
+        let deformations = BindingValues::Deformation(vec![
+            vec![[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]],
+            vec![[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]],
+        ]);
+        assert_eq!(
+            deformations.len(),
+            2,
+            "two keypoints' worth of three vertices each, not six"
+        );
+
+        assert!(BindingValues::Transform(Vec::new()).is_empty());
+        assert!(BindingValues::Deformation(Vec::new()).is_empty());
+    }
+
+    /// The unfamiliar inhabitant is a value, distinct from every value the
+    /// format defines — `AxisPolarity::Unknown` most of all, which is a decision
+    /// the rigger declined to make rather than a token we cannot read.
+    #[test]
+    fn an_unfamiliar_value_is_not_any_value_the_format_defines() {
+        let unfamiliar = AxisPolarity::Unfamiliar("radial".to_owned());
+        for defined in [
+            AxisPolarity::Bilateral,
+            AxisPolarity::Unipolar,
+            AxisPolarity::Unknown,
+        ] {
+            assert_ne!(unfamiliar, defined);
+        }
+        assert_ne!(
+            AxisPolarity::Unfamiliar("radial".to_owned()),
+            AxisPolarity::Unfamiliar("torque".to_owned()),
+            "the token is what distinguishes one from another"
+        );
+        assert_ne!(
+            OutputSource::Unfamiliar("torque".to_owned()),
+            OutputSource::Angle
+        );
+        assert_ne!(
+            CompositionMode::Unfamiliar("multiply".to_owned()),
+            CompositionMode::Sum
+        );
+    }
 }
