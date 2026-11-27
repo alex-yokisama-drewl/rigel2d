@@ -16,8 +16,10 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
-# No `license` key: nothing in docs/ settles one, and `publish = false` means cargo does not
-# need it. Declaring a licence here would be inventing a project-level answer in a manifest.
+# Dual-licensed, the Rust ecosystem's default. The texts are LICENSE-MIT and LICENSE-APACHE at
+# the repository root, which are what the licence actually is; this key only declares it to
+# cargo. `publish = false` stands for its own reasons and is unrelated.
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 rigel-format = { path = "crates/rigel-format" }

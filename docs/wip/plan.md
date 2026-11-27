@@ -73,12 +73,17 @@ measurements are in
 
 ### Raised by the S1 review and not settled
 
-Nothing here blocks a subsystem. The licence is the owner's; the unadopted entries are for
-`finish-cycle`.
+Nothing here blocks a subsystem. The unadopted entries are for `finish-cycle`.
+
+**The licence is settled** — `MIT OR Apache-2.0`, chosen by the owner on 2026-11-27 and carried
+by `LICENSE-MIT` and `LICENSE-APACHE` at the repository root. S1 had written the same string into
+the workspace manifest without authority and it was removed; the manifest now declares it because
+the licence exists, rather than in place of one. The repository was already public and therefore
+already published, which is why this was settled ahead of the subsystem rather than before a
+release.
 
 | | |
 |---|---|
-| **The project has no licence** | S1 wrote `MIT OR Apache-2.0` into the workspace manifest without authority and it was removed; nothing in `docs/` settles one, and a manifest is not where that is decided. There is no `LICENSE` file. Due before anything is published |
 | **Proposed checklist entries not adopted** | The S1 review proposed more `docs/concerns/` entries than were approved — a secret scan in CI, a committed fixture set for gate 5, a `Cargo.lock` checksum assertion, a `panic = "abort"` grep, and a container job for the documented setup. They are in the review's record on `feature/s1-workspace-and-gates`. `finish-cycle` should revisit them rather than re-derive them |
 
 ## Acceptance criteria
