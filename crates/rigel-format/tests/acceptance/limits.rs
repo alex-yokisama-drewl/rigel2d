@@ -18,9 +18,27 @@
 //! `script`: it walks the format definition and fails on any collection or
 //! string with no limit, which needs the format definition to exist as something
 //! walkable.
+//!
+//! # The memory half, which task 8 added
+//!
+//! `LIM-2`, `LIM-3` and `LIM-7` each ask that **peak resident bytes during a
+//! failed load stay below the declared payload limit**. That is what *checked
+//! before allocating* means in practice, and no assertion over a returned
+//! [`Rejection`] reaches it: a loader that inflates the expansion and then
+//! reports a limit returns exactly the same value as one that never inflated it.
+//! The counting allocator in `tests/shared/counting_allocator.rs` is what tells
+//! the two apart, and the assertions below use it.
+//!
+//! **What still has no fixture** is `LIM-2`'s and `LIM-7`'s *just over* corpus —
+//! a texture past the dimension limit nothing references, and material past the
+//! payload limit inside a later-version file's opaquely preserved region. Those
+//! need fixtures the corpus does not carry and tests `acceptance-planner` writes;
+//! the figures they were blocked on now exist. Reported in
+//! `docs/wip/s2-format.md`.
 
 use rigel_format::{ArchiveFault, LimitKind, Rejection, declared_limit, load};
 
+use crate::counting::peak_bytes;
 use crate::support::fixture;
 
 /// LIM-1, the half that can be written — every load limit is declared in **one
@@ -53,11 +71,23 @@ fn lim_1_every_load_limit_is_declared_in_one_place() {
 /// loader that trusts the header has a decompression bomb.
 ///
 /// The criterion also asks that **peak resident bytes during the attempt stay
-/// below the declared limit**. That needs a counting allocator the acceptance
-/// suite does not have; it is reported as the half this test does not carry.
+/// below the declared limit**, which is the half the counting allocator added in
+/// task 8 carries. It is the assertion that tells a loader which refused the
+/// expansion apart from one which produced it and then complained.
 #[test]
 fn lim_3_a_decompression_bomb_fails_as_a_limit() {
-    let rejection = load(&fixture("rigged:decompression-bomb"))
+    let payload_limit =
+        declared_limit(LimitKind::DecompressedPayloadBytes).expect("a declared figure");
+    let mut outcome = None;
+    let peak = peak_bytes(|| outcome = Some(load(&fixture("rigged:decompression-bomb"))));
+    assert!(
+        peak < payload_limit,
+        "the bomb expands to 256 MiB; the failed load held {peak} bytes, which is \
+         not below the declared limit of {payload_limit}"
+    );
+
+    let rejection = outcome
+        .expect("the load ran")
         .expect_err("an entry expanding past the limit is refused");
     match rejection {
         Rejection::LimitExceeded {
@@ -85,8 +115,15 @@ fn lim_3_a_decompression_bomb_fails_as_a_limit() {
 /// one of the numbered criteria: these fixtures exist because an archive brings
 /// container faults a JSON file could not have, and each is refused **before
 /// anything is decompressed**.
+///
+/// *Before anything is decompressed* is the clause task 8 made assertable:
+/// every one of these refusals is read out of the central directory, so the
+/// peak each costs is a fraction of the payload limit rather than near it. The
+/// bound asserted is the same one `LIM-2`, `LIM-3` and `LIM-7` name.
 #[test]
 fn hostile_containers_are_refused_as_container_faults() {
+    let payload_limit =
+        declared_limit(LimitKind::DecompressedPayloadBytes).expect("a declared figure");
     let cases = [
         ("rigged:entry-name-overlong", ArchiveFault::EntryNameTooLong),
         (
@@ -103,7 +140,16 @@ fn hostile_containers_are_refused_as_container_faults() {
         ),
     ];
     for (name, expected) in cases {
-        let rejection = load(&fixture(name))
+        let mut outcome = None;
+        let peak = peak_bytes(|| outcome = Some(load(&fixture(name))));
+        assert!(
+            peak < payload_limit,
+            "{name} is refused from the central directory, so the failed load must \
+             hold far less than {payload_limit} bytes; it held {peak}"
+        );
+
+        let rejection = outcome
+            .expect("the load ran")
             .err()
             .unwrap_or_else(|| panic!("{name} must be refused"));
         match rejection {

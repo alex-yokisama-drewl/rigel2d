@@ -28,6 +28,19 @@
 
 mod support;
 
+/// The counting allocator, shared with `tests/fuzz.rs`.
+///
+/// Added by task 8, which is where `LIM-3`'s *peak resident bytes during the
+/// attempt stay below the declared limit* stops being a gap the module comment
+/// in `limits.rs` records and becomes an assertion. A `#[global_allocator]` is a
+/// property of a binary rather than of a library, so it is registered here and
+/// `rigel-format` does not know it exists.
+#[path = "../shared/counting_allocator.rs"]
+mod counting;
+
+#[global_allocator]
+static ALLOCATOR: counting::Counting = counting::Counting;
+
 mod canonical;
 mod execution;
 mod extensions;

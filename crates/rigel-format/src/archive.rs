@@ -253,6 +253,82 @@ fn refuse_overlap(archive: &zip::ZipArchive<File>) -> Result<(), Rejection> {
     Ok(())
 }
 
+/// What one entry produced, and how much of it was kept.
+struct Produce {
+    /// The bytes retained — at most the `retain` ceiling asked for.
+    kept: Vec<u8>,
+    /// Bytes the stream produced, which is what a limit is enforced against and
+    /// may be larger than `kept`.
+    count: u64,
+    /// Why the stream stopped early, if it did. Held rather than returned so
+    /// that a limit is reported before a decode error — an entry that is both
+    /// over the limit and malformed is over the limit first.
+    unreadable: Option<std::io::Error>,
+}
+
+/// Decompresses one entry, retaining `retain` bytes and counting all of them.
+///
+/// The ceiling is what keeps a failed load's peak below the limit: the bomb's
+/// expansion streams through a fixed chunk and is dropped, so the refusal costs
+/// the chunk and the entry's declared size rather than the expansion.
+///
+/// It stops one byte past `limit`, because one byte past settles the question
+/// and the rest is work a hostile file asked for (`LIM-6` — the bound on a
+/// rejected load is linear work, and this is where the loop is bounded).
+fn produce<R: Read>(mut source: R, retain: usize, limit: u64) -> Produce {
+    /// Large enough that a real payload costs few reads, small enough that it
+    /// is noise beside any limit.
+    const CHUNK: usize = 64 * 1024;
+
+    // One chunk to start with, and **one** jump to the full ceiling when a
+    // stream actually overflows it. Neither half is incidental:
+    //
+    //   * doubling the way `read_to_end` does holds the old block and the new
+    //     one at every step, and that transient is what put the old shape of
+    //     this function at three times the payload limit;
+    //   * reserving the declared size up front instead would let a one-kilobyte
+    //     file that merely *claims* to hold sixty-four megabytes cost sixty-four
+    //     megabytes, which is the same amplification wearing different clothes.
+    //
+    // So the declaration bounds the buffer and the stream decides when to take
+    // it.
+    let mut kept = Vec::with_capacity(retain.min(CHUNK));
+    // On the heap rather than the stack, so that the counting allocator in the
+    // test binaries sees this buffer too — a measurement that silently excludes
+    // the scratch space is not the measurement `LIM-3` asked for.
+    let mut scratch = vec![0u8; CHUNK];
+    let mut count: u64 = 0;
+    let mut unreadable = None;
+    loop {
+        let produced = match source.read(&mut scratch) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => {
+                unreadable = Some(e);
+                break;
+            }
+        };
+        count = count.saturating_add(produced as u64);
+        if kept.len() < retain {
+            let room = retain - kept.len();
+            let wanted = produced.min(room);
+            if kept.len() + wanted > kept.capacity() {
+                kept.reserve_exact(retain - kept.len());
+            }
+            kept.extend_from_slice(&scratch[..wanted]);
+        }
+        if count > limit {
+            break;
+        }
+    }
+    Produce {
+        kept,
+        count,
+        unreadable,
+    }
+}
+
 /// A name for a message, with no promise that it was ever valid UTF-8.
 trait NameLossy {
     fn name_raw_lossy(&self) -> String;
@@ -277,10 +353,28 @@ impl Container {
 
     /// One entry's bytes, under the payload limits.
     ///
-    /// The declared size refuses early and decides nothing else: what is
-    /// enforced is the count of bytes this call actually produces, so an entry
-    /// that declares a kilobyte and expands to a quarter of a gigabyte is
-    /// refused at the limit rather than at its own word (`LIM-3`).
+    /// The declared size refuses early and bounds what this call **retains**. It
+    /// decides nothing about acceptance: what is enforced is the count of bytes
+    /// this call actually produces, so an entry that declares a kilobyte and
+    /// expands to a quarter of a gigabyte is refused at the limit rather than at
+    /// its own word (`LIM-3`).
+    ///
+    /// # Why the declaration bounds the buffer, which looks like trusting it
+    ///
+    /// It is the opposite direction from the one `LIM-3` warns about. Trusting a
+    /// *small* declaration to mean a small expansion is the decompression bomb;
+    /// using it as a **ceiling on what is held** cannot be, because it has
+    /// already been refused against the limit above. Producing more bytes than
+    /// the central directory records is a refusal either way — a zip entry's
+    /// uncompressed size is not advisory — so nothing past that ceiling is ever
+    /// wanted, and holding it is the whole of what the bomb buys.
+    ///
+    /// The shape this replaced was `take(limit + 1).read_to_end(&mut produced)`,
+    /// which returned the right [`Rejection`] and held **192 MiB** doing it: 64
+    /// MiB of expansion and 128 MiB of `Vec` growth transients. `LIM-3` asks for
+    /// peak bytes below the declared limit and that is three times over it. It
+    /// was invisible until `tests/shared/counting_allocator.rs` measured it, and
+    /// `limits::lim_3_a_decompression_bomb_fails_as_a_limit` now does.
     pub(crate) fn read(&mut self, entry: &Entry) -> Result<Vec<u8>, Rejection> {
         let limit = required_limit(LimitKind::DecompressedPayloadBytes)?;
         let total = required_limit(LimitKind::TotalLoadMemory)?;
@@ -312,12 +406,17 @@ impl Container {
             .by_index_raw(entry.index)
             .map_err(|e| fault(ArchiveFault::NotAnArchive, format!("{e}")))?;
 
-        let mut produced = Vec::new();
-        let read = match method {
-            zip::CompressionMethod::Stored => raw.take(limit + 1).read_to_end(&mut produced),
-            zip::CompressionMethod::Deflated => flate2::read::DeflateDecoder::new(raw)
-                .take(limit + 1)
-                .read_to_end(&mut produced),
+        // Retain at most what the directory declared; count everything.
+        let retain = usize::try_from(entry.declared_size).unwrap_or(usize::MAX);
+        let Produce {
+            kept: produced,
+            count,
+            unreadable,
+        } = match method {
+            zip::CompressionMethod::Stored => produce(raw, retain, limit),
+            zip::CompressionMethod::Deflated => {
+                produce(flate2::read::DeflateDecoder::new(raw), retain, limit)
+            }
             other => {
                 return Err(fault(
                     ArchiveFault::NotAnArchive,
@@ -326,7 +425,7 @@ impl Container {
             }
         };
 
-        if produced.len() as u64 > limit {
+        if count > limit {
             return Err(Rejection::LimitExceeded {
                 limit: LimitKind::DecompressedPayloadBytes,
                 declared: limit,
@@ -336,7 +435,24 @@ impl Container {
                 ),
             });
         }
-        read.map_err(|e| fault(ArchiveFault::NotAnArchive, format!("entry unreadable: {e}")))?;
+        if let Some(e) = unreadable {
+            return Err(fault(
+                ArchiveFault::NotAnArchive,
+                format!("entry unreadable: {e}"),
+            ));
+        }
+        // Under the limit and still not the size the directory records: the
+        // entry and its own central-directory row disagree about what it holds,
+        // which is a broken container rather than a limit.
+        if count != entry.declared_size {
+            return Err(fault(
+                ArchiveFault::NotAnArchive,
+                format!(
+                    "an entry produced {count} bytes where the archive records {}",
+                    entry.declared_size
+                ),
+            ));
+        }
 
         let mut crc = flate2::Crc::new();
         crc.update(&produced);
@@ -395,6 +511,44 @@ mod tests {
                 "{undefined:?} must not be defined"
             );
         }
+    }
+
+    /// What `produce` retains is the ceiling it was given; what it counts is
+    /// everything the stream produced. The two differing is the whole of how a
+    /// decompression bomb is refused without being held (`LIM-3`).
+    #[test]
+    fn a_stream_past_the_ceiling_is_counted_and_not_kept() {
+        let stream = vec![7u8; 10_000];
+        let out = produce(stream.as_slice(), 100, 1_000_000);
+        assert_eq!(out.count, 10_000, "every byte produced is counted");
+        assert_eq!(out.kept.len(), 100, "and only the ceiling is held");
+        assert!(out.unreadable.is_none());
+        assert!(out.kept.iter().all(|b| *b == 7), "the prefix is the prefix");
+    }
+
+    /// One byte past the limit settles it, so the loop stops there rather than
+    /// running a hostile entry to its end.
+    #[test]
+    fn a_stream_past_the_limit_stops_rather_than_draining() {
+        let stream = vec![0u8; 8 * 1024 * 1024];
+        let out = produce(stream.as_slice(), 16, 1024);
+        assert!(out.count > 1024, "it produced enough to decide");
+        assert!(
+            out.count < 8 * 1024 * 1024,
+            "and stopped instead of draining the whole stream; it read {}",
+            out.count
+        );
+        assert_eq!(out.kept.len(), 16);
+    }
+
+    /// A stream shorter than its ceiling keeps all of it, which is every
+    /// ordinary entry.
+    #[test]
+    fn a_stream_within_the_ceiling_is_kept_whole() {
+        let stream = vec![3u8; 64];
+        let out = produce(stream.as_slice(), 64, 1_000_000);
+        assert_eq!(out.count, 64);
+        assert_eq!(out.kept, stream);
     }
 
     /// A limit with no figure refuses rather than permits. Vacuous while every

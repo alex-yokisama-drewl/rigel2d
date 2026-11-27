@@ -16,6 +16,18 @@
 //! inside the process: every fixture reaches its catalogued outcome, and the
 //! directory the puppet sits in is unchanged and gains nothing. Reported as a
 //! gap in `docs/wip/s2-format.md`.
+//!
+//! **Task 8 assessed that harness and decided against building it**, so this is
+//! a gap with a decision behind it rather than one nobody has looked at. The
+//! reasoning is in `docs/wip/s2-format.md` under task 8; the short of it is that
+//! interception is a different implementation on each of the three platforms a
+//! puppet is opened on, that a `seccomp` violation kills the test binary rather
+//! than failing a test, and that what it would establish — *these fixtures, on
+//! this run, did not spawn anything* — is narrower than the static check
+//! `EXEC-3` already specifies and nobody has written yet.
+//!
+//! `EXEC-5`'s campaign half is likewise its own job and is now
+//! `crates/rigel-format/tests/fuzz.rs`. The regression form stays here.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 

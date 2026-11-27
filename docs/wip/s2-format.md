@@ -18,14 +18,19 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 to 7 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 8, hostile input.**
+**Current task:** tasks 1 to 8 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 9, the third-party gate.**
 **Blocked on:** nothing.
 
 **The suite is green.** Every acceptance test passes, and so does every unit test, every
 fixture check and every gate. That is the first time since task 3, which is the designed
 shape: the tests were written failing and the implementation turned them green without any
 of them being weakened to fit it.
+
+**Task 8 found one real defect behind a green test**, and it is the reason that task existed:
+the bomb was refused with the right error after the expansion had been allocated, at three
+times the limit `LIM-3` names. Nothing could see it until there was a counting allocator.
+Task 8's *Contradicts docs* carries the figures.
 
 **The `CANON-3` / `ID-3` contradiction is settled** — see *Decisions*. Task 7 stopped rather
 than choosing between two acceptance tests, which was correct; the criteria decided it.
@@ -492,7 +497,7 @@ byte for byte, against a corpus authored with no project code. The task is **not
 one acceptance test cannot pass while `ID-3` does — see *Blocked on* under *Status*, and task 7's
 *Contradicts docs*. Nothing else in the suite fails and nothing ends at an `unimplemented!()`.
 
-### 8. Hostile input — `todo`
+### 8. Hostile input — `done`
 
 A time-boxed fuzz run over the parser, and the zip-level hostile fixtures: decompression bomb,
 over-long entry name, duplicate entry names, overlapping local-header data, an entry name the
@@ -500,6 +505,18 @@ format does not define.
 
 **Done when:** no crash, no hang, bounded memory; each hostile entry is refused before anything
 is decompressed. No user gate.
+
+**Done**, and *bounded memory* was the half of it that was not true. `archive::read` refused the
+bomb with the right error after allocating the expansion; the counting allocator in
+`tests/shared/counting_allocator.rs` is what showed it, `archive::read` was rewritten, and
+`LIM-3` now asserts the bound rather than recording it as a gap. The fuzz run is
+`tests/fuzz.rs`, a target of its own with a budget small enough for the default suite and
+environment variables that open it up.
+
+**What this task did not close, and why**, is under *Deferred*: `LIM-2`'s and `LIM-7`'s *just
+over* fixtures, `LIM-6`'s linear-work assertion, `EXEC-1`'s interception harness — assessed and
+decided against, with the cheaper assertion named — and `EXEC-3`'s script, which is that
+assertion and is nobody's yet.
 
 ### 9. The third-party gate — `todo` *(human gate)*
 
@@ -721,6 +738,39 @@ collection is not written.
 Two stale doc comments corrected rather than left to mislead: `lib.rs` said the writer and the
 validator were still `unimplemented!()`, and a test helper in `load.rs` said the same of
 `validate`. Neither is a behaviour change.
+
+Task 8. A **counting global allocator** at
+`crates/rigel-format/tests/shared/counting_allocator.rs`, included by the acceptance binary and
+by the fuzz target, each of which registers it for itself — `rigel-format` does not know it
+exists. It wraps the system allocator with a per-thread live-byte counter and a high-water mark,
+and `peak_bytes_during` reports the peak above where a region began. Its own tests ride in every
+binary that includes it, because an allocator a binary forgot to register reports zero and zero
+passes every bound vacuously. One of them holds a large block on *another* thread while the
+measuring thread holds nothing: that is the test that makes the per-thread choice
+self-enforcing, and it was confirmed to fail against a process-global counter.
+
+With it, `LIM-3`'s *peak resident bytes during the attempt stay below the declared limit* is
+asserted rather than recorded as a gap, and so is the same bound over the four zip-level hostile
+fixtures — the half `tests/acceptance/limits.rs` says in its module comment it cannot carry.
+
+**`archive::read` was rewritten to meet that bound, which it did not meet.** See *Contradicts
+docs*. It now streams through a fixed chunk, retains at most what the central directory declares
+and counts every byte produced, taking one jump to that ceiling the first time a stream overflows
+a chunk. Unit tests beside it hold the ceiling, the count and the early stop, and a
+refusal was added for an entry whose produced size disagrees with its own directory row.
+
+A **fuzz campaign** at `crates/rigel-format/tests/fuzz.rs`, its own test target rather than part
+of the acceptance suite — those are written from the criteria without sight of an implementation,
+and a fuzz harness is written against the thing it drives. Mutation kinds over a spread of seed
+fixtures: container-level byte flips, splatting, truncation, insertion and deletion, plus
+text-level and structural mutation of `puppet.json`, text-level mutation of `rigel2d.json`, and
+rebuilding the archive with an entry renamed, dropped or duplicated. Every input is derived from
+the run's seed and its own index alone, so a failure reproduces from the two numbers it prints,
+and the failing container is kept and its path printed. Each input must end in a refusal or a
+load, must not panic, and must not hold more than the loader's own declared total-load budget.
+The default budget is half a second or 512 inputs; `RIGEL_FUZZ_SECONDS`, `RIGEL_FUZZ_INPUTS` and
+`RIGEL_FUZZ_SEED` open it up for a real run. Both failure paths — a panic and an allocation past
+the budget — were confirmed to fire against a planted fault.
 
 **Decisions made:**
 
@@ -1011,6 +1061,45 @@ Task 7.
 - **`SaveError` gained `Display` and `Error`.** No test needed it — the suite prints it with
   `{e:?}` — but `Rejection` carries both and a save error carried neither, which left the one
   error in this crate that a caller could not put in front of a person.
+
+Task 8.
+
+- **The byte counters are per thread, not process-global with the measuring tests serialised.**
+  `cargo test` runs the tests in one binary concurrently, so a global peak reports whatever the
+  tests beside the measured one happened to be doing — a figure that looks like a measurement,
+  passes while the suite is small and fails later for a reason nobody can attribute. A mutex
+  around the measuring tests would also work and was rejected: it needs every future measuring
+  test to remember to take the lock, forgetting is silent, and it slows the suite for nothing a
+  thread-local does not already give. What a per-thread counter cannot see is a thread the
+  measured code spawned; `rigel-format` spawns none, and the file says so.
+- **A `realloc` is counted as the new block arriving before the old one leaves.** A growing `Vec`
+  really does hold both while it copies, and that transient is the whole of what the old
+  `archive::read` was hiding. Counting it the other way would have made the measurement agree
+  with the defect.
+- **The central directory's declared size bounds what `archive::read` retains.** It looks like
+  trusting the declaration, which `LIM-3` warns against, and it is the opposite direction:
+  trusting a *small* declaration to mean a small expansion is the bomb, while using it as a
+  ceiling on what is held cannot be, because it has already been refused against the limit. A
+  stream producing more than its own directory row records is a refusal either way, so nothing
+  past the ceiling is ever wanted.
+- **The buffer takes one jump to that ceiling rather than reserving it up front.** Reserving the
+  declared size eagerly would let a one-kilobyte file that merely *claims* sixty-four megabytes
+  cost sixty-four megabytes — the same amplification wearing different clothes. Starting at one
+  chunk and reserving the rest exactly, once, when a stream overflows it, costs one copy for a
+  large honest entry and nothing for a small lying one.
+- **The fuzz campaign is a separate test target, not an edit to `exec_5`.** The acceptance test
+  says in terms that the campaign is task 8's and that a fuzzer does not belong in the default
+  suite; it keeps the regression form and is untouched.
+- **The default fuzz budget is half a second or 512 inputs, whichever comes first.** Sized so
+  `cargo test` does not notice it, because [testing.md](../testing.md) is explicit that a suite
+  slow enough to be switched off is the failure that matters. The campaign is the same code with
+  `RIGEL_FUZZ_SECONDS` raised.
+- **The fuzz generator is re-seeded per input from the seed and the index**, rather than carried
+  across the loop. An input is then the same bytes however many ran before it, which is what
+  makes `RIGEL_FUZZ_SEED=… RIGEL_FUZZ_INPUTS=<index + 1>` a reproduction rather than a re-run.
+- **`EXEC-1`'s interception harness is assessed and deliberately not built.** Reasoning under
+  *Deferred*; `tests/acceptance/execution.rs`'s module comment now says the gap has a decision
+  behind it rather than reading as one nobody has looked at.
 
 **Contradicts docs:**
 
@@ -1346,6 +1435,45 @@ the same moment, and **reported rather than fixed**.
   children first and its opaque ones after, which happens to reproduce `rigged:future-minor`'s
   arrival order and is stable across saves, but it is a choice nothing states.
 
+Task 8.
+
+- **`archive::read` did not meet `LIM-3`, and nothing said so.** The criterion asks that peak
+  resident bytes during the bomb's refusal stay below the declared payload limit. The shape in
+  place was `take(limit + 1).read_to_end(&mut produced)`, which returns exactly the right
+  `Rejection` and held **201,486,317 bytes** doing it — 64 MiB of expansion and the rest `Vec`
+  growth transients, against a 67,108,864-byte limit. Three times over, measured the first time
+  anything measured it. Task 5's handoff and `archive.rs`'s own module comment both read as
+  though the limit were already enforced before allocating; the refusal was right and the
+  allocation was not. This is the finding the counting allocator was built to make, and it
+  argues that *checked before allocating* should never again be recorded as satisfied by a test
+  over a return value.
+- **`tests/acceptance/limits.rs` says `LIM-2`, `LIM-6` and `LIM-7` are blocked because "no limit
+  figure exists to build a fixture against". That is no longer true.** Task 5 stated a figure for
+  every `LimitKind`, derived or provisional. What those criteria are still blocked on is
+  narrower and different: the *fixtures* — a texture past the dimension limit that nothing
+  references, and material past the payload limit inside a later-version file's opaquely
+  preserved region — which `rigel-fixtures` does not build, and the tests, which are
+  `acceptance-planner`'s to write. The module comment was updated to say the memory half is now
+  carried and that the fixtures are what remain; the claim about figures is this branch's to
+  route, not an implementer's to correct in a requirements document.
+- **`docs/testing.md`'s harness table has no row for a fuzz campaign.** The nearest is
+  *Integration — `cargo test`, workspace — `tests/` in each crate*, which is where
+  `tests/fuzz.rs` sits, but a time-boxed randomised run is not an integration test and its
+  budget, its seed and its environment variables are the kind of thing that table exists to say
+  once. It also carries no row for a shared, non-target directory under `tests/` —
+  `tests/shared/` here — although the trap note beside it is about exactly that corner of cargo's
+  auto-discovery.
+- **`docs/invariants.md`'s I5 entry says a counting global allocator makes the CPU-allocation
+  count exact, and cites `docs/stack.md`.** Nothing in the repository had one until this task,
+  and the one added here is in two test binaries rather than in the runtime that entry is about.
+  The claim is about what the stack *permits*, not about what exists, and it reads as the latter.
+- **`EXEC-3` is marked `script` in
+  [puppet-acceptance.md](../requirements/puppet-acceptance.md) and no such script exists.** Found
+  while assessing `EXEC-1`, because `EXEC-3` is the cheaper assertion `EXEC-1` would otherwise
+  need a harness for. `scripts/no-outbound.sh` and `scripts/locked-graph.sh` between them cover
+  the *outbound connection* clause; process spawn and dynamic library load are covered by
+  nothing.
+
 **Traps:**
 
 - **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
@@ -1469,6 +1597,35 @@ Task 7.
   terminate on all of them and still write every node, or the validator never gets to name the
   rule. Colouring each entry once does it, and two unit tests carry the shapes.
 
+Task 8.
+
+- **A peak counter that is not wired up reports zero, and zero passes every bound.** Every
+  assertion added in this task is of the form *peak < limit*, so an unregistered
+  `#[global_allocator]`, a `#[path]` include that drifted, or a measurement helper that returned
+  early would turn the whole set green while measuring nothing. The allocator's own tests are in
+  the same file for that reason and run in **every binary that includes it**; the one that holds
+  a block on another thread was run against a process-global counter to confirm it can fail.
+  Nothing else in this task is worth as much as that pair of checks.
+- **A `Vec` reaching its final size tells you almost nothing about what it held getting there.**
+  `read_to_end` ended at 64 MiB and peaked at three times that, and every assertion over the
+  returned `Rejection` was green throughout. If a limit is about memory, the measurement has to
+  be of the peak and has to count `realloc` as both blocks.
+- **`tests/shared/` is not a cargo test target and that is why it works.** Cargo auto-discovers
+  `tests/*.rs` and `tests/<dir>/main.rs`; a directory with neither is invisible to it, which is
+  what lets one file be `#[path]`-included by two binaries. Renaming it to `tests/shared.rs`, or
+  adding a `main.rs` to it, turns it into a third test target carrying only the allocator's own
+  tests. [testing.md](../testing.md)'s trap note is about the opposite mistake and does not cover
+  this one.
+- **A test that installs a panic hook silences the binary** — task 3's trap, and it is why the
+  fuzz target does not install one either. `catch_unwind` over a loop of 160,000 inputs prints a
+  `panicked at` line per failure and that noise is the price.
+- **`std::process::id()` is in `save.rs`, naming the temporary file.** It is not a process spawn,
+  and a deny-list over `std::process` written for `EXEC-3` would flag it. The pattern wanted is
+  `Command::new` / `process::Command`, not the module.
+- **`zip`'s `SimpleFileOptions::compression_level` still refuses an ordinary deflate level**,
+  which task 1 found and which the fuzz target's repacker hits for the same reason. Leaving the
+  level unset is the way through, and the comment beside it says so.
+
 **Assumptions:**
 
 - ~~Every JSON key name, the current version, the gravity default, the compression per entry kind
@@ -1568,6 +1725,25 @@ Task 7.
   hold an older puppet backs it up.** That follows the decision already taken — *a save decides
   whether it is upgrading by reading the file it is replacing* — and `ID-9` does not exercise it.
 
+Task 8.
+
+- **`rigel-format` spawns no threads**, so a per-thread byte counter sees the whole of a load.
+  True by inspection today — nothing in the crate names a thread API — and the counting
+  allocator's module comment is where the assumption is written down.
+- **An entry whose produced size disagrees with its central-directory row is a broken container
+  rather than a limit.** No fixture carries that shape: every valid fixture is written by the
+  `zip` crate and is honest, and the bomb is over the limit before the question arises. The
+  refusal is reached only by a mutated file, where the fuzz campaign exercises it and asserts
+  only that it is a refusal.
+- **The loader's declared `TotalLoadMemory` figure is the right bound for a fuzz input.** It is
+  the loader's own stated budget for a whole load, so an unbounded allocation fails against it;
+  it is also provisional, so a future figure moves this assertion with it. A tighter bound — the
+  payload limit — would be wrong, because a mutated central directory may honestly declare an
+  entry near it.
+- **Half a second is enough budget for the default run to be a regression gate.** It reaches
+  about 500 inputs on this machine and the test refuses to pass under 64, so a machine slow
+  enough for the gate to stop meaning anything fails rather than passes quietly.
+
 **Deferred:**
 
 Task 4 — what was in the task's scope and is not done, with why:
@@ -1628,6 +1804,45 @@ Task 7 — what is in the writer's scope and is not done, with why:
 | `canonical::canon_3_input_order_does_not_reach_the_file` | It cannot pass while `ID-3` does, and the disagreement is about what [format.md](../format.md) calls *the one thing order is allowed to decide*. Reported in *Contradicts docs*; the repair is one line in an acceptance test and is not an implementer's to make |
 | A load limit enforced on the **write** side | Nothing asks for one. A puppet assembled past a load limit saves and then will not load, which is a worse failure than refusing it and is nobody's criterion today |
 | The number spelling agreeing with the corpus's at every magnitude | A tie between two shortest decimals is spelled differently here and there. Never reached by a puppet's own magnitudes; see *Contradicts docs* and *Tried and rejected* |
+
+Task 8.
+
+| Left | Why |
+|---|---|
+| `EXEC-1`'s interception harness | Assessed and decided against — see below |
+| `EXEC-3`'s script | The cheaper assertion `EXEC-1` wants, specified below and not written. It is its own criterion and its own gate wiring, and absorbing it here would have been scope growth |
+| `LIM-2`'s and `LIM-7`'s *just over* fixtures | They need a texture past the dimension limit that nothing references and material past the payload limit inside a later-version file's preserved region. `rigel-fixtures` builds neither, and the tests that would read them are `acceptance-planner`'s. The figures they were recorded as blocked on now exist — see *Contradicts docs* |
+| `LIM-6`'s linear-work assertion | Needs two fixtures an order of magnitude apart in declared size, which is the same missing corpus. `archive::produce` now stops one byte past the limit rather than draining a hostile stream, which is the behaviour `LIM-6` is about, and nothing asserts it end to end |
+
+**Why `EXEC-1`'s harness should not be built.** The last of these is the one that decides it.
+
+1. **It is three harnesses, not one.** Interception means `seccomp`-BPF on Linux — a new
+   dependency, `unsafe`, and an allowlist that has to admit everything the allocator, the test
+   harness and `flate2` do and be re-tuned on a toolchain bump — a job object plus AppContainer
+   on Windows, and `sandbox_init` on macOS, which is deprecated and on a platform
+   [testing.md](../testing.md) records as untested beyond building because there is no Mac.
+   Gating it to Linux buys a check that runs on one of the three platforms a puppet is opened on.
+2. **A `SIGSYS` kills the test binary, not the test.** `cargo test` runs tests concurrently in
+   one process, so a filter installed for one is installed for all of them and a violation takes
+   out the run instead of failing an assertion. Doing it properly means forking a child per
+   fixture — a process spawn, from inside the thing asserting that nothing spawns a process.
+3. **It would establish less than it costs.** A harness proves that *these fixtures*, on *this
+   run*, did not spawn or connect. [invariants.md](../invariants.md) says of I1 in terms that it
+   "cannot be a test, because it is a negative over all code rather than a behaviour to assert",
+   and a harness does not change that — it narrows the negative to one corpus.
+
+**The cheaper assertion, which is already specified.** `EXEC-3`, `script`: *no dynamic-load,
+process-spawn or evaluation-shaped call is reachable from a parsing path* — the same deny-list
+shape as `scripts/no-outbound.sh`, over first-party source, with a `--self-test` that plants each
+forbidden form. Two clauses of `EXEC-1` are already covered and need nothing: *outbound
+connection* by `no-outbound.sh` over our source and by `locked-graph.sh` over the dependency
+graph, and *filesystem access outside the puppet's own container* in part by
+`exec_1_loading_every_fixture_touches_nothing`, which asserts the puppet's directory gains,
+loses and changes nothing across the whole catalogue. What is left for the script is process
+spawn and dynamic library load, and two facts make the static claim stronger than a harness's:
+`rigel-format` carries `#![forbid(unsafe_code)]`, so it reaches no syscall except through `std`,
+and its whole dependency set is pure Rust with no `libloading` and no `std::process`. The trap
+for whoever writes it is in *Traps*.
 
 **Tried and rejected:**
 
@@ -1707,3 +1922,20 @@ Task 7 added these.
   field and it invents a version number: a 1.5 file would be written back as 1.2, which is a
   claim about the file that is simply false, and the material it carries would be licensed by
   accident rather than by what its writer said.
+
+Task 8 added these.
+
+- **Serialising the measuring tests behind a mutex over a process-global counter.** The obvious
+  shape, and it is a lock every future measuring test has to remember to take, with silence as
+  the failure mode when one does not. A thread-local counter needs nobody to remember anything.
+- **Reserving the entry's declared size up front in `archive::read`.** It is one allocation, no
+  growth, and exactly the figure the directory names — and it lets a one-kilobyte file that
+  claims sixty-four megabytes cost sixty-four megabytes. The amplification the bomb was buying,
+  bought a different way.
+- **Rewriting `exec_5` into the campaign.** It is the test that names the criterion, so putting
+  the campaign in it reads as the tidy answer. The test's own comment says the campaign is this
+  task's and that a fuzzer does not belong in the default suite, and an acceptance test is not an
+  implementer's to repurpose.
+- **Asserting the fuzz inputs against the payload limit rather than the total-load budget.** It
+  is the tighter bound and it is the wrong one: a mutated central directory may honestly declare
+  an entry near the payload limit, and the loader is entitled to hold it.
