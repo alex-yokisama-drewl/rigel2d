@@ -17,8 +17,8 @@ intended.
 
 ## Status
 
-**Current task:** 7 — discard the S0 spike scaffolding. Tasks 3 and 6 are each `awaiting approval`, on separate questions
-**Blocked on:** nothing
+**Current task:** all built. Tasks 3 and 6 are each `awaiting approval`, on separate questions — see those tasks. Nothing else is outstanding before **C. Finish**
+**Blocked on:** the two approvals
 
 ---
 
@@ -216,7 +216,7 @@ to spare. What would count as wrong: a package listed that turns out to be unnec
 missing that the container happened already to have. A container has no display server, no GPU
 driver and no compositor, so it cannot speak for any of those.
 
-### 7. Discard the S0 spike scaffolding — `todo`
+### 7. Discard the S0 spike scaffolding — `done`
 
 [plan.md](plan.md) records `spike/alpha-sender/` as throwaway scaffolding S1 discards. Deleting
 it is only half the task: [README.md](../README.md)'s status paragraph and the *Reproducing it*
@@ -225,9 +225,10 @@ section of
 point at the directory, and macOS and a second Windows machine are still unmeasured, so the
 pointer has to become one a future measurer can follow rather than simply vanish.
 
-**Done when:** the directory is gone, both documents name the branch and the merge commit the
-instrument lives in instead of a path that no longer resolves, and `scripts/docs-check.sh` is
-clean. No user gate.
+Both documents now give the git coordinate — commit `dafc348`, or the branch
+`feature/s0-transparency-spike` — with the `git show` and `git checkout` lines to recover it.
+Recovery is framed as expected rather than exceptional, because macOS is unmeasured and the
+Windows findings rest on one machine.
 
 ---
 
@@ -243,6 +244,12 @@ with the specified dependency graph wired and nothing implemented.
 
 `scripts/test-record.sh` now records `assertions_run` alongside the pass flag, and says on a zero
 that a pass means nothing was checked.
+
+The push gates: `.github/workflows/push-gates.yml`, carrying gates 1, 2, 4 and 5 on Linux in the
+order [stack.md](../stack.md#on-push-proposed) sets, and a separate `builds` job on Windows and
+macOS that claims only a build. `scripts/no-outbound.sh` is gate 5.
+
+`spike/alpha-sender/` is gone, and the documents that pointed at it now point into git.
 
 **Decisions made:**
 - **Gate set, glibc deferral, toolchain pin, committed lockfile and CI provider** — all five are
