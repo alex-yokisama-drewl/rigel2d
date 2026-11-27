@@ -5,8 +5,9 @@ animated puppet; **the player** performs that puppet live from tracking input in
 software. Same ground as Inochi Creator and Inochi Session, aimed at beginners and smaller
 streamers on weak hardware. Both applications and the runtime they share live in this
 repository. The workspace builds and the push gates run; no production code is implemented yet.
-Requirements are complete; technical design has settled the format, the evaluation pass, the
-scene, the runtime's boundaries and the stack. Phase 1 is in flight (`docs/wip/plan.md`).
+Requirements cover every area, with the gaps that gate the next subsystem recorded in
+`docs/wip/plan.md`; technical design has settled the format, the evaluation pass, the scene, the
+runtime's boundaries and the stack. Phase 1 is in flight — **start at `docs/wip/plan.md`**.
 
 The project is **Rigel2D**; the two applications are **Studio** and **Live**.
 

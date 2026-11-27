@@ -4,9 +4,10 @@ What it is built on, how to run it locally, and what runs on push.
 
 The evidence behind every row below is in
 [research/2026-11-26-stack.md](research/2026-11-26-stack.md), which marks each claim as read in a
-library's own source, reported by a third party, or inferred from an API's shape. **Nothing in it
-was observed** — no code was built or run — so the rows here are chosen on documented behaviour
-and are not yet confirmed by use. [decisions.md](decisions.md) carries what lost.
+library's own source, reported by a third party, or inferred from an API's shape. **Nothing in
+that research was observed** — no code was built or run when it was written. Since then the
+transparency conditions below have been measured, and the build has been walked on a bare
+machine; everything else here still rests on documented behaviour rather than on use. [decisions.md](decisions.md) carries what lost.
 
 ## Built on **[proposed]**
 
@@ -173,8 +174,8 @@ for the Windows and macOS builds.
 
 | | Gate |
 |---|---|
-| 1 | `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings` |
-| 2 | `cargo test --workspace` — unit and acceptance tests, and the structural UI assertions |
+| 1 | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` |
+| 2 | `cargo test --workspace --locked` — unit and acceptance tests, and the structural UI assertions |
 | 3 | The per-frame counters against their committed baseline, on the reference and stress puppets |
 | 4 | `scripts/docs-check.sh` |
 | 5 | The no-outbound-connection assertion over our own code |
