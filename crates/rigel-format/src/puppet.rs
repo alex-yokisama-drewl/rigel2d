@@ -50,6 +50,23 @@ pub struct Puppet {
     /// Always present, always written, even holding the only value the format
     /// defines (`DET-6`).
     pub composition_mode: CompositionMode,
+    /// The version the file this puppet was read from declared, when that
+    /// version is **later** than [`crate::FormatVersion::CURRENT`]. `None`
+    /// otherwise — for a file at this version or an earlier one, and for a
+    /// puppet assembled in memory, both of which save at the current version.
+    ///
+    /// **What a save declares.** A build must be able to save a structure it
+    /// has no code for (`docs/format.md` — *The version is readable on its
+    /// own*), and the material a later minor licenses is licensed by the
+    /// **declaration**: writing a 1.2 file back as 1.1 would make its unmarked
+    /// members, its unknown node kinds and its unfamiliar enumerated values
+    /// invalid in the file we had just written, so `VER-1` could open a
+    /// later-version file and produce one that no longer loads.
+    ///
+    /// It is deliberately **not** read by [`crate::validate`]: whether an
+    /// unfamiliar enumerated value is legal stays the reader's question, for
+    /// the reason that module's header gives.
+    pub declared_version: Option<crate::version::FormatVersion>,
     /// The flat node array, in depth-first preorder, siblings in draw order.
     ///
     /// A node of a kind this build does not know is **not** here: it is material
@@ -668,6 +685,7 @@ mod tests {
             root: Id(2),
             gravity: 1.0,
             composition_mode: CompositionMode::Sum,
+            declared_version: None,
             nodes: vec![
                 Node {
                     id: Id(2),

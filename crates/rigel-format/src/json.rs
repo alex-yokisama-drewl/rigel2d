@@ -49,6 +49,16 @@ pub enum Json {
     /// Members in the order they arrived. Canonical ordering is applied when
     /// the value is written, never on the way in.
     Object(Vec<(String, Json)>),
+    /// Text that is already canonical JSON, written through untouched.
+    ///
+    /// **The parser never produces one.** It exists for [`crate::save`], which
+    /// has to put material this build does not understand back exactly as it
+    /// arrived: an extension's `data`, a later-version file's unmarked members,
+    /// a node of a kind this build cannot read. Those are held as the bytes
+    /// [`Json::to_canonical_bytes`] produced at load, and re-emitting them
+    /// through our own number formatter would damage values we by definition do
+    /// not understand (`EXT-4`, `EXT-9`, `docs/format.md`).
+    Raw(String),
 }
 
 impl Json {
@@ -61,6 +71,7 @@ impl Json {
             Json::String(_) => "a string",
             Json::Array(_) => "an array",
             Json::Object(_) => "an object",
+            Json::Raw(_) => "preserved text",
         }
     }
 
@@ -139,7 +150,7 @@ impl Json {
             Json::Null => out.push_str("null"),
             Json::Bool(true) => out.push_str("true"),
             Json::Bool(false) => out.push_str("false"),
-            Json::Number(text) => out.push_str(text),
+            Json::Number(text) | Json::Raw(text) => out.push_str(text),
             Json::String(text) => write_string(text, out),
             Json::Array(items) => {
                 out.push('[');

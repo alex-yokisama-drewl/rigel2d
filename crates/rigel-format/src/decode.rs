@@ -62,9 +62,15 @@ pub(crate) struct Decoded {
 
 /// Parses the structure entry into a puppet.
 ///
-/// `licensed` is whether the file declared a later minor version than this
-/// build knows.
-pub(crate) fn decode(document: &Json, licensed: bool) -> Result<Decoded, Rejection> {
+/// `declared` is the version `rigel2d.json` carried. A minor later than this
+/// build's **licenses** material it has no code for, and is kept on the puppet
+/// so the writer declares it again rather than demoting the file to this
+/// version and invalidating what that declaration licensed.
+pub(crate) fn decode(
+    document: &Json,
+    declared: crate::version::FormatVersion,
+) -> Result<Decoded, Rejection> {
+    let licensed = declared.minor > crate::version::FormatVersion::CURRENT.minor;
     let mut decoder = Decoder {
         licensed,
         violations: Vec::new(),
@@ -79,6 +85,7 @@ pub(crate) fn decode(document: &Json, licensed: bool) -> Result<Decoded, Rejecti
         .sort_by(|a, b| a.owner.cmp(&b.owner).then_with(|| a.path.cmp(&b.path)));
     let mut puppet = puppet;
     puppet.preserved = std::mem::take(&mut decoder.preserved);
+    puppet.declared_version = licensed.then_some(declared);
     decoder
         .notices
         .sort_by(|a, b| a.namespace.cmp(&b.namespace));
@@ -553,6 +560,8 @@ impl Decoder {
             channel_mappings,
             textures,
             extensions,
+            // Both filled by `decode` once the walk is done.
+            declared_version: None,
             preserved: Preserved::default(),
         })
     }

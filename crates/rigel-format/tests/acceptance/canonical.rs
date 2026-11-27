@@ -183,7 +183,38 @@ fn canon_3_input_order_does_not_reach_the_file() {
     save(&subject, &forwards).expect("it saves");
 
     let mut permuted = subject.clone();
-    permuted.nodes.reverse();
+    // `nodes` is regrouped, not reversed. `docs/format.md` makes order among
+    // siblings *draw order* — "the one thing order is allowed to decide" — and
+    // `ID-3` asserts that reversing sibling order **does** reach the file, as
+    // that criterion's whole point. A reversal here would assert the opposite,
+    // and the two tests could never both pass whatever the writer did.
+    //
+    // `CANON-3` is about the order the same entities were *added* in, not about
+    // sibling order: "ordering is the build's rule, not the input's". So this
+    // walks the same tree grouped by parent instead of in depth-first preorder —
+    // a different array, every parent's children in the same relative order, the
+    // same puppet. Canonicalisation has to put it back.
+    permuted.nodes = {
+        let original = permuted.nodes.clone();
+        let mut parents = Vec::new();
+        for node in &original {
+            if !parents.contains(&node.parent) {
+                parents.push(node.parent);
+            }
+        }
+        parents.reverse();
+        let mut regrouped = Vec::with_capacity(original.len());
+        for parent in parents {
+            regrouped.extend(original.iter().filter(|n| n.parent == parent).cloned());
+        }
+        assert_eq!(regrouped.len(), original.len(), "every node is still here");
+        assert_ne!(
+            regrouped.iter().map(|n| n.id).collect::<Vec<_>>(),
+            original.iter().map(|n| n.id).collect::<Vec<_>>(),
+            "and the array order really did change"
+        );
+        regrouped
+    };
     permuted.parameters.reverse();
     permuted.bindings.reverse();
     permuted.textures.reverse();

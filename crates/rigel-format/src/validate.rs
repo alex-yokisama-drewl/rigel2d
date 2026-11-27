@@ -1316,6 +1316,7 @@ mod tests {
             root: Id(2),
             gravity: 1.0,
             composition_mode: CompositionMode::Sum,
+            declared_version: None,
             nodes: vec![
                 node(2, 0, NodeBody::Composite),
                 node(3, 2, NodeBody::Part(part())),

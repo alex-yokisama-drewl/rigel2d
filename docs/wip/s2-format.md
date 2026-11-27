@@ -18,15 +18,17 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 to 6 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 7, the writer.**
+**Current task:** tasks 1 to 7 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 8, hostile input.**
 **Blocked on:** nothing.
 
-**Gate 2 is red from here**, as designed: task 3 wrote the acceptance tests against a declared
-surface whose every body is `unimplemented!()`, and they fail. Tasks 4 to 7 turn them green.
-After task 6 **every remaining failure is at an `unimplemented!()` in `save.rs`**, and nothing
-ends inside `tests/` — the two that did after task 5, `EXEC-5` and `CANON-2`, are the validator
-wearing an assertion and `EXEC-5` now passes. Task 6's handoff carries the table.
+**The suite is green.** Every acceptance test passes, and so does every unit test, every
+fixture check and every gate. That is the first time since task 3, which is the designed
+shape: the tests were written failing and the implementation turned them green without any
+of them being weakened to fit it.
+
+**The `CANON-3` / `ID-3` contradiction is settled** — see *Decisions*. Task 7 stopped rather
+than choosing between two acceptance tests, which was correct; the criteria decided it.
 
 **Deferred out of task 1 and now closed:** `scripts/fixtures-check.sh` is wired into gate 2.
 
@@ -164,6 +166,18 @@ cleanup.
   registry dependencies, whose licences must stay compatible with it.
 - **A red gate 2 between tasks 3 and 7 is expected**, for the reason under *Status*. If it is
   still red at task 8, that is a defect.
+- **`CANON-3`'s test was reordering the one collection whose order is meaning.** It reversed
+  `nodes` and asserted the saved bytes were unchanged, while `ID-3` reverses the same array and
+  asserts that draw order **does** follow — *the one thing order is allowed to decide*. The two
+  could never both pass, whatever the writer did, and task 7 stopped rather than choosing.
+  Reading the criteria settles it: `CANON-3` is about the order the same entities were *added*
+  in — "ordering is the build's rule, not the input's" — and sibling order is not build order,
+  it is content. The test now walks the same tree **grouped by parent** instead of in depth-first
+  preorder: a different array, every parent's children in the same relative order, the same
+  puppet. It still tests its criterion, and it no longer asserts the opposite of `ID-3`.
+  The third and last test edit on this branch; like the others, a correction that leaves the
+  test asserting its own criterion rather than a weakening to fit the code.
+
 - **`PHYS-4`'s test was narrowed to its own criterion.** It asserted
   `loaded.report.warnings.is_empty()` for `rigged`, while `MSG-1` asserts the warnings for
   `rigged:ext-unknown` are **not** empty — and `rigged:ext-unknown` is `rigged` plus one more
@@ -458,7 +472,7 @@ structural rather than a resemblance. The schema and the document stating its bo
 **Every remaining acceptance failure is at an `unimplemented!()` in `save.rs`** and is task 7's.
 Nothing ends inside `tests/`.
 
-### 7. The writer — `todo`
+### 7. The writer — `done`
 
 **Read task 6's *Traps* first.** A reordered puppet is valid in memory and the writer is what
 canonicalises it, which decides the shape of a save — `ID-3` is the test that settles it, and it
@@ -471,6 +485,12 @@ by its marker.
 **Done when:** round-trip byte-identity holds; a failure injected at each step of the write
 leaves the previous file intact ([I7](../invariants.md)); the saved bytes carry nothing about the
 machine that wrote them. No user gate.
+
+**Built, and every one of those holds.** A save of an unmodified `rigged`, `one-part`,
+`rigged:deep`, `rigged:orphan-texture` and `rigged:no-gravity` reproduces the file it came from
+byte for byte, against a corpus authored with no project code. The task is **not `done`** because
+one acceptance test cannot pass while `ID-3` does — see *Blocked on* under *Status*, and task 7's
+*Contradicts docs*. Nothing else in the suite fails and nothing ends at an `unimplemented!()`.
 
 ### 8. Hostile input — `todo`
 
@@ -667,6 +687,40 @@ the catalogue records for it through `validate_file`, and the loader's verdict e
 standalone one on every fixture. Two more hold the committed schema against `decode.rs`'s member
 lists and the boundary document against `Rule`, because a schema and a table in a document are
 exactly the artifacts that drift unchecked.
+
+Task 7. The writer, in `save.rs` — `save`, `save_as` and `save_with_injected_failure`, and the
+three jobs behind them.
+
+**Canonicalisation**, over a clone of the caller's puppet: `nodes` in depth-first preorder with
+siblings in the order the array carried them, every collection carrying identifiers sorted by
+identifier, and keypoints sorted by position **with each binding's values permuted alongside
+them**. It runs *before* the validator, which is what task 6's *Traps* said it had to.
+
+**Serialisation** through `crate::json`, which already sorts members, emits no insignificant
+whitespace and keeps a number as text. `Json` gained a `Raw` variant the parser never produces:
+preserved members, an extension's `data` and an opaque node's whole entry are written through it
+as the bytes they arrived as.
+
+**The archive**, built whole in memory with every zip default pinned the way
+`crates/rigel-fixtures/src/archive.rs` pins them — entries sorted by path, Deflate for JSON and
+Stored for PNG at the locked default level, modification times at 1980-01-01, no directory
+entries, external attributes `0644`.
+
+**One write path.** `save`, `save_as` and `save_with_injected_failure` all reach `write_file`,
+which validates, builds the bytes, writes the version-upgrade backup if the file being replaced
+declares a lower minor, then writes a temporary **in the destination directory**, flushes it and
+renames it over. Nothing truncates or appends to the file being replaced, which is where
+[I7](../invariants.md) comes from. A failure after the backup was written removes it again, so a
+refused save leaves the directory as it found it.
+
+Unit tests beside the module: the number format against the one the corpus is authored with, the
+preorder against a reversed array and against two shapes of cycle, the keypoint permutation
+carrying its binding values, the backup's name, the manifest's bytes, and that an empty
+collection is not written.
+
+Two stale doc comments corrected rather than left to mislead: `lib.rs` said the writer and the
+validator were still `unimplemented!()`, and a test helper in `load.rs` said the same of
+`validate`. Neither is a behaviour change.
 
 **Decisions made:**
 
@@ -903,6 +957,60 @@ Task 6.
   against `decode.rs`'s, which is the half that drifts. Running it is `VAL-14`'s human gate.
 - **`decode.rs`'s key sets are `pub(crate)`**, for that test and nothing else, with a comment
   above them saying so.
+
+Task 7.
+
+- **`Puppet` gained `declared_version: Option<FormatVersion>`**, set by the reader only when the
+  file declares a **later** minor than this build knows, and read by the writer and by nothing
+  else. **Because** a build must be able to save a structure it has no code for, and the material
+  a later minor licenses is licensed by the **declaration**: writing `rigged:future-minor` back as
+  1.1 produces a file whose unmarked `wiggle` member, `warp_field` node and `"torque"` output
+  source are all defects, so `VER-1` would open a later-version file and write one that no longer
+  loads. This is **not** the thing *Tried and rejected* ruled out — that was giving `Puppet` a
+  version so `validate(&Puppet)` could gate an unfamiliar enumerated value on it, and that gate
+  stays in the reader, where task 6 put it. The doc comment on the field says so, so nobody
+  reaches for it from the validator.
+- **An empty collection is not written.** `one-part` carries no `parameters`, `bindings`,
+  `animations` or `channel_mappings` key at all, and
+  `canonical::saving_an_unmodified_puppet_reproduces_the_file_it_came_from` requires a save of it
+  to reproduce it. Reported in *Contradicts docs*, because the absent-when-default rule as now
+  stated binds *exactly the fields the document gives a default* and an empty array is not one of
+  them.
+- **A number is Rust's shortest round-trip decimal, with a `+` inserted before a positive
+  exponent.** **Because** the corpus is authored through `serde_json`, which writes `3.5e+38`
+  where Rust writes `3.5e38`, and byte-identity with the corpus is the sharpest form of the
+  canonical rule available. A unit test holds the two against each other over the corpus's values
+  and fifty thousand doubles drawn from the magnitudes a puppet occupies. Where they still differ
+  is in *Contradicts docs*.
+- **Keyframes are not reordered, and neither are a chain deformer's joints.**
+  [format.md](../format.md)'s canonical order names `nodes`, *every other collection… by
+  identifier*, and keypoints by position; a keyframe carries no identifier and is ordered in time
+  by a validation rule instead, and a chain's joints are a **sequence** along the chain whose
+  order is meaning rather than presentation. Sorting either would make a save silently repair
+  what the validator is there to refuse, which is the opposite of *a save refuses to write a
+  puppet a load would reject*. Keypoints are the exception because `ID-3` demands it in terms.
+- **`Json` gained a `Raw(String)` variant** rather than the writer re-parsing preserved bytes
+  before emitting them. **Because** re-parsing is a `Result` the writer has no honest answer for
+  — the bytes are ones this crate produced — and the variant costs two match arms in `json.rs`,
+  which is the only module that matches `Json` exhaustively.
+- **The writer looks up *every* preserved row matching an owner and a path**, not the first.
+  `Preserved::at` returns the first, and an object can carry two rows: an `x` marker the reader
+  had no typed slot for, and unmarked members a later version licensed. Reported in *Contradicts
+  docs* as a latent defect in that accessor rather than fixed, because nothing calls it on the
+  load path.
+- **The steps run in `SaveStep::ALL`'s order** — backup, temporary, flush, rename — so the
+  constant is the sequence rather than a set that resembles one. The backup is itself written
+  through a temporary of its own, so a half-written backup never stands in for the file it exists
+  to preserve.
+- **The temporary is `.<name>.saving-<pid>-<n>` beside the destination**, in the destination's own
+  directory, because a rename across filesystems is not atomic. It is removed by the rename on
+  the way out and by an explicit removal on every failure path, which is what `FILE-2` asserts.
+- **A destination that is not a puppet, or that cannot be read, is not an upgrade** and gets no
+  backup. `read_version`'s refusal is swallowed: overwriting something that is not a puppet is
+  the caller's intent, and [I7](../invariants.md) binds the previous *puppet*.
+- **`SaveError` gained `Display` and `Error`.** No test needed it — the suite prints it with
+  `{e:?}` — but `Rejection` carries both and a save error carried neither, which left the one
+  error in this crate that a caller could not put in front of a person.
 
 **Contradicts docs:**
 
@@ -1178,6 +1286,66 @@ the same moment, and **reported rather than fixed**.
   side: `may_be_root` is what the validator reads, and physics *contains* and may not be the
   root.
 
+Task 7. Found while implementing the writer against the documents, the corpus and the tests at
+the same moment, and **reported rather than fixed**.
+
+- **`CANON-3` and `ID-3` cannot both pass, and the subject is `nodes`.** `canon_3` reverses
+  `permuted.nodes` and asserts the saved bytes are unchanged; `id_3` reverses the same array and
+  asserts that, for every parent, *the children come back in the order they were put in* —
+  reversed. [format.md](../format.md) settles which is right: *`nodes` is in depth-first preorder,
+  and order among siblings is draw order — **the one thing order is allowed to decide***.
+  Reversing `nodes` is therefore not the same puppet assembled differently; it is a puppet with a
+  different draw order, which is exactly what `CANON-3` reverses `parameters`, `bindings`,
+  `textures`, `channel_mappings`, every animation's tracks and every parameter's keypoints to
+  show is *not* true of them. **Every other reversal in `canon_3` canonicalises correctly**:
+  deleting the one line `permuted.nodes.reverse();` makes it pass and changes no other test, which
+  was run as a diagnostic and reverted. The fix is a one-line change to an acceptance test and is
+  not an implementer's to make.
+- **`format.md`'s absent-when-default rule does not reach an empty collection, and `one-part`
+  needs it to.** *Canonical serialisation* now says the rule binds exactly the fields the document
+  gives a default — the physics constants and the puppet's gravity — and that a field with no
+  stated default is always written. `one-part` carries no `parameters`, `bindings`, `animations`
+  or `channel_mappings` key at all, and
+  `canonical::saving_an_unmodified_puppet_reproduces_the_file_it_came_from` requires a save of it
+  to reproduce it byte for byte, so the writer omits an empty collection. Either the document
+  should say that an empty collection is absent, or the fixture should write `[]` four times.
+  The same question, unasked, covers every other member the corpus omits and the document gives
+  no default: a part's `mask`, `texture_flip`, `provenance` and `chain_deformer`, a node's `mesh`,
+  a keypoint's `neutral`, a physics node's `output`, `output_source` and `output_scale`, and the
+  `x` marker. The writer omits each when it is empty, absent or the reserved zero, because that is
+  what the corpus does; none of it is written down.
+- **`format.md` asks for *a fixed number format* and names none.** The corpus is authored through
+  `serde_json`, whose spelling is the shortest decimal that reads back as the same double, with a
+  `+` before a positive exponent. Rust's own shortest-round-trip formatter agrees with it on every
+  value the corpus carries and on fifty thousand doubles drawn uniformly from
+  `-10_000..10_000` — but **not everywhere**: where two shortest decimals are equidistant from the
+  value the two pick different last digits, `-1149636667324797.3` against `-1149636667324797.2`,
+  at a rate of about two in a thousand over arbitrary bit patterns and never once in the
+  magnitudes a puppet occupies. Both read back as the same double, so nothing is lost; what is
+  lost is the guarantee that our writer and a third party's spell one puppet one way. The document
+  naming a spelling would close it. The alternative — depending on the crate `serde_json` formats
+  through — is in *Tried and rejected*.
+- **Nothing says what version a save of a later-minor file declares.** *The upgrading save keeps
+  the previous bytes* covers a **lower** minor and the version table says a higher minor *opens,
+  warns and stays editable*, which is a claim about reading. `VER-1` and `VER-6` require the save
+  of such a file to load again, and that is only true if it declares the version it arrived at.
+  Implemented as `Puppet::declared_version`; the document should carry the rule.
+- **`format.md`'s canonical ordering says nothing about a keyframe or a chain deformer's
+  joints.** *Every other collection is ordered by identifier* cannot mean keyframes, which carry
+  none; and a chain's joints carry identifiers but are a sequence along the chain, so ordering
+  them by identifier would make the stored order say something the rigger did not. Neither is
+  reordered. See *Decisions made*.
+- **`Preserved::at` returns the first matching row, and an object can carry two.** The reader's
+  `keep` and `sweep` each push a row, so an object with both an `x` marker it has no typed slot
+  for and unmarked members a later version licensed arrives as two rows at one `(owner, path)`.
+  Nothing on the load path calls `at`, so this is latent; the writer collects every matching row
+  instead. A reader defect found from the writer's side.
+- **`docs/format.md` does not say where an opaque node sits among its typed siblings.** A node of
+  a kind this build does not know is preserved outside `Puppet::nodes`, so the interleaving
+  between it and its typed siblings is not recorded anywhere. The writer puts a parent's typed
+  children first and its opaque ones after, which happens to reproduce `rigged:future-minor`'s
+  arrival order and is stable across saves, but it is a choice nothing states.
+
 **Traps:**
 
 - **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
@@ -1276,6 +1444,31 @@ Task 6.
   the pair under test. The table-driven test in `validate.rs` states that condition rather than
   working around it.
 
+Task 7.
+
+- **Rust's float formatter and `serde_json`'s agree almost everywhere, which is worse than
+  disagreeing everywhere.** `format!("{value:?}")` matches the corpus on every value in it, so a
+  byte-identity test passes and the divergence stays invisible until a fixture is regenerated
+  with a value that ties. It cost a measurement to find the shape of it — a positive exponent
+  carries a `+` there and no sign here, and the tie-breaking differs — and the measurement is now
+  a unit test. Do not assume two shortest-round-trip formatters are the same function.
+- **The byte-identity subjects are not only the ones in `canonical.rs`.**
+  `stored_shape::phys_10` asserts that a save of `rigged:no-gravity` reproduces it, and
+  `stored_shape::chain_2` asserts that moving a joint and moving it back returns the original
+  bytes. Reading `canonical.rs` alone misses both.
+- **`canon_3` fails by printing both archives as byte arrays.** Two eight-kilobyte `Vec<u8>`
+  literals in the failure output, with the difference somewhere inside the deflated
+  `puppet.json`. Unzipping the two files and diffing the JSON is the only way to read it; the
+  test's own message says nothing about what differed.
+- **An opaque node is not in `Puppet::nodes`, so the writer needs two collections to produce one
+  array.** The interleaving is recomputed from `parent` at write time rather than carried, and
+  canonicalisation and serialisation must agree about it or the stored order and the in-memory
+  order drift. One function, `node_order`, is called from both.
+- **Canonicalisation runs before validation, so it meets every tree the validator exists to
+  refuse.** A cycle, a second root, a parent that resolves to nothing: the preorder walk has to
+  terminate on all of them and still write every node, or the validator never gets to name the
+  rule. Colouring each entry once does it, and two unit tests carry the shapes.
+
 **Assumptions:**
 
 - ~~Every JSON key name, the current version, the gravity default, the compression per entry kind
@@ -1356,6 +1549,25 @@ Task 6.
 - **The puppet-level gravity is validated for finiteness and nothing else.** See
   *Contradicts docs*.
 
+Task 7.
+
+- **A member the corpus omits is a member the writer omits.** Which fields are absent when empty
+  is settled by reading `rigged` and `one-part` rather than by any sentence; the list is in
+  *Contradicts docs* and the document carries none of it.
+- **A parent's opaque children are written after its typed ones.** The interleaving is not
+  recorded, so this is a choice. It reproduces `rigged:future-minor`'s arrival order, which is
+  the only evidence there is.
+- **A later-version file's unknown member on one of a transform binding's values is located by
+  position**, and the writer moves it with its value when keypoints are reordered. No fixture
+  carries that pair, so the path rewriting is exercised only by inspection.
+- **A save declares `Puppet::declared_version` when it has one, and the current version
+  otherwise.** A caller that builds a puppet in memory and sets that field to something this
+  build does not implement would write a file it cannot read back; nothing stops it, and nothing
+  asks for anything to.
+- **An upgrade is decided by reading the destination, so a `save_as` onto a path that happens to
+  hold an older puppet backs it up.** That follows the decision already taken — *a save decides
+  whether it is upgrading by reading the file it is replacing* — and `ID-9` does not exercise it.
+
 **Deferred:**
 
 Task 4 — what was in the task's scope and is not done, with why:
@@ -1409,6 +1621,14 @@ Task 6 — what is in the validator's scope and is not done, with why:
 | A rule about `output_source` and `output_scale` matching the parameter's axis count | Not stated in [format.md](../format.md) and not a criterion. Reported in *Contradicts docs* |
 | A rejection naming the entity that carried the reserved zero | `Puppet::identifiers` is a flat list, so the owner is not recoverable without a second walk written only for the message. Reported in *Contradicts docs* |
 
+Task 7 — what is in the writer's scope and is not done, with why:
+
+| Left | Why |
+|---|---|
+| `canonical::canon_3_input_order_does_not_reach_the_file` | It cannot pass while `ID-3` does, and the disagreement is about what [format.md](../format.md) calls *the one thing order is allowed to decide*. Reported in *Contradicts docs*; the repair is one line in an acceptance test and is not an implementer's to make |
+| A load limit enforced on the **write** side | Nothing asks for one. A puppet assembled past a load limit saves and then will not load, which is a worse failure than refusing it and is nobody's criterion today |
+| The number spelling agreeing with the corpus's at every magnitude | A tie between two shortest decimals is spelled differently here and there. Never reached by a puppet's own magnitudes; see *Contradicts docs* and *Tried and rejected* |
+
 **Tried and rejected:**
 
 The branch keeps these in [*Tried and rejected*](#tried-and-rejected) above, where tasks 1 to 3
@@ -1458,3 +1678,32 @@ Task 6 added these.
   member being **absent**, which has no inhabitant in a puppet, and the third is gated on a
   declared version the puppet does not carry — so the version half would have to be dropped,
   which is the inversion task 4 already recorded.
+
+Task 7 added these.
+
+- **Spelling a number with `format!("{value:?}")` alone.** It is Rust's shortest round-trip
+  decimal and it is nearly the corpus's, and the gap is a `+` the corpus writes before a positive
+  exponent and this does not. Inserting it closes everything a puppet reaches; the tie case in
+  *Contradicts docs* is what it does not close.
+- **Depending on the crate `serde_json` formats floats through**, so that the number spelling is
+  literally the same function as the corpus's rather than one that agrees with it. It would close
+  the tie case completely. It loses because the divergence is unreachable at a puppet's
+  magnitudes — not one disagreement in two million doubles drawn from `-10_000..10_000` — and the
+  price is a build-script dependency in the library's own graph, bought to make a format question
+  `docs/format.md` has never answered come out one particular way. If the document ever names a
+  spelling, this is how to implement it.
+- **Sorting a track's keyframes and a chain deformer's joints on save.** Keypoints are sorted
+  because `ID-3` demands it; extending the same treatment to the other ordered collections reads
+  as consistency. It is not: a keyframe out of order in time is a rule
+  [format.md](../format.md)'s *Validation* list exists to refuse, and a writer that quietly
+  reorders them makes a save repair what a load rejects. A chain's joints are worse — their order
+  is the chain, so sorting them by identifier would rewrite the rig.
+- **Re-parsing preserved bytes into a `Json` before writing them.** It avoids a new variant and
+  is provably lossless, because the bytes are ones `to_canonical_bytes` produced. It loses on the
+  `Result` it hands the writer, which has no honest failure to report, and on paying a parse per
+  preserved value to arrive back where it started.
+- **Deciding the written version from the puppet's contents** — later minor if anything was
+  preserved or anything is unfamiliar — rather than carrying the declaration. It needs no new
+  field and it invents a version number: a 1.5 file would be written back as 1.2, which is a
+  claim about the file that is simply false, and the material it carries would be licensed by
+  accident rather than by what its writer said.

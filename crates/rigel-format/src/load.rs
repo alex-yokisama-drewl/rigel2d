@@ -409,7 +409,7 @@ pub(crate) fn read_file(path: &Path) -> Result<Opened, Rejection> {
     let document = json::parse(&bytes).map_err(|e| Rejection::Malformed {
         detail: format!("puppet.json: {}", e.detail),
     })?;
-    let mut decoded = crate::decode::decode(&document, licensed)?;
+    let mut decoded = crate::decode::decode(&document, found)?;
 
     // The texture payloads, each under the same per-entry limit.
     let mut unreadable = Vec::new();
@@ -538,9 +538,9 @@ mod tests {
         path
     }
 
-    /// The parse, with the validator left out of it: what this task owns ends
-    /// where [`crate::validate`] begins, and every body in that module is still
-    /// `unimplemented!()`.
+    /// The parse, with the validator left out of it: what these tests own ends
+    /// where [`crate::validate`] begins, and that module has a test module of
+    /// its own.
     fn opened(file: &str) -> Opened {
         read_file(&fixture(file)).unwrap_or_else(|e| panic!("{file} is read: {e}"))
     }

@@ -2,15 +2,13 @@
 //!
 //! No GPU, no window, no toolkit — see `docs/stack.md`.
 //!
-//! # This was a contract, and is being filled in
+//! # This was a contract, and it is filled in
 //!
 //! The surface was declared by `acceptance-planner` from the criteria in
 //! `docs/requirements/puppet-acceptance.md`, before any implementation existed and
 //! without sight of one, so that the acceptance tests in `tests/acceptance/` have
-//! something to compile against. Tasks 4 to 7 of `docs/wip/s2-format.md` fill it
-//! in. **The writer and the validator's algorithm are still `unimplemented!()`**
-//! — [`save`] is task 7 and [`validate`] and [`validate_file`] are task 6 — so a
-//! load that gets as far as validating panics there rather than returning.
+//! something to compile against. Tasks 4 to 7 of `docs/wip/s2-format.md` filled
+//! it in, and nothing in it is `unimplemented!()` any more.
 //!
 //! Each item says what it must do and names the criterion that drives it. Where
 //! this surface and a criterion disagree, **the criterion wins** — this crate is
