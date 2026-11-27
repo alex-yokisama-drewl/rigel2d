@@ -115,3 +115,27 @@ sweep.
 - **An operation that mirrors or reverses data returns the original bytes when applied twice, and bounds the set it modifies** — `judgment`
   → `test`: mirror a rigged node twice and assert byte equality with the original. Assert every binding outside the selection evaluates identically, which is the assertable form of *a mirror never writes a parameter*.
   Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+### Physics as a node, and tracks
+
+- **Physics state is never serialised, and a load or a replacement starts from rest** — `judgment`
+  → `test`: save mid-simulation and assert the bytes equal a save at rest; load the same puppet twice and assert an identical first frame. A load that fails must leave no simulation state behind ([I4](../invariants.md)).
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A physics node whose output drives a binding on one of its own ancestors validates, loads, evaluates deterministically and saves** — `judgment`
+  → `test`, paired with a rejection case as the tree-acyclicity criteria are. The dataflow cycle is deliberate and broken in time by the one-frame read; a validator that rejects it rejects a valid file, which is the failure this entry exists to catch.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **No operation that copies, pastes or mirrors a physics node leaves a parameter with two base drivers** — `judgment`
+  → `test`, table-driven over the operation set, including a paste between puppets with overlapping identifier spaces. A refusal, never a repair.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A deletion names every parameter it leaves driverless and every physics node it leaves driving nothing** — `judgment`
+  → `test` on the structured result. Deleting a parameter now leaves its physics node standing as a chain link, which is a state no edit could previously produce.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Deleting a parameter removes its track in every animation, names each one by animation, and undo restores them byte-identically** — `judgment`
+  → `test`. A track is authored keyframes, so a report saying only that the animation survives hides lost work.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Every node kind carries a containment declaration and a constitutive-or-incidental declaration for each reference it holds; a kind missing either fails the check** — `judgment`
+  → `script` over the format definition. This is what keeps *a physics node contains only physics* a row in a table rather than a special case, and what makes the next kind arrive with a stated answer.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **The derived mirror axes are computed from drawn geometry alone** — `judgment`
+  → `test`: change a physics node's local offset and assert both derived axes are unchanged. Physics has an offset and draws nothing, so it is the first kind that could wrongly move them.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.

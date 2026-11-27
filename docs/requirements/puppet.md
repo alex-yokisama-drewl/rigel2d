@@ -10,11 +10,15 @@ response to named inputs so that a static drawing appears to move in three dimen
 
 Its pieces, named in [vocabulary.md](../vocabulary.md):
 
-- a **node tree** of parts, mesh groups and composites, which fixes draw order and nesting. A
-  **part is a leaf**: parts draw, and mesh groups and composites contain. Keeping each kind to
-  one job is what makes the tree's shape say where deformation and compositing can happen, and
-  it is why a cascade reaches the parts under a deleted group and stops there. Art that wants to
-  sit under a shared transform goes in a mesh group, which is what one is for;
+- a **node tree** of parts, mesh groups, composites and physics, which fixes draw order and
+  nesting. A **part is a leaf**: parts draw, mesh groups and composites contain, and physics
+  anchors. Keeping each kind to one job is what makes the tree's shape say where deformation and
+  compositing can happen, and it is why a cascade reaches the parts under a deleted group and
+  stops there. Art that wants to sit under a shared transform goes in a mesh group, which is what
+  one is for. **What each kind may contain is declared per kind by the format** — a part contains
+  nothing, a mesh group or a composite contains any kind, a physics node contains only physics —
+  so that a kind added later arrives with a stated answer rather than a validator exception, and
+  so that a deletion cascade can never reach artwork through a physics node;
 - **textures**, referenced by parts. A part's reference carries a **texture flip** per axis, so two parts
   may share one drawing with one of them reversed — the ordinary case for a pair of eyes;
 - **parameters**, each a one- or two-dimensional axis with keypoints along it. A parameter
@@ -33,8 +37,15 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   writes**, which is the expected state and not a sign it is unused;
 - **bindings**, each mapping a parameter to something that changes — a node transform, or
   per-vertex offsets on a mesh — with values stored at keypoints and interpolated between;
-- **physics**, which drives parameters from simulated motion rather than from input;
-- **animations**, which drive parameters over time;
+- **physics**, a kind of node: simulated motion anchored in the tree, which reads its own
+  accumulated transform from the previous frame, displaces that node's own transform by the
+  result, and may drive one parameter. **Driving a parameter is optional**, because a physics
+  node is equally a link in a pendulum chain — which is why the reference to the parameter it
+  drives is incidental rather than constitutive, [below](#deletion-is-report-then-a-confirmed-cascade-decided).
+  **A chain lags by one frame however long it is**, because each node reads a previous frame that
+  already carried its parent's displacement;
+- **animations**, which drive parameters over time, each composed of **tracks**. One track
+  drives exactly one parameter, and an animation carries at most one track per parameter;
 - **chain deformers**, each a chain of **joints** deforming the geometry along it — see
   [below](#a-chain-deformer-is-a-permanent-structure-not-a-bulk-edit-tool-proposed);
 - **masks**, each a reference from one part to another restricting where the first draws, as
@@ -43,8 +54,9 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   data although they are edited in Live rather than Studio, and **Live writes them into the
   puppet file** by saving it, so that a delivered puppet reacts for whoever receives it — see
   [performing.md](performing.md#channel-mappings-are-puppet-data-and-live-writes-them-decided).
-- **mirror axes**, one left–right and one top–bottom, which a mirror reflects across. Authoring-only
-  data, defaulting to the puppet's centre, and the only piece in this list the player never reads.
+- **mirror axes**, one left–right and one top–bottom, which a mirror reflects across. Authoring
+  data, defaulting to the puppet's centre. The player loads it and does not act on it, exactly as
+  it does with axis polarity — see [One file](#one-file-decided).
 
 Inochi2d's model is the starting point and its vocabulary of pieces is largely right. This
 project departs from it deliberately in several places recorded below — textures as entities
@@ -474,9 +486,12 @@ The report names the whole set before anything changes.
   subtree. Textures the deleted parts were the last to reference are collected in the same step,
   and the report names them.
 - Deleting a **parameter** removes what cannot exist without it: its **bindings**, the **channel
-  mappings** that feed it, and the **physics** that drives it. An **animation** that drove it
-  **survives**, driving the rest. The nodes those bindings drove survive untouched too — a node
-  is not defined by being driven.
+  mappings** that feed it, and in every **animation** that drove it, the **track** that did so.
+  A track is authored keyframes, so **the report names each one by animation** rather than saying
+  the animation survives. The animation itself **survives**, driving the rest, and survives with
+  no tracks left. A **physics node** that drove the parameter also survives, now driving nothing
+  and named in the report, because a physics node is whole without a parameter. The nodes those
+  bindings drove survive untouched too — a node is not defined by being driven.
 
 **A dependent is removed only where the reference is constitutive; otherwise it just loses the
 reference.** Both leave no dangling reference, which is all the validator asks, so the rule is
@@ -484,8 +499,8 @@ chosen on what it costs the rigger rather than on validity.
 
 | The reference is | Then | Examples |
 |---|---|---|
-| **Constitutive** — the dependent cannot exist without it | The dependent is removed, and the closure continues through it | A **part** without its **texture**; a **binding** or a **channel mapping** without its **parameter**; **physics** without the parameter it drives |
-| **Incidental** — the dependent is whole without it | The reference drops and the dependent stays. The closure stops here, because nothing was removed | A part that was **masked** by a removed part, which survives unmasked; an **animation** driving several parameters, one of them deleted, which survives driving the rest |
+| **Constitutive** — the dependent cannot exist without it | The dependent is removed, and the closure continues through it | A **part** without its **texture**; a **binding** or a **channel mapping** without its **parameter**; a **track** without the parameter it drives |
+| **Incidental** — the dependent is whole without it | The reference drops and the dependent stays. The closure stops here, because nothing was removed | A part that was **masked** by a removed part, which survives unmasked; an **animation** whose track for a deleted parameter went, which survives driving the rest; a **physics node** whose driven parameter went, which survives as a link in its chain |
 
 **A part without its texture stays declared constitutive although nothing can now delete a
 texture.** The declaration is what the closure is computed from, and the kind is still exercised
@@ -547,9 +562,17 @@ Consequences that follow and are settled with it:
   desynchronise from a source.
 - **There is no derived artifact that can be mistaken for a working copy**, which was the main
   risk of the alternative.
-- **The runtime skips what it does not need.** Authoring data is addressable separately, so the
-  player does not pay to load it. **The format declares, per kind of data, whether it is
-  runtime or authoring-only**, and the player skips exactly the authoring-only set.
+- **There is no separate authoring payload, and the player loads the whole structure.** Data
+  only Studio acts on — import provenance, the mirror axes, axis polarity — sits beside
+  everything else, and the player ignores what it cannot use. **Because** that set is an import
+  identifier and a content hash per part, plus two axes: tens of kilobytes against a stress
+  workload budgeted at hundreds of megabytes of resident texture
+  ([platform.md](platform.md#the-reference-puppet-and-the-stress-puppet-proposed)). Splitting it
+  into its own payload saves the player a rounding error and costs a category of its own — data
+  that is recognised but deliberately unread, a byte-carry path through every save Live makes,
+  and a validator that answers differently in each application. The earlier rule that the format
+  declares each kind runtime or authoring-only is **withdrawn**;
+  [decisions.md](../decisions.md) carries why, and what would reopen it.
 
 What a puppet stores is the **cut-up parts**, which are what rendering needs anyway, together
 with enough import provenance to match returning artwork on re-import, as

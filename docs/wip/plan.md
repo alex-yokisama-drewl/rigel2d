@@ -6,9 +6,11 @@ The current phase: which subsystems get built, in what order where order matters
 The workspace builds, the push gates run and block a merge, and no production code is
 implemented yet — the crates are shells.
 
-**The next work is requirements, not code.** S2 is blocked until the gaps named under
-*What blocks S2* below are settled. Starting S2 first means settling them by accident, in code,
-which is the thing commissioning the criteria early was meant to prevent.
+**The requirements round that gated S2 is done** — 2026-11-27, on
+`requirements/s2-format-gaps`. What it settled is below under *What blocked S2*. **S2 is clear to
+start**, with one piece of design work due first: [format.md](../format.md) must say what a
+physics node stores and how the per-kind containment declaration is written. Neither is a
+requirements question and neither was settled by that round.
 
 ## Where this phase ends, and why there
 
@@ -94,37 +96,31 @@ different points.
 The planner's most useful output is the gaps it finds in the requirements. Those route back into
 `docs/requirements/` before the subsystem they affect starts.
 
-### What blocks S2
+### What blocked S2 — settled 2026-11-27
 
-**S2 is gated on requirements gaps, not just on S1.** Writing criteria against
-[puppet.md](../requirements/puppet.md) turned up places where the requirement does not say
-enough for a criterion to exist without inventing the answer. They are the *Criteria not
-written* table at the foot of
-[puppet-acceptance.md](../requirements/puppet-acceptance.md#criteria-not-written-open), and
-**resolving the ones that bear on the format is requirements work that comes before S2 starts**.
-That is why the criteria were commissioned early rather than written alongside the code.
+**S2 was gated on requirements gaps, not just on S1.** Writing criteria against
+[puppet.md](../requirements/puppet.md) turned up places where the requirement did not say enough
+for a criterion to exist without inventing the answer, recorded in the *Criteria not written*
+table at the foot of
+[puppet-acceptance.md](../requirements/puppet-acceptance.md#criteria-not-written-open). Three of
+its rows bore on the format. Commissioning the criteria early is what surfaced them before any
+code could settle them by accident, which was the point of the early commission.
 
-Which of that table's rows block the format subsystem, as scoped by this plan:
-
-| Row | Why it blocks S2 |
+| Row | How it was settled |
 |---|---|
-| **Which kinds of data are authoring-only** | The format declares it per kind, which `FILE-6` and `FILE-7` assert. S2 writes the format; it cannot declare a membership nobody has written down |
-| **Whether physics is a node** | Node-tree membership is format structure. [vocabulary.md](../vocabulary.md) and the pieces list say parts, mesh groups and composites; [platform.md](../requirements/platform.md)'s workload table counts physics nodes |
-| **The term for the part of an animation that drives one parameter** | S2 names fields, and a name in a stored format is expensive to change later. [vocabulary.md](../vocabulary.md) settles terms with the owner rather than letting whoever needs one first invent it |
+| **Which kinds of data are authoring-only** | **Dissolved rather than answered.** The authoring-only set turned out to be an import identifier and a content hash per part plus two axes — tens of kilobytes against a workload budgeted at hundreds of megabytes of texture — so the split was withdrawn and the player loads the whole structure. [FILE-6](../requirements/puppet-acceptance.md#n-one-file-decided) and FILE-7 are retired; [decisions.md](../decisions.md) carries why |
+| **Whether physics is a node** | **It is**, and it also displaces its own node's transform and contains only physics, which makes a pendulum chain an ordinary subtree. It reads its own previous-frame transform, so the one-frame delay is deliberate and does not accumulate down a chain. Its reference to the parameter it drives is incidental, so a deletion cascade can never reach artwork through one |
+| **The term for the part of an animation that drives one parameter** | **Track.** Defined in [vocabulary.md](../vocabulary.md), which also records *lane* — inochi2d's word for it — as a term this project does not use |
 
-The table's other rows do not block S2: the determinism tolerance is a figure the evaluation
-pass needs, the unparseable-extension texture case is disclosed rather than fixable, and the
-unknown-polarity import path decides whether a criterion is live or dormant on a path Studio
-owns. **That scoping is the agent's call** — see *Who decides what* in `CLAUDE.md` — and the
-three rows above are the owner's to settle.
+The table's remaining rows still do not block S2: the determinism tolerance is a figure the
+evaluation pass needs, the unparseable-extension texture case is disclosed rather than fixable,
+and the unknown-polarity import path decides whether a criterion is live or dormant on a path
+Studio owns.
 
-**The criteria and the tests separate here, and on a greenfield phase they must.** The
-`plan-phase` lane closes on *acceptance criteria and tests exist and have been confirmed
-failing*. A criteria document can be written now, from the requirements alone. A runnable test
-cannot: there is no crate to put it in and no command to run it until S1 exists, so nothing can
-be confirmed failing before then. The split is therefore criteria now, tests once S1 lands — and
-S1's own completion includes a test suite that runs and a recorded result, which is what makes
-"confirmed failing" mean anything.
+**Raised by that round and not blocking S2.** The workload table has no dimension for tracks per
+animation or keyframes per track, because the corpus counted `.motion3.json` files rather than
+the curves inside them. Until that research is done, animation cost is unbounded by the table and
+no load limit covers it. It is in [open-questions.md](open-questions.md) and is due before S4.
 
 ## Due before the subsystem that needs them
 

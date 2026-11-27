@@ -68,13 +68,15 @@ incompatible.
 
 | Term | Means |
 |---|---|
-| **Puppet** | A complete rig: node tree, textures, parameters, bindings, physics, animations |
-| **Node** | One entry in a puppet's tree. Part, mesh group, composite are kinds. Never "object" or "layer" |
+| **Puppet** | A complete rig: node tree, textures, parameters, bindings, animations |
+| **Node** | One entry in a puppet's tree. Part, mesh group, composite, physics are kinds. What each kind may contain is declared per kind. Never "object" or "layer" |
 | **Part** | A node that draws a mesh with a texture. **References** a texture; never owns one |
 | **Texture** | An image, an entity in its own right. Many parts may reference one |
+| **Physics** | A node kind. Reads its own previous-frame transform, displaces that node's transform, may drive one parameter. Contains only physics |
 | **Parameter** | A puppet's own named axis with keypoints. **Not** an input channel |
 | **Binding** | Maps a parameter to a node transform or to per-vertex offsets. Edited in Studio |
 | **Channel mapping** | Maps a channel to a parameter. Puppet data, edited in Live |
+| **Track** | The part of an animation that drives one parameter. Never a "lane" |
 | **Deformation** | Per-vertex mesh offsets. Not a transform, which moves a whole node |
 | **Identifier** | The stable value every stored reference names an entity by. Never a name, an index or a file offset |
 | **Handle** | What an identifier resolves to at load, for the frame loop. Never written to a file |
@@ -88,7 +90,7 @@ incompatible.
 | **The editor** / **the player** | Descriptive terms for Studio and Live. Still sanctioned |
 
 Never say: *performance* (means two things here), *model*, *session*, *object*, *layer*,
-*sprite*, *project*. `docs/vocabulary.md` says what to say instead, and why.
+*sprite*, *project*, *lane*. `docs/vocabulary.md` says what to say instead, and why.
 
 ## Invariants
 

@@ -100,12 +100,20 @@ question it asks — *is this parameter this subtree's own, or the puppet's?* �
 rigger would have been answering by hand. The rigger can still override it; what they do not have
 to do is decide it on every paste.
 
-**A duplicated parameter carries its physics, and neither channel mappings nor animations.** Physics
-is rigging and belongs with it. A channel mapping is data Live wrote, naming a channel; an
-animation is authored work about the parameter it was written against. Carrying either onto an
-axis that did not exist a moment ago would be a guess at which channel should feed it, or at
-whether a timeline meant both sides — so a duplicate that carried no physics arrives **with no
-driver at all**, and **the result names every parameter in that state.**
+**A duplicated parameter carries nothing — not physics, not channel mappings, not animation
+tracks.** Physics is a **node** in the tree, so it is copied when the subtree being copied
+contains it and not otherwise; a parameter has no physics of its own to carry. A channel mapping
+is data Live wrote, naming a channel; a **track** is authored work about the parameter it was
+written against. Carrying either onto an axis that did not exist a moment ago would be a guess at
+which channel should feed it, or at whether a timeline meant both sides. So a duplicated
+parameter arrives **with no driver at all**, and **the result names every parameter in that
+state** — which is now the ordinary outcome rather than the exception, and is why naming it
+matters more than it did when physics travelled with the parameter.
+
+**Where a copied subtree does contain a physics node**, the copy must not drive the parameter the
+original drives: that is two base drivers on one parameter, which the validator refuses. The
+copied physics node arrives driving nothing and is named in the result, exactly as the duplicated
+parameter is.
 
 *Driver* is [evaluation.md](../evaluation.md)'s term and it is exclusive: a parameter has exactly
 one, a channel mapping or physics, and two is a validation failure. So the reported set is the

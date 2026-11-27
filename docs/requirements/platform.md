@@ -105,7 +105,7 @@ the corpus median; the stress sits above the largest rig measured on every dimen
 | | Reference | Stress | |
 |---|---|---|---|
 | Parts | 85 | 300 | Drawn parts. **The comparable figure across formats** |
-| Nodes | 190 | 500 | Every tree entry, drawing or not |
+| Nodes | 190 | 500 | Tree entries of every kind **except physics**. The figure was derived from Cubism as parts, deformers and art meshes, which excludes physics because Cubism keeps physics outside the model — so **tree entries in total are this row plus the physics row below**, and a generator reading this row alone emits too small a tree |
 | Vertices | 3,200 | 9,600 | |
 | Triangles | 4,700 | 14,100 | |
 | Parameters | 42 | 150 | |
@@ -113,7 +113,7 @@ the corpus median; the stress sits above the largest rig measured on every dimen
 | Masks and composites | 11 | 80 | Measured as mask references in the corpus, which is a narrower unit |
 | Offscreen passes per frame | 11 | 80 | Follows the row above, though a mask and an offscreen pass are not the same thing |
 | Shaded pixels per frame | 3 M | 9 M | Not derivable from a file; belongs to the runtime counters |
-| Physics nodes | 12 | 40 | |
+| Physics nodes | 12 | 40 | Tree entries too, and **additional to the Nodes row rather than part of it**. Load limits derived from a node count must use the sum |
 | Animations | 8 | 32 | The one row comfortably above the corpus at both ends |
 | Source artwork | 25 Mpx | 75 Mpx | |
 | GPU-resident texture bytes | 100 MB | 300 MB | |
@@ -126,6 +126,14 @@ and *nodes* is a figure for our own tree.
 **Bindings are understated.** One Cubism keyform set carries deformation, opacity and draw
 order together where inochi2d counts three bindings, so the corpus measurement undercounts the
 Cubism half and the true spread is wider than the row shows.
+
+**The table has no track or keyframe dimension, and needs one.** Per-frame animation cost is
+driven by playing **tracks** and by keyframes per track, not by the `Animations` row, which
+counts whole animations. The corpus cannot supply the figures as measured: it counted
+`.motion3.json` files rather than the curves inside them
+([2026-11-26-puppet-corpus.md](../research/2026-11-26-puppet-corpus.md)). Reading curve counts
+out of the same files is a research task, not a decision, and until it is done the animation
+cost of the stress workload is unbounded by this table and no load limit covers it.
 
 **The texture rows are the weakest in the table.** The Cubism samples cannot bound them — each
 ships one or two 2048² packed atlases, which is an export setting, and the layered source never
@@ -168,7 +176,7 @@ still a hitch on stream.
 | First-use work after the first presented frame | None | | The broader form of the row above, and how I5 is actually asserted: every render state a puppet can reach is prepared before it is first needed, or paid for during load |
 | Startup to first frame | 3 s cold, 1 s warm | | Cold means every derived cache empty, which is every beginner's first run |
 | Puppet load | 2 s | | Including validation and texture upload |
-| Input latency | 2 frames | | From a packet arriving to the frame it affects. Latest value wins; the queue never grows |
+| Input latency | 2 frames | | From a packet arriving to the frame it affects, for a **directly driven** parameter. Latest value wins; the queue never grows. A **physics-driven** effect adds exactly one frame and no more, because physics reads the previous frame's transform ([evaluation.md](../evaluation.md)) — stated so that hair is not measured against a budget it cannot meet, nor the budget quietly stretched to let it pass |
 
 The editor's responsiveness splits by interaction kind, because one figure is wrong for two of
 these three:

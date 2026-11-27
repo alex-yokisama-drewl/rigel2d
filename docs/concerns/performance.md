@@ -96,3 +96,24 @@ Universal entries reference them.
 - **A texture nothing draws is neither decoded, uploaded, nor counted against resident texture memory** — `judgment`
   → `test`: load a puppet carrying an unreferenced texture of declared size; assert it round-trips byte-identically and appears in no upload count or residency figure. Otherwise a file carrying unused artwork inflates the player's memory budget with art nobody can see.
   Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+### Physics timing, and counting a tree that has four kinds
+
+- **Physics responds exactly one frame after its input — counted in frames, at any output rate** — `judgment`
+  → `test` with an injected clock and a step input: assert the first response is frame N+1, not N and not N+2. Include the first frame after a load, after a replacement, and after a missed deadline. Nothing may evaluate the pass twice in one frame to catch up.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A chain of physics nodes lags by one frame whatever its depth** — `judgment`
+  → `test`: assert a chain of many segments and a chain of one respond on the same frame. Each node reads a previous frame that already carried its parent's displacement, so the delay must not accumulate — the obvious implementation mistake makes it accumulate and looks correct on a single pendulum.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **The generated workloads' per-kind node counts match the table's definition, with physics counted separately from `Nodes`** — `judgment`
+  → `test` using a counter that shares no code with the generator: assert `Nodes` equals every kind but physics, and that tree entries in total equal `Nodes` plus `Physics nodes`. Catches a generator that reads the `Nodes` row alone and emits too small a tree.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Every load limit admits the stress workload's totals, physics nodes included** — `judgment`
+  → `test`: load the generated stress puppet against the committed limits and assert none is within its stated margin of refusing it. Limits derived from the `Nodes` row alone would be too tight by the physics count.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Previous-frame transform storage is allocated at load, swapped rather than copied, and read in constant time per physics node** — `judgment`
+  → `test`: assert heap allocations and bytes copied per frame are zero from the first presented frame, and that per-node read cost is independent of tree depth, using a deep-chain fixture. A store created lazily on frame one is first-use work and fails [I5](../invariants.md).
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **Track evaluations per frame equal the playing tracks, independent of total tracks and of keyframes per track** — `judgment`
+  → `test`: assert a puppet with many long non-playing animations yields the same counters as one with few short ones. The track-level form of the rule that animation lookup seeks rather than scans.
+  Seeded at planning, 2026-11-27, on the physics-and-track revision.
