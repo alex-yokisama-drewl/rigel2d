@@ -48,6 +48,9 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   drives exactly one parameter, and an animation carries at most one track per parameter;
 - **chain deformers**, each a chain of **joints** deforming the geometry along it — see
   [below](#a-chain-deformer-is-a-permanent-structure-not-a-bulk-edit-tool-proposed);
+- **a gravity**, one magnitude for the whole puppet which every physics node scales by its own
+  multiplier. Physics is the only thing that reads it, and one puppet-wide field is what lets a
+  rigger stop every pendulum at once;
 - **masks**, each a reference from one part to another restricting where the first draws, as
   [vocabulary.md](../vocabulary.md) defines;
 - **channel mappings**, each feeding one parameter from a named input channel. These are puppet

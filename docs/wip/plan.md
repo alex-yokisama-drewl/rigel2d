@@ -6,11 +6,12 @@ The current phase: which subsystems get built, in what order where order matters
 The workspace builds, the push gates run and block a merge, and no production code is
 implemented yet — the crates are shells.
 
-**The requirements round that gated S2 is done** — 2026-11-27, on
-`requirements/s2-format-gaps`. What it settled is below under *What blocked S2*. **S2 is clear to
-start**, with one piece of design work due first: [format.md](../format.md) must say what a
-physics node stores and how the per-kind containment declaration is written. Neither is a
-requirements question and neither was settled by that round.
+**The requirements round that gated S2 is done, and so is the design pass it handed on** — both
+2026-11-27. What the requirements round settled is below under *What blocked S2*; the design pass
+added the per-kind containment declaration and the physics node's stored shape to
+[format.md](../format.md), against
+[research/2026-11-27-physics-parameterisation.md](../research/2026-11-27-physics-parameterisation.md).
+**S2 is clear to start.**
 
 ## Where this phase ends, and why there
 

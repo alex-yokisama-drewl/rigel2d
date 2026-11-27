@@ -43,6 +43,30 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-27 — One physics model, and no rigid-pendulum switch
+
+**Decided:** a physics node stores one spring pendulum's constants — a rest length, a gravity
+multiplier, a resonant frequency, and separate angle and length damping — plus an optional
+parameter output whose every axis names the simulated quantity driving it and the gain onto it.
+No model-type switch, no map-mode enum, no local-only flag. The puppet carries one gravity
+magnitude that each node's multiplier scales. The evidence is in
+[research/2026-11-27-physics-parameterisation.md](research/2026-11-27-physics-parameterisation.md).
+**Because:** inochi2d's constants are physical quantities that map one-to-one onto a single node,
+and this format's node is one anchor and one bob. Cubism's are dimensionless factors tied to a
+hard-coded 30 fps reference, meaningful only inside a chain, with no stiffness knob at all — and
+a chain here is nesting, so a per-chain parameterisation has nothing to attach to.
+**Rejected:** inochi2d's `model_type`, because its rigid model ignores `frequency` and
+`length_damping`, and a control that silently disables two others is the clearest beginner trap
+in either incumbent's field set; a high frequency approximates the rigid case. Its `map_mode`, an
+enum over the four orderings of angle, length, x and y, because naming the source per axis covers
+all four and covers a one-dimensional parameter without a special case. Its `local_only`, which
+tree placement already determines here. And Cubism's parameterisation entire.
+**Consequences:** both dampings are stored although a hair rig rarely wants stretch, because
+removing a stored field later is a format break while hiding one in the editor is not — so Studio
+is expected to show fewer knobs than the file holds, and that gap will read as an oversight.
+Upper bounds on the constants are unset: sign and finiteness are all the validator enforces until
+an integrator stability sweep measures them, which is due with the evaluation pass.
+
 ## 2026-11-27 — The puppet file has no separate authoring payload
 
 **Decided:** everything a puppet stores lives in one structural entry. Data only Studio acts on —

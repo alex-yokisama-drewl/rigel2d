@@ -78,6 +78,7 @@ written is Live's design around it.
 | [research/2026-11-26-inochi-file-measurements.md](research/2026-11-26-inochi-file-measurements.md) | What is actually inside an inochi2d model file? |
 | [research/2026-11-26-deformation-models.md](research/2026-11-26-deformation-models.md) | How do other 2D systems model deformation, and is a skeleton needed? |
 | [research/2026-11-26-puppet-corpus.md](research/2026-11-26-puppet-corpus.md) | How large is a real 2D vtuber puppet, measured across a corpus? |
+| [research/2026-11-27-physics-parameterisation.md](research/2026-11-27-physics-parameterisation.md) | What simulation constants should one physics node store? |
 
 `docs/wip/` is **empty between phases**, which is the normal state rather than a missing file.
 A `plan.md` exists only while a phase is in flight and a `<feature>.md` only on its own branch
