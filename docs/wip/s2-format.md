@@ -18,9 +18,9 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 to 8 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 9, the third-party gate.**
-**Blocked on:** nothing.
+**Current task:** tasks 1 to 8 are `done`. **Task 9 is `awaiting approval` — the human gate.**
+**Blocked on:** the owner looking at `rigged` with the specification and ordinary tooling, and
+reading the load messages. Nothing else remains before task 10.
 
 **The suite is green.** Every acceptance test passes, and so does every unit test, every
 fixture check and every gate. That is the first time since task 3, which is the designed
@@ -527,7 +527,7 @@ over* fixtures, `LIM-6`'s linear-work assertion, `EXEC-1`'s interception harness
 decided against, with the cheaper assertion named — and `EXEC-3`'s script, which is that
 assertion and is nobody's yet.
 
-### 9. The third-party gate — `todo` *(human gate)*
+### 9. The third-party gate — `awaiting approval` *(human gate)*
 
 The one thing in S2 a person must settle, and the whole case for the format being an archive.
 
