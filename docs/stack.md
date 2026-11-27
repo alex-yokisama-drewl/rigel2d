@@ -18,11 +18,63 @@ and are not yet confirmed by use. [decisions.md](decisions.md) carries what lost
 | UI toolkit | egui, through `egui-wgpu` | Its test harness reads an AccessKit tree headlessly, which is the only Rust answer that checks the roles, accessible names and geometry of the tree egui builds. **It says nothing about delivery**: whether the platform adapter (UIA on Windows, AT-SPI on Linux) hands that tree to assistive technology cannot be automated here. MIT/Apache-2.0, which leaves the deferred plugin question open |
 | Plugin host, when it arrives | Undecided, WebAssembly likely | Not built now. Recorded because Rust having no stable ABI is usually called a weakness and here is nearly irrelevant: [I1](invariants.md) wants a sandbox, and a WebAssembly host commits to no native ABI today |
 
+### What the transparency spike settled **[decided]**
+
+Transparency was the first thing this choice was exposed to, and it has been measured rather
+than reasoned about ([research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md)).
+**A decoration-free winit window emits correct premultiplied alpha into a real compositor on
+Linux/X11, and alpha reaches OBS on both Linux and Windows. The stack survives.** What came out
+of it is a set of conditions:
+
+- **The backend must be pinned on Windows.** wgpu's default selection chose Vulkan on the machine
+  tested, which crashes with an access violation — offscreen as well as windowed, so it is not a
+  transparency fault. DX12 and OpenGL both render correctly. A build that leaves the choice to
+  wgpu picks the one that failed there. **Whether the crash is that driver or Windows generally
+  is unknown**: it was one machine, with an Intel HD Graphics 630 and a GeForce GTX 950M.
+- **No wgpu backend on Windows offers an alpha-capable swapchain.** DX12 reported `Opaque` alone,
+  Vulkan `Opaque` and `Inherit`, because presentation goes through `CreateSwapChainForHwnd`;
+  desktop transparency there needs DirectComposition or a layered window and wgpu exposes
+  neither. **Output is unaffected** — `Opaque` ignores alpha for desktop compositing rather than
+  discarding it from the buffer, and the capture route reads the buffer.
+- **The surface format and its colour space must be pinned explicitly, on every platform.** The
+  spike pinned `Bgra8Unorm`. An sRGB surface applies the transfer function a second time and
+  falsifies every measured value silently — a half-transparent white reads about 188 where the
+  reference table says 128, which looks like a plausible result rather than a bug. wgpu 30 added
+  `SurfaceConfiguration::color_space`, whose default `Auto` resolves to `Srgb`, so the hazard is
+  now reachable without anyone asking for an sRGB *format*. With a linear format the shader's
+  values still reach the surface unencoded — the colour space only tells the compositor how to
+  read them — but anyone carrying over the older two-field mental model will miss it.
+
+**What is affected is the editor's preview on Windows**, which cannot be transparent on the
+desktop. That is a platform difference in Studio and it is not yet designed for; it belongs to
+the Studio cycle.
+
+macOS is unobserved, and so is the windowing assumption there.
+
+### Moving to a new wgpu major **[decided]**
+
+First-hand from the spike's port to wgpu 30, and the support for the re-check note at the foot
+of this document. This note names its version so that it ages visibly.
+
+- **Read the vendored source in one pass before porting**, under
+  `~/.cargo/registry/src/*/wgpu-<major>*/src/api/`. wgpu 30's API differed from older versions
+  enough to make guesses worthless: `PipelineLayoutDescriptor` has `immediate_size` where it had
+  `push_constant_ranges`; `multiview` became `multiview_mask` and is now required on
+  `RenderPassDescriptor` too; `PollType::Wait` is a struct variant needing `submission_index` and
+  `timeout`; `get_mapped_range` returns a `Result`; `InstanceDescriptor` has no `Default`, though
+  `Instance::default()` exists. Reading settled all of it at once, where compiling and fixing one
+  error at a time would have taken several passes. **Do this before the port, not during it.**
+- **The one that fails silently:** `SurfaceTexture::present` is gone in wgpu 30; presentation
+  moved to `Queue::present`, and a frame that is merely dropped is *discarded* rather than shown.
+  A port that drops the call compiles and renders nothing, with no error.
+
 ### The render surface is a window the toolkit does not own **[proposed]**
 
 This is part of the choice rather than a refinement of it.
 
-Live's render surface is a bare winit window with a wgpu surface, transparent and undecorated,
+Live's render surface is a bare winit window with a wgpu surface, undecorated, and carrying
+alpha — transparent **on the desktop** on Linux, but not on Windows, where no wgpu backend offers
+an alpha-capable swapchain (above). The alpha reaches the capture route either way,
 with no widget toolkit linked into its draw path. Live's control surface, and all of Studio, are
 egui on a **separate** window sharing the same wgpu device, so Studio's viewport is a paint
 callback into that device rather than a second renderer.
@@ -132,24 +184,17 @@ gates are [testing.md](testing.md).
 Each of these would reverse or amend the choice, and each has a spike that settles it. Nothing
 should be built that assumes any of them has gone well.
 
-1. **Transparency has not been observed anywhere.** winit's own documentation calls transparency
-   "more of a hint for the system" on some platforms and gives no per-platform notes. **This is
-   the same spike [performing.md](requirements/performing.md) already requires** for the OBS
-   alpha path — both need a decoration-free window emitting correct premultiplied alpha into a
-   real compositor on Linux, Windows and macOS, so there is one piece of work here, not two. If it
-   needs platform-specific branches, macOS-as-a-build-target weakens for every Rust option and
-   Qt's maturity starts to be worth its other costs.
-2. **egui's accessibility tree contains only what egui populates**, so a custom-painted canvas —
+1. **egui's accessibility tree contains only what egui populates**, so a custom-painted canvas —
    Studio's mesh editor, its timeline, its parameter graph — contributes nothing unless its
    author says so. Studio is mostly custom canvases, which makes this a question about Studio's
    verifiability rather than about a toolkit feature. [testing.md](testing.md) carries the
    convention that answers it, and Slint is the named fallback if the convention proves
    unworkable.
-3. **wgpu creates render passes and framebuffers lazily, on first use, inside the frame loop.**
+2. **wgpu creates render passes and framebuffers lazily, on first use, inside the frame loop.**
    Pipelines and shaders — the expensive part — are eager, which is why wgpu passes at all. These
    two are cheap metadata objects and a warm-up pass during load is the mitigation
    [platform.md](requirements/platform.md) already prescribes, but they are a non-zero
    resource-creation counter after frame one, which is [I5](invariants.md) as stated.
 
 **Re-check this document at the start of each cycle.** wgpu's major versions move fast and the
-`wgpu-hal` internals the third point rests on are not a stable API.
+`wgpu-hal` internals the second point rests on are not a stable API.

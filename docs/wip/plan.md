@@ -2,7 +2,9 @@
 
 The current phase: which subsystems get built, in what order where order matters.
 
-**Status: proposed. Not yet agreed.** Nothing is built.
+**Status:** agreed 2026-11-26. **S0 is done** (2026-11-27); every other subsystem is not
+started. No production code exists — `spike/alpha-sender/` is S0's throwaway instrument, and S1
+discards it.
 
 ## Where this phase ends, and why there
 
@@ -24,8 +26,8 @@ Ordered. `Blocks on` names what genuinely must come first; everything else may m
 
 | | Subsystem | Done when | Blocks on |
 |---|---|---|---|
-| S0 | **Transparency and alpha-output spike** | A known half-transparent frame has gone through each candidate route into a real OBS on Linux and Windows, and the pixel values OBS emits are asserted — premultiplied against straight alpha explicitly among them. macOS is attempted at its tier. The `[open]` in [performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-open) is resolved, the Game Capture capability tension is answered, and a dated file lands in [research/](../research/) | Nothing |
-| S1 | **Workspace and the push gates** | Every crate in [stack.md](../stack.md#workspace-proposed)'s workspace table builds from a clean checkout, the push gates run, `scripts/test-record.sh` records a result, and [stack.md](../stack.md#running-locally-proposed)'s *Running locally* steps are corrected to what was actually walked — including the Linux package list it asks for | S0 |
+| S0 | **Transparency and alpha-output spike** | **Done 2026-11-27** — measured on Linux and Windows, recorded in [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md). The `[open]` in [performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-decided) is resolved and the Game Capture capability tension answered. **macOS was not attempted** — no Mac was reachable — so Syphon alpha stays unobserved, which [platform.md](../requirements/platform.md) permits at its tier | Nothing |
+| S1 | **Workspace and the push gates** | Every crate in [stack.md](../stack.md#workspace-proposed)'s workspace table builds from a clean checkout, the push gates run, `scripts/test-record.sh` records a result, and [stack.md](../stack.md#running-locally-proposed)'s *Running locally* steps are corrected to what was actually walked — including the Linux package list it asks for, and `CLAUDE.md`'s *Running it* table with them | S0 |
 | S2 | **`rigel-format`: read, validate, write** | A puppet archive round-trips byte-identically; the validator rejects a hand-written malformed corpus and accepts stale bindings as a state; load limits are enforced before allocating; extension data survives untouched; every write goes through the one atomic path | S1 |
 | S3 | **The workload generator and the fixture corpus** | The reference and stress puppets are generated from the committed dimension table in [platform.md](../requirements/platform.md), both validate, and the generated puppet doubles as the conformance fixture [puppet.md](../requirements/puppet.md) requires | S2 |
 | S4 | **The evaluation pass** | A generated puppet evaluates to a posed tree for given channel input, in the order [evaluation.md](../evaluation.md) sets; one parameter has one driver, enforced by the validator; stale bindings behave as specified; the name-resolution counter is zero | S2 |
@@ -38,23 +40,36 @@ S3 and S4 both depend only on S2 and are independent of each other. S3 is placed
 gives S4 its fixture, not because S4 needs it to exist. Ordering them the other way costs only a
 hand-built fixture.
 
-S0 blocks everything, and that is the point rather than an inconvenience — see below.
+S0 blocked everything, and that was the point rather than an inconvenience — see below.
 
-### Why S0 is first, and what it may cost
+### Why S0 was first, and what it found
 
-[stack.md](../stack.md#what-this-choice-is-still-exposed-to-open) names transparency as the first
-of what the stack choice is still exposed to, and is explicit that nothing should be built
-assuming it has gone well. It has not been observed working on any platform; every claim about it
-is drawn from reading source and documentation. It gates the OBS delivery path
-([performing.md](../requirements/performing.md)) and the stack's own windowing assumption at the
-same time, and one piece of work settles both.
+S0 went before everything else because a bad answer would have reopened the stack choice.
+[stack.md](../stack.md) named transparency as the first thing that choice was exposed to, and
+every claim about it was drawn from reading source and documentation rather than from running
+anything.
 
-**If it fails, the stack choice reopens** and S1 onward are built on a different foundation. So
-S0 carries its own throwaway scaffolding rather than waiting for S1 to formalise a workspace that
-may not survive it. S1 then formalises whatever S0 established.
+**The stack survives.** A decoration-free winit window emits correct premultiplied alpha into a
+real compositor on Linux/X11, and alpha reaches OBS on both Linux and Windows. Transparency was
+never the problem: it was bit-exact at every probe, on every route measured. It is no longer on
+stack.md's exposure list, and the conditions that came out of the spike are in
+[*What the transparency spike settled*](../stack.md#what-the-transparency-spike-settled-decided).
 
-S0 is a spike. It produces evidence and a resolved `[open]`, not production code, and its
-scaffolding is expected to be discarded.
+**What the spike found instead was a colour hazard no document anticipated.** Each host silently
+assumes an encoding of the buffer it is handed, the two measured hosts assume different ones, and
+neither reports a mismatch — so a renderer correct for one is wrong for the other by an amount
+that reads as a plausible picture rather than a fault. That is now the rule in
+[runtime.md](../runtime.md), and it is why the route decision in
+[decisions.md](../decisions.md) went to a plugin of our own on Linux rather than to the one
+third-party route that was measured working end to end.
+
+### What S1 inherits
+
+| | |
+|---|---|
+| `spike/alpha-sender/` | **Throwaway scaffolding — S1 discards it.** A standalone crate and a set of Python probes, never a workspace member. S1's job is to formalise what S0 established, not to adopt its instrument. **Git keeps it**: the merge that lands S0 is where a later cycle recovers it from, and [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md) still points at it for reproduction — which matters, because macOS and a second Windows machine are both still unmeasured |
+| **The backend is pinned on Windows** | Never left to wgpu's default selection, which chose the one backend that crashed on the machine measured. [stack.md](../stack.md#what-the-transparency-spike-settled-decided) carries the reason, alongside the surface-format and colour-space condition from the same spike |
+| **Read the vendored wgpu source before porting** | Due in S5, where the render stage meets wgpu. The spike's port found the API differs across majors enough to make guesses worthless; [stack.md](../stack.md#moving-to-a-new-wgpu-major-decided) carries what it cost |
 
 ## Acceptance criteria
 
@@ -66,8 +81,8 @@ different points.
 |---|---|---|
 | [puppet.md](../requirements/puppet.md) | **Done** — [puppet-acceptance.md](../requirements/puppet-acceptance.md) | Its `[open]` on the compatibility promise is a signal from the owner and changes no criterion |
 | [platform.md](../requirements/platform.md) | With S6 | The counter half can be commissioned now; the soak length and the tolerated deadline-miss rate are `[open]` |
-| [performing.md](../requirements/performing.md) | After S0 | The spike resolves the `[open]` that decides the output path |
-| [authoring.md](../requirements/authoring.md) | Next cycle | Studio is not in this phase |
+| [performing.md](../requirements/performing.md) | **Due now** | S0 is done and the `[open]` that decides the output path is resolved |
+| [authoring.md](../requirements/authoring.md) | **Partly done** — the operations settled on 2026-11-26 are in [authoring-acceptance.md](../requirements/authoring-acceptance.md); the rest is next cycle | Studio is not in this phase |
 
 The planner's most useful output is the gaps it finds in the requirements. Those route back into
 `docs/requirements/` before the subsystem they affect starts.

@@ -101,3 +101,17 @@ sweep.
 - **A file written by an independent generator, using no project code, validates and loads** — `judgment`
   → `test`. The reference puppet generator satisfies this; it is the machine-checkable form of "third parties can write the format".
   Seeded at planning, 2026-11-26.
+
+### Texture lifetime, copy, paste and symmetry
+
+- **An operation that copies or merges entities mints a new identifier for every one of them, and remaps references internal to the copied set** — `judgment`
+  → `test` once paste exists: copy a subtree containing a mask between two of its own parts, paste, assert the pasted mask names the pasted part and not the original. Assert no issued identifier equals any live or retired one. Paste, merge, parameter duplication and the re-import split all take this path.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **A field with a default has exactly one stored form for that default** — `judgment`
+  → `test`: texture flip, axis polarity and the mirror axes each serialise one way when unset — absent or explicit, never both. A default that serialises two ways makes the same puppet save to different bytes, which is the canonical-serialisation promise.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **An operation that mirrors or reverses data returns the original bytes when applied twice, and bounds the set it modifies** — `judgment`
+  → `test`: mirror a rigged node twice and assert byte equality with the original. Assert every binding outside the selection evaluates identically, which is the assertable form of *a mirror never writes a parameter*.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.

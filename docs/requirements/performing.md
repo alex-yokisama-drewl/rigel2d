@@ -15,60 +15,67 @@ colours a puppet may contain and degrades edges — a limitation about output pl
 the artwork, which is the wrong place for it. Inochi Session's transparency is a Windows-only
 plugin with no Linux equivalent, which makes this a gap rather than a preference.
 
-### Which platforms need an OBS plugin **[open]**
+### Which platforms need an OBS plugin **[decided]**
 
-**The choice among the options below is deferred to the spike, deliberately.** Alpha has not
-been observed working end to end on any candidate path, so picking one now would be picking on
-the strength of source reading alone. The spike described below is the
-trigger: it decides this, and nothing should be built that assumes an answer before it runs.
-What is already settled, and does not wait for the spike, is that output sits behind a narrow
-interface that can host more than one backend.
+**We write our own plugin, Linux first, built to extend.** Settled on 2026-11-27 against the
+measurements in
+[2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md), which is the
+spike this section previously deferred to.
 
-What each platform offers **on paper** — every row below is drawn from reading source and
-documentation, and none of it has been observed working
-([2026-11-26-linux-alpha-output.md](../research/2026-11-26-linux-alpha-output.md)):
-
-| Platform | Plugin-free route to alpha | |
+| Platform | Route | State |
 |---|---|---|
-| macOS | **Yes** | OBS ships a Syphon client with a transparency setting |
-| Windows | **Yes** | Built-in Game Capture with "Allow Transparency". Spout, despite being the platform's convention, is a third-party plugin and never shipped in OBS. **See the caveat below** |
-| Linux | **No** | OBS's built-in PipeWire path is portal-based and declares the texture without an alpha channel, so transparency is discarded on arrival |
+| Linux | **Our own plugin** | To be built. No route that ships with OBS carries alpha here |
+| Windows | Stock OBS **Game Capture** | Observed working on one machine, with two caveats below |
+| macOS | Stock OBS **Syphon client** `[proposed]` | **Unmeasured** — no Mac was reachable, so this row rests on reading source, as the whole section once did |
 
-**Linux is the odd one out, not the general case.** This matters because it rules out the
-tempting symmetry: writing one plugin of our own for every platform would *add* an install step
-on the platforms the table above shows need none, in the name of consistency. Uniformity is not
-worth that.
+**Because a host that guesses our encoding is the actual risk, and a plugin stops it guessing.**
+Alpha turned out to survive every route measured. What does not survive is colour: each host
+silently assumes an encoding, and the two measured hosts assume *different* ones, so a renderer
+correct for one is wrong for the other by an amount that reads as a plausible picture rather than
+a fault. A plugin of our own controls the import and declares what it is being sent. That
+argument did not exist when this section was written, because the behaviour was unknown.
 
-So the decision is narrower than it first appeared:
+The supporting reasons are the ones already recorded: on Linux no stock route carries alpha at
+all, `libobs` has one texture-import call per platform so extending later is open without being
+committed to now, and the plugin is the *small* half of the work — the sender is per-platform
+under every option, so owning the plugin adds less than it appears to.
 
-| Option | |
-|---|---|
-| Depend on a third-party Linux plugin | No work for us. The two differ in risk. The research recommends the `obs-pwvideo` route as primary on technical fit, while noting it is a single-maintainer, best-effort project and pulls in `libfunnel`, which is single-author, has no tagged release and declares its API unstable. It recommends `obs-vkcapture` as the fallback, far more widely deployed and actively released, at the cost of a launch wrapper and a swapchain that actually presents |
-| **Write our own, Linux first, built to extend** | We own the Linux story. The sender is per-platform either way; `libobs` has one texture-import call per platform, so extending later is open without being committed to now |
-| Write our own for all three | Consistency at the cost of an install step where none is needed |
+**The alternatives and why they lost are in [decisions.md](../decisions.md)**, with the date.
+The short of it: `obs-vkcapture` works today but would put the route carrying our output in
+someone else's hands, and writing our own everywhere still fails the test *uniformity is not
+worth an install step where none is needed* — though less clearly than it did, which is why the
+plugin is built to extend.
 
-Whichever is chosen, the recurring cost of owning an OBS plugin is **coupling to OBS releases**,
-not the code: OBS refuses to load plugins built for a newer release, offers no stability
-promise, changed its Windows plugin folder layout in version 33, and requires signing on
-Windows and notarisation on macOS.
+#### What Windows costs us, having chosen stock Game Capture **[decided]**
 
-**An unresolved tension in the Windows route.** Game Capture works by hooking the player's
-swapchain, which is OBS reaching into our process rather than the player handing over frames.
-Whether that is compatible with "the player requests no screen-capture or window-capture
-capability" below turns on whose capability it is — arguably OBS's, since the player requests
-nothing and only presents its own window. It is not settled, and the spike should answer it
-rather than assume.
+- **The player converts its frame for this route**, as it does for every route.
+  [runtime.md](../runtime.md) owns that rule and carries what each host assumes; this document
+  does not restate the encodings, so that a re-measurement changes one place.
+- **Game Capture fails silently when the player and OBS are on different GPUs.** Its hook shares
+  a texture, which cannot cross GPUs; the window lists, the source stays blank, and nothing
+  reports an error. Observed on one dual-GPU laptop, where it was also the owner's existing
+  experience with unrelated games. **The player must detect and explain it** — a beginner cannot
+  tell it apart from a broken application, and this is the one place where choosing the stock
+  route puts a diagnosis on us that a plugin of our own would not.
 
-**Settled regardless:** output sits behind a narrow interface that can host more than one
-backend, because the candidates differ in maturity and any of them may fail.
+#### The Game Capture capability question, answered **[decided]**
 
-**A spike comes before design lock, and it covers every platform.** Alpha has not been
-observed working end to end on *any* path — not Linux, not Windows Game Capture, not macOS
-Syphon. Every conclusion above is drawn from reading source code and documentation. The spike
-pushes a known half-transparent frame through each route into a real OBS and asserts on the
-pixel values OBS emits; premultiplied-versus-straight alpha is the likeliest place for it to be
-quietly wrong, and the macOS path has no premultiplied handling at all, which is a hint rather
-than a conclusion.
+[The clean-surface rule](#the-render-surface-carries-nothing-but-the-puppet-including-when-things-fail-decided)
+says the player requests no screen-capture or window-capture capability. Game Capture works by
+hooking the player's swapchain — which is how it reads a frame before the desktop composites it,
+and is consistent with everything the spike measured.
+
+**It does not breach the rule.** The player enumerates nothing, captures nothing, and requests no
+capability; it presents its own window and OBS reaches into it. The rule exists to prevent the
+player becoming a route by which *another* window's contents reach a live stream, and a hook into
+our own process creates no such route.
+
+What it does mean is that a third party injects code into the player's process on Windows, which
+is worth stating plainly rather than discovering later. On Linux, where we hand frames over
+deliberately, that does not arise — which is a further point in favour of the plugin.
+
+**Settled regardless, and unchanged:** output sits behind a narrow interface that can host more
+than one backend, because the candidates differ in maturity and any of them may fail.
 
 ## Nothing stops the puppet rendering **[decided]**
 

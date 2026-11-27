@@ -22,6 +22,74 @@ from one.** That line is what keeps the two applications from diverging: Studio 
 in what they ask the user and in what they do with the result, not in how a puppet evaluates or
 draws.
 
+## The frame has one convention, and every consumer converts from it **[proposed]**
+
+The runtime renders in **one** colour and alpha convention, never varied per platform. Every
+output path converts from it at its own boundary, and **each conversion is established by
+measurement rather than assumed**.
+
+**Which convention it is, is `[open]`.** The rule above binds whatever it turns out to be, and
+nothing should be built assuming a particular one. It cannot sensibly be chosen before the
+plugin in [performing.md](requirements/performing.md) has a format, and both **capture** routes
+are reachable from any single convention by a conversion at the boundary — which is not true of
+the third row below, for the reason given under it.
+
+**Because two hosts were measured and neither assumed what the other did**
+([2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md)):
+
+| Consumer | Reads the buffer as |
+|---|---|
+| OBS on Linux, via `obs-vkcapture` | Linear light, already premultiplied |
+| OBS on Windows, via Game Capture | sRGB-encoded, straight alpha |
+| An X11 compositor, for the editor's viewport | Encoded values, blended in encoded space |
+
+**The two capture routes agree once each is fed what it expects**, and not by coincidence of
+three measurements: Linux stores `L·a` and emits `E(L·a)`, Windows stores `E(L)` and emits
+`E(D(E(L))·a) = E(L·a)`. Equal for every `L` and `a`.
+
+Fed the other's convention, each is wrong by an amount that reads as a plausible picture rather
+than a fault — and the size of it is easy to understate. A half-transparent white measured 92
+where it should have been 188, a factor of two in luminance, and feeding either route the other's
+convention also shifts **opaque** mid-tones, so it is not confined to edges. **Neither host
+documents its assumption, and neither reports a mismatch.**
+
+**The compositor row is the exception, and it cannot be converted away.** A capture route is
+handed our buffer and composites it itself; a desktop compositor blends our window over a
+background we neither control nor see, and it does so in *encoded* space where OBS works in
+linear. White at half alpha over black reaches the desktop as 128 and the stream as 188; over
+mid-grey, 192 and 205. No single stored value satisfies both, for the structural reason that one
+expression is linear in the encoded background and the other is not.
+
+What follows:
+
+- **The convention is the runtime's and is single.** A renderer that varies by platform cannot be
+  reasoned about, and it would put the divergence this document exists to prevent back inside the
+  frame loop.
+- **The conversion lives at the output boundary**, which is the application's — consistent with
+  *how the surface is presented* already sitting outside what the runtime owns.
+- **A plugin of our own does not remove the conversion; it makes it ours and explicit.** The
+  conversion still happens, at a point we choose, against a format we define, instead of a host
+  inferring one from a buffer that carries no colour-space tag. That is the difference, and it is
+  the whole of the argument for writing one.
+- **A new output route is not integrated until its conversion has been measured.** A route added
+  on the strength of its documentation is a route whose colour is wrong in a way no test covers:
+  both hazards above were invisible by eye and were caught only by asserting on pixel values
+  written down in advance.
+- **Anything that must match the output composites inside the frame.** Studio's viewport, and
+  any preview meant to show what the stream will show, draws the puppet against its own
+  background in our own code rather than letting the host compositor do it. A window left
+  transparent for the desktop to fill in is showing a *different* composite from the one going to
+  the stream, by the measured amounts above. This is a constraint on Studio's viewport and on
+  Live's own window, and neither is designed yet.
+- **This is the mechanism behind the guarantee in this document's opening**, that a rig cannot
+  look right while authored and wrong while performed. The viewport and the output reach the
+  screen through different hosts with different assumptions, so that guarantee holds only if the
+  conversions are right and the comparison is made where we control the blend.
+
+**The evidence is narrow and the rule is not.** One Windows machine, one Linux compositor, no
+Mac. The rule is written to bind regardless, because its value is in forbidding the assumption,
+not in the particular numbers measured.
+
 ## Loading never disturbs what is already there **[proposed]**
 
 A load produces a complete, validated puppet or it produces nothing. There is no partially

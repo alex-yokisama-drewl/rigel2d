@@ -3,9 +3,11 @@
 Every document in the project is listed here. If it is not on this list, it does not exist —
 see [documentation.md](documentation.md).
 
-**Status: nothing is built yet.** Requirements are complete across every area listed below, and
-technical design has settled the format, the evaluation pass, the scene, the runtime's
-boundaries and the stack. No plan, no code.
+**Status: nothing is built yet, beyond one throwaway spike.** Requirements are complete across
+every area listed below, and technical design has settled the format, the evaluation pass, the
+scene, the runtime's boundaries and the stack. A phase plan exists in `docs/wip/`, and
+`spike/alpha-sender/` holds the S0 instrument, which is scaffolding and is expected to be
+discarded.
 
 What is settled is in [decisions.md](decisions.md), which is the list to read rather than one
 restated here — it supersedes its own entries in place, so a summary elsewhere goes stale.
@@ -13,9 +15,9 @@ restated here — it supersedes its own entries in place, so a summary elsewhere
 `CLAUDE.md`.
 
 **A session picking this up starts at `docs/wip/open-questions.md`**, which holds what is still
-undecided. The largest remaining `[open]` is transparent output: it has not been observed
-working on any platform, it now gates both the OBS delivery path and the stack's own
-windowing assumption, and one spike settles both — see [stack.md](stack.md).
+undecided. Transparent output was the largest item there and is no longer on it: it was measured
+on 2026-11-27 and the output route is settled — see
+[research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md).
 
 ## Start here
 
@@ -34,6 +36,7 @@ windowing assumption, and one spike settles both — see [stack.md](stack.md).
 | [requirements/puppet.md](requirements/puppet.md) | What is a puppet, and what must its file guarantee? |
 | [requirements/puppet-acceptance.md](requirements/puppet-acceptance.md) | How would we know the puppet requirements were met? Criteria, written before any implementation |
 | [requirements/authoring.md](requirements/authoring.md) | What must the editor do, and what must it feel like? |
+| [requirements/authoring-acceptance.md](requirements/authoring-acceptance.md) | How would we know the editor's copy, paste and mirror operations were right? Criteria for those operations only, written before any implementation |
 | [requirements/performing.md](requirements/performing.md) | What must the player do, from tracking input to streaming output? |
 | [requirements/platform.md](requirements/platform.md) | What must it run on, and to what frame budget? |
 
@@ -50,8 +53,8 @@ windowing assumption, and one spike settles both — see [stack.md](stack.md).
 
 **Studio's and Live's own designs are deliberately not written.** This pass covered the format,
 the runtime and the stack, in the build order [overview.md](overview.md) sets out. Live's output
-plumbing additionally waits on the spike named in [stack.md](stack.md), which is the same spike
-[requirements/performing.md](requirements/performing.md) requires for the OBS alpha path.
+route is now decided ([requirements/performing.md](requirements/performing.md)); what is not
+written is Live's design around it.
 
 ## Working on it
 
@@ -63,6 +66,7 @@ plumbing additionally waits on the spike named in [stack.md](stack.md), which is
 | [concerns/](concerns/) | The cross-cutting checklists, and how they grow |
 | [research/](research/) | Dated findings, each against the decision it fed |
 | [research/2026-11-26-linux-alpha-output.md](research/2026-11-26-linux-alpha-output.md) | How does the player get transparent frames into OBS on Linux? |
+| [research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md) | Does transparent output actually work, and what does each route do to our frames? |
 | [research/2026-11-26-stack.md](research/2026-11-26-stack.md) | What should it be built on — language, GPU abstraction, UI toolkit? |
 | [research/2026-11-26-tracker-interchange.md](research/2026-11-26-tracker-interchange.md) | Do different trackers send interchangeable data, and what must a mapping store? |
 | [research/2026-11-26-inochi-file-measurements.md](research/2026-11-26-inochi-file-measurements.md) | What is actually inside an inochi2d model file? |

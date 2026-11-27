@@ -4,6 +4,14 @@
 
 ## Verdict
 
+> **Superseded in part on 2026-11-27 by measurement**
+> ([2026-11-27-transparency-spike.md](2026-11-27-transparency-spike.md)). The ordering below is
+> inverted by it: this report recommends `obs-pwvideo` as primary and `obs-vkcapture` as
+> fallback, on technical fit read from source. In practice `obs-vkcapture` works end to end,
+> while `obs-pwvideo`'s sending half does not build on the target distribution. The structural
+> claim this report makes about `obs-pwvideo`'s alpha-bearing format table was confirmed. Act on
+> the spike, not on the recommendation here.
+
 **Revised after the Windows and macOS follow-up.** Linux is the only platform where stock OBS has no way to receive our frames with alpha. The earlier text of this report treated the plugin as unavoidable; that stays true for Linux and is false for Windows and macOS (see "Follow-up: Windows, macOS and a plugin of our own" below).
 
 **"Without a plugin" cannot be met on Linux.** Every mechanism found that carries alpha needs an OBS-side component the user installs. OBS's built-in PipeWire sources are portal-based (screen/window capture and cameras), and their dmabuf import declares the texture as `GS_BGRX`, i.e. no alpha. `performing.md` said, before this finding, the output is native and plugin-free on every platform. That is achievable on macOS, achievable on Windows only through Game Capture (not Spout, which is a third-party plugin in OBS), and not achievable on Linux. The user must either reword the requirement to allow a plugin on Linux, or choose to ship our own plugin everywhere. That is a product decision, not a research question.

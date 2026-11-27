@@ -22,6 +22,10 @@ out.**
 - **Merging into an existing puppet accepts more than one thing at a time** — several images, a
   PSD, or another puppet. Inochi Creator's one-at-a-time merge is a specific friction worth
   naming: the work it makes tedious is routine.
+- **Artwork nothing draws can be removed deliberately**, as one command over unreferenced textures
+  only, reporting what it will take and how large it is. It is the one operation whose subject is a
+  texture, and it exists because a rigger who receives a puppet carrying unused artwork otherwise has
+  no way to remove it — see [puppet.md](puppet.md#a-textures-life-is-bound-to-the-parts-that-reference-it-decided).
 - **Merging another puppet copies what it takes.** Parts arrive with fresh identifiers and no
   tie to the puppet they came from, so the result stays self-contained. A live reference would
   mean a stored reference resolving outside the file it arrived in, which
@@ -43,6 +47,150 @@ other's mirror. A persistent link would be puppet data needing its own identity,
 validation and a defined behaviour when the two sides are deliberately made to differ — and
 riggers make them differ routinely, so the link would be fighting the common case. The cost is
 that changing one side means mirroring again.
+
+**A part's texture flip is not a link either.** It is stored state on one part, saying its
+texture is sampled reversed, and it is what lets a pair of eyes share one drawing
+([puppet.md](puppet.md#what-a-puppet-is-proposed)). It records nothing about any other part.
+
+### Copy takes everything; paste chooses what lands **[decided]**
+
+A rigger does not know which pieces of a node they want until they know where it is going. So
+copy is one command over a whole node, and **paste** is where the choice is made:
+
+| Paste | Lands | The case it is for |
+|---|---|---|
+| **Whole node** | The subtree, its meshes, its bindings and its deformations | Duplicating a finished piece of a rig |
+| **Mesh only** | The mesh, onto an existing part, replacing that part's mesh | Heterochromia: two eyes, two drawings, one mesh |
+| **Rigging only** | Bindings and deformations, onto an existing node | One eye is rigged, the other's art is already placed |
+
+Each is available plain or **mirrored**, and each is one undo step.
+
+**Mesh-only paste does not carry the texture reference** — carrying it would make the operation a
+whole-node paste. The target keeps its own texture, and the mesh is scaled into that texture's
+coordinate space by the same defined rule replacement art of different dimensions already uses
+([puppet.md](puppet.md#adding-artwork-when-the-art-and-the-rig-disagree-proposed)). This is why
+Studio needs no operation that repoints a part at a different texture: the case that wants one is
+this paste, where the coordinate-space question is answered instead of hidden.
+
+**Pasting rigging creates bindings, never parameters.** A binding maps one parameter to one node;
+pasting rigging onto the other eye adds bindings, and the parameters they name already exist. A
+parameter that drives five other nodes is untouched by gaining a sixth binding. Everything below
+follows from that, and it is the reason the operation composes with a rig in which one parameter
+drives many nodes.
+
+### Which parameters a paste shares, and which it duplicates **[decided]**
+
+Pasted bindings can name the **existing** parameters, so both sides move together, or
+**duplicates** of them, so the sides move independently. Both are wanted and neither is right for
+a whole operation at once: a mirrored eye needs its own parameters or it can never wink, and a
+mirrored earring needs the *head's* tilt parameter or it stops following the head.
+
+**So the choice is made per parameter, by whether that parameter reaches outside what is being
+pasted.** A parameter used only by nodes inside the pasted set is duplicated. A parameter also
+used by nodes outside it is shared.
+
+| Mirroring | Parameter | Reaches outside? | |
+|---|---|---|---|
+| An eye | `EyeLOpen` | No — only the eye uses it | **Duplicated**, so the pair can blink separately |
+| An earring | `HeadTiltX` | Yes — the head and the hair use it too | **Shared**, so the earring still follows the head |
+| An earring | `EarringSway` | No | **Duplicated** |
+
+**Because** it gets both cases right with nothing to choose and nothing to undo, and because the
+question it asks — *is this parameter this subtree's own, or the puppet's?* — is the question the
+rigger would have been answering by hand. The rigger can still override it; what they do not have
+to do is decide it on every paste.
+
+**A duplicated parameter carries its physics, and neither channel mappings nor animations.** Physics
+is rigging and belongs with it. A channel mapping is data Live wrote, naming a channel; an
+animation is authored work about the parameter it was written against. Carrying either onto an
+axis that did not exist a moment ago would be a guess at which channel should feed it, or at
+whether a timeline meant both sides — so a duplicate that carried no physics arrives **with no
+driver at all**, and **the result names every parameter in that state.**
+
+*Driver* is [evaluation.md](../evaluation.md)'s term and it is exclusive: a parameter has exactly
+one, a channel mapping or physics, and two is a validation failure. So the reported set is the
+duplicates that have neither — a duplicate that carried its physics has its driver and is not
+reported, because it will move on stream. A puppet that moves in Studio and is dead on stream is
+the failure this report exists to prevent, and a report that named working parameters too would
+be read past.
+
+### Mirroring reads a parameter and never writes one **[decided]**
+
+Mirroring a **binding** reflects that binding's own stored values, and where the parameter's axis
+is bilateral, reverses which keypoint holds which value. **The parameter itself is never
+modified.** Mirroring the left eye therefore cannot change how any other node bound to the same
+parameter behaves.
+
+**This is stated as a rule because it is reliably got wrong.** The natural reading of "flip the
+rigged eye" is that the axis is reversed, and an axis belongs to a parameter that other nodes
+share — so the operation looks as though it must reach them. It does not, because what is stored
+per node is the binding, and the reversal is a remapping of that binding's values across the
+parameter's keypoints.
+
+- **Axis polarity decides whether reversal applies at all.** A bilateral axis reverses; a unipolar
+  one does not, because reversing *eye open* would open the eye when it should shut.
+- **A parameter whose polarity is unknown reverses nothing, and the result says so**, naming each
+  parameter left alone so the rigger can set its polarity and mirror again. This is the case for a
+  puppet from a third-party tool. Guessing would be wrong for every head-turn parameter in it, and
+  invisible.
+- **A mirror toggles the texture flip on the axis it mirrored**, for every part it reflects. A
+  mirrored mesh over unreversed artwork puts the highlight on the wrong side of the second eye,
+  which is the case the whole sharing arrangement exists to serve — so reflecting a part reflects
+  how it samples its texture, and nothing has to be flipped by hand afterwards. Toggling twice
+  returns the original, which is what makes the rule below consistent with this one.
+- **A mirror preserves vertex index correspondence.** The reflected mesh has the same vertices in
+  the same order, so deformations transfer onto it by position in the list. A mirror that
+  renumbered them would scramble every offset it carried across, silently and unrecoverably.
+- **Mirroring a node in place twice returns the original**, byte for byte — the reflection, the
+  reversed axes and the toggled texture flips all undo each other. This is about mirroring *in
+  place*, not about a mirrored paste, which creates a second node and has nothing to return to.
+- Inochi Creator's mirror-within-one-parameter and "flip the whole rigged eye" are the same
+  operation at two scopes — one binding, or every binding in a subtree.
+
+### Mirror axes **[decided]**
+
+A puppet carries two, defaulting to its centre: the **left–right mirror axis**, which swaps left
+and right, and the **top–bottom mirror axis**, which swaps top and bottom. They are named for what
+they swap rather than for the orientation of the line, because those two namings invert each other
+([vocabulary.md](../vocabulary.md)).
+
+The default is **derived**, not stored, so it cannot go stale as the puppet grows; an axis the
+rigger moves is stored from then on, and moving one is an undoable edit that changes no existing
+node. Every mirrored operation's result names the axis it used. Anything the two axes do not cover
+is a mirror followed by a move, which is the ordinary cost of not having a third mechanism.
+
+### Pasting into a different puppet **[decided]**
+
+Sharing a parameter has no meaning across files, so a paste into another puppet **duplicates,
+always**, and says so rather than offering a mode it cannot honour.
+
+**Artwork arriving by paste deduplicates against the destination**, by content hash, exactly as an
+import does. Pasting a part into a puppet that already holds the same drawing yields one texture,
+not two — otherwise the cheapest route to duplicating artwork would be the one the rigger reaches
+for most.
+
+**A mirrored paste uses the destination's mirror axes**, because the axes belong to the puppet being
+written and not to the one the fragment came from.
+
+**Every identifier is reissued from the destination.** Identifiers are unique within a puppet and
+nothing more ([I3](../invariants.md)), so two unrelated puppets using the same small numbers is the
+normal case. A pasted reference that resolved by number in the destination would be a wrong
+reference in a file that never looked malformed. References from the pasted set to something that
+was not copied follow the kinds the format declares: constitutive, and the paste is refused naming
+what is missing; incidental, and the reference drops.
+
+### Every compound edit reports what it did **[decided]**
+
+Paste, mirror, import and the collection of artwork nothing draws each return a structured result
+naming what was **created, shared, flagged, collected and left unchanged**. This is what makes the
+rest of this section checkable before either application's interface exists, and it is what the
+person is shown.
+
+**An operation that changes something the rigger did not point at must name it.** That is the
+common shape behind the failures this section is built to avoid: a mirror that reverses an axis,
+a paste that couples two sides through one parameter, a re-import that splits artwork two parts
+were sharing, a mesh paste that leaves deformations stale. Each is correct behaviour and each is
+invisible, and a beginner finds out on stream.
 
 ## Meshing **[proposed]**
 

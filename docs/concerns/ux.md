@@ -128,3 +128,13 @@ every cycle. Each entry carries its provenance. See README.md.
 - **A first-time user reaches a moving puppet from a PSD without outside help** — `judgment`
   Human gate on the first end-to-end build. Stays `judgment` permanently. Watch for every point where the tester stops, searches or asks; each becomes an entry.
   Seeded at planning, 2026-11-26.
+
+### Texture lifetime, copy, paste and symmetry
+
+- **A default the rigger did not choose is inspectable before commit and named in the result** — `judgment`
+  → `test` once operations return structured results: the paste component, whether a parameter was shared or duplicated, which mirror axis was used, and which axes a mirror left unreversed. The failure this catches is silent and late — the rigger finds out when both eyes blink together, on stream.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
+
+- **Every term the interface shows is defined in `vocabulary.md` and explained where it first appears** — `script`
+  → a lint over the string catalogue, beside the strict-vocabulary lint. The vocabulary places the onboarding cost on explaining a term at first appearance rather than on a second set of friendlier names, and nothing currently checks that the explanation is there. *Mirror*, *texture flip*, *bilateral* and *unipolar* are the terms this revision adds.
+  Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
