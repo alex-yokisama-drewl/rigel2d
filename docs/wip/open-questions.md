@@ -2,15 +2,14 @@
 
 The agenda: everything still open, grouped by what each one waits on.
 
-**This file was due for deletion once the phase plan was written, and is deliberately kept.**
-[documentation.md](../documentation.md) says it goes when the requirements are agreed and the
-plan exists, which is now. It survives because the grouping below is the thing being kept: the
-questions waiting on the project owner are still waiting, and `scripts/docs-check.sh` lists every
-`[open]` tag without saying which of them anyone can answer. It goes when that group empties.
+**Kept past its deletion date on purpose.** [documentation.md](../documentation.md) retires it
+once the requirements are agreed and a plan exists, which is now. What is being kept is the
+grouping: `scripts/docs-check.sh` lists every `[open]` tag but cannot say which of them anyone
+but the owner can answer. It goes when the first group below empties.
 
 **This file carries no content.** Each line names a question and points at the `[open]` section
 that holds it — that section is the question's home, because it keeps the context the question
-needs and it survives this file being deleted. This file adds only the grouping.
+needs and survives this file being deleted. This file adds only the grouping.
 
 ---
 
@@ -60,24 +59,13 @@ because the API surface is deliberately undesigned.
 |---|---|
 | Read inochi2d's source to see how its bindings actually compose | Deferred by the owner, not dropped. Composition is the named weak point and the incumbent's approach is the most useful remaining input |
 
-## Dimensions swept
+## Not on this list
 
-Every dimension in [concerns/](../concerns/) has now been swept. `accessibility` and `ops` were
-held back pending the stack and were swept on 2026-11-26, once [stack.md](../stack.md) settled.
-Their entries are approved and in place.
+`scripts/docs-check.sh` derives the full `[open]` set from the tags and is the complete list.
+This file is narrower on purpose: it carries the questions that are *waiting on someone*, so
+that the first group above can be read as an agenda. A question that is open but not blocked —
+the runtime's colour convention, the stack's remaining exposures, several rows of
+[puppet-acceptance.md](../requirements/puppet-acceptance.md)'s *Criteria not written* — is real
+and is not here.
 
-The accessibility sweep bit where this file predicted it would: the custom-canvas registration
-convention in [testing.md](../testing.md) turned out to describe a test that cannot fail, which
-is the one piece of it still open above.
-
-**What the sweeps settled, rather than opened.** The owner's answers on 2026-11-26 closed the
-questions about release packaging and the operating-system floors, who tests Windows and on
-what, whether there is a local log and a diagnostics report, what a save does when the file
-changed underneath it, what a relaunch restores after a crash during a load, whether a fallback
-to defaults may overwrite, and whether application configuration is inside the one write path.
-Each now lives as settled text in the document that owns it.
-
-**One answer narrowed a claim rather than widening one.** Canvas manipulation does not have to be
-keyboard-operable, which means the project does not claim WCAG AA overall — it claims it for the
-chrome and states the exemption, in the shape [platform.md](../requirements/platform.md) uses for
-the macOS tier. That is recorded in `concerns/accessibility.md`.
+**The ones that gate the next subsystem are in [plan.md](plan.md)**, under *What blocks S2*.

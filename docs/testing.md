@@ -23,16 +23,16 @@ specific to this one:** the harness, the idioms, and what is deliberately not te
 run by `cargo test --workspace`, and nothing reports it. Each such directory needs a `main.rs` or
 an explicit `[[test]]` entry.
 
-`.claude/test-cmd` holds `cargo test --workspace`. The counter gate runs as its own job: it
+`.claude/test-cmd` holds the command, and is the one place it is written down — the gate list in
+[stack.md](stack.md#on-push-proposed) and CI both run it with `--locked`. The counter gate runs as its own job: it
 compares against a committed baseline rather than passing or failing on its own terms, and
 [platform.md](requirements/platform.md#how-this-is-verified-proposed) explains why that half carries the
 whole frame budget.
 
-**The soak is its own job too, and is excluded from the default run.** Four hours of simulated
-stream is upward of eight hundred thousand frames, which would put minutes onto every ordinary
-`cargo test --workspace`; a suite that slow stops being run, and the soak would be the thing
-switched off. It is marked ignored by default and run on its own schedule — nightly, and before
-a release. [platform.md](requirements/platform.md) sets the length and says why four hours.
+**The soak is its own job too, and is excluded from the default run.** It is marked ignored by
+default and run on its own schedule — nightly, and before a release.
+[platform.md](requirements/platform.md) sets the length, and carries the arithmetic for why a
+suite that slow would simply be switched off.
 
 The growth row is the one that catches accidental quadratic behaviour in deformation
 composition and physics — the failure that makes a tool pleasant on small rigs and useless on

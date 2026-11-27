@@ -63,7 +63,7 @@ Universal entries reference them.
   → `test`: resource creations and pipeline preparation after frame one are zero, for every blend, mask and composite combination the puppet uses.
   Seeded at planning, 2026-11-26.
 - **A soak run at the stated stream length leaves counters and resident bytes flat** — `judgment`
-  → `test`. The stream length is still `[open]` in `docs/requirements/platform.md`.
+  → `test`. The length is four hours, set in `docs/requirements/platform.md`.
   Seeded at planning, 2026-11-26.
 
 ### Memory and loading
