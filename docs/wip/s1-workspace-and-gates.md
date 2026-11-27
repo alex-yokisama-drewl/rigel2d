@@ -17,7 +17,7 @@ intended.
 
 ## Status
 
-**Current task:** 2 — `scripts/test-record.sh` records a result
+**Current task:** 3 — the Linux push-gate workflow, gates 1, 2 and 4
 **Blocked on:** nothing
 
 ---
@@ -151,16 +151,15 @@ The crates live under `crates/`. `rigel-format` has no dependencies at all, whic
 property [stack.md](../stack.md#workspace-proposed) asks for and the thing to re-check whenever
 something is added to it.
 
-### 2. `scripts/test-record.sh` records a result — `todo`
+### 2. `scripts/test-record.sh` records a result — `done`
 
-The script already exists and reads `.claude/test-cmd`, which already holds
-`cargo test --workspace`. Neither has ever run against a workspace. Make it work and record a
-result.
+The script and `.claude/test-cmd` both already existed; neither had run against a workspace.
+Staleness was already handled — the session-start hook compares the newest record's SHA against
+`HEAD` and says so.
 
-**Done when:** the script runs the suite, writes a result keyed by `HEAD`'s SHA in the shape
-`.claude/rules/testing.md` describes, and a second run against a different commit reports the
-earlier result as stale rather than as an error. The suite is empty and the result says so
-honestly — that is what makes "confirmed failing" mean something from S2. No user gate.
+**What was missing:** the record said `passed: true` over a suite with nothing in it. It now
+carries `assertions_run`, and the script says on a zero that a pass means nothing was checked.
+Read that field before trusting a green record, in CI or at a session start.
 
 ### 3. The Linux push-gate workflow — gates 1, 2 and 4 — `todo`
 
@@ -239,6 +238,9 @@ The workspace: `Cargo.toml` at the root, `rust-toolchain.toml` pinning 1.95.0, a
 `Cargo.lock`, and the four crates [stack.md](../stack.md#workspace-proposed) names, each a shell
 with the specified dependency graph wired and nothing implemented.
 
+`scripts/test-record.sh` now records `assertions_run` alongside the pass flag, and says on a zero
+that a pass means nothing was checked.
+
 **Decisions made:**
 - **Gate set, glibc deferral, toolchain pin, committed lockfile and CI provider** — all five are
   in *Decisions* above with their reasons. Two touch `[proposed]` sections and say so.
@@ -249,6 +251,12 @@ with the specified dependency graph wired and nothing implemented.
   entry rather than one discovered during the work.
 
 **Traps:**
+- **A recorded `passed: true` meant "the runner exited 0", not "anything was checked."** With an
+  empty workspace the suite is green and the session-start hook reports it as a result for
+  `HEAD`, so a session would read "tests pass" where nothing existed to pass. This is the failure
+  [concerns/README.md](../concerns/README.md) names — a check that does not exist reads as
+  covered — reached through the result file rather than through a checklist entry. The record
+  now carries `assertions_run`. **Anything reading a result reads that field too.**
 
 **Assumptions:**
 

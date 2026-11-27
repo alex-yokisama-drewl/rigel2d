@@ -34,6 +34,15 @@ status="${PIPESTATUS[0]}"
 set -e
 
 end="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# How many assertions actually ran. A green result over an empty suite is not evidence, and
+# without this the record says "passed" where it means "nothing was checked" — which is the
+# failure docs/concerns/README.md names: a check that does not exist reads as covered.
+# Parsed from the runner's own summary lines; null when the runner is not one we can read.
+ran="$(grep -oE '^test result: [a-zA-Z]+\. [0-9]+ passed; [0-9]+ failed' "$out" \
+        | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' \
+        | awk '{s+=$1} END {if (NR) print s; else print "null"}')"
+[ -n "$ran" ] || ran=null
 tail_out="$(tail -40 "$out" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk '{printf "%s\\n", $0}')"
 
 cat > ".test-results/$sha.json" <<JSON
@@ -43,6 +52,7 @@ cat > ".test-results/$sha.json" <<JSON
   "command": "$(printf '%s' "$cmd" | sed 's/\\/\\\\/g; s/"/\\"/g')",
   "status": $status,
   "passed": $([ "$status" -eq 0 ] && echo true || echo false),
+  "assertions_run": $ran,
   "started": "$start",
   "finished": "$end",
   "tail": "$tail_out"
@@ -53,4 +63,5 @@ rm -f "$out"
 echo
 echo "recorded: .test-results/$sha.json (status $status)"
 [ "$dirty" = true ] && echo "note: working tree was dirty — this result does not describe $sha alone"
+[ "$ran" = "0" ] && echo "note: the suite is empty — a pass here means nothing was checked, not that anything works"
 exit "$status"
