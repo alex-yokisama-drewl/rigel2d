@@ -6,8 +6,8 @@
 # fails the job, which is the check that blocks a merge.
 #
 # Gate 3, the per-frame counters, is absent deliberately. It has no subject until
-# the runtime produces a command stream and the workload generator a puppet to run
-# it against; docs/wip/plan.md puts the committed baseline in S6.
+# the runtime produces a command stream and a committed counter baseline exists.
+# docs/stack.md's *On push* carries the reason.
 #
 # Third-party actions are pinned to a commit hash, not a tag, per the supply-chain
 # entry in docs/concerns/security.md. A tag can be moved; a hash cannot.
@@ -24,7 +24,7 @@ permissions:
 
 concurrency:
   # Keyed so a branch push and that branch's pull_request land in the same group: otherwise
-  # every PR branch runs all three jobs twice, concurrently, on metered runners.
+  # every PR branch runs the whole workflow twice, concurrently, on metered runners.
   group: push-gates-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 

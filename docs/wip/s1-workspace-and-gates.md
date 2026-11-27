@@ -289,6 +289,9 @@ macOS that claims only a build. `scripts/no-outbound.sh` is gate 5.
   needs a decision about cadence.
 
 **Traps:**
+- **A durable file that names a phase subsystem goes stale when the phase ends.** The workflow
+  comment explaining gate 3's absence pointed at `docs/wip/plan.md` and named S6. The reason is
+  phase-independent — no command stream, no committed baseline — and it now says that instead.
 - **A `set -e` script died on a `grep` that matched nothing, and so wrote no record at all.**
   `scripts/test-record.sh` has `pipefail` set and `set -e` restored before the parse, so when
   `cargo` emitted no `test result:` line — which is exactly what a compile error does — the
