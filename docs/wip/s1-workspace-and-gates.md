@@ -17,8 +17,8 @@ intended.
 
 ## Status
 
-**Current task:** 3 — `awaiting approval`. The workflow is in and green; what needs the owner is branch protection
-**Blocked on:** nothing — task 4 can proceed while the gate is open
+**Current task:** 5 — Windows and macOS build jobs. Task 3 is `awaiting approval` on branch protection, which blocks nothing else
+**Blocked on:** nothing
 
 ---
 
@@ -175,17 +175,21 @@ second half is a repository setting only the owner can make. A gate that runs an
 does not block is exactly the failure this task exists to prevent, and it looks identical to a
 working one on the runs page.
 
-### 4. Gate 5 — the no-outbound-connection assertion — `todo`
+### 4. Gate 5 — the no-outbound-connection assertion — `done`
 
-A script over our own source, per `concerns/security.md`. It must fail on an attempt to open an
-outbound connection and say which file did it. Its scope is our code and not a dependency's;
-[decisions.md](../decisions.md) and `wip/open-questions.md` both record that the plugin and
-dependency cases are deliberately unresolved, so the script states its own scope rather than
-implying a stronger claim.
+`scripts/no-outbound.sh`, a deny-list over first-party Rust source, in the workflow.
 
-**Done when:** the script is in the workflow, passes against the empty workspace, and **fails
-against a deliberate violation added and reverted in the same session** — an assertion never
-observed failing is not an assertion. No user gate.
+**Listening is not connecting**, and that is the thing to preserve if the script is ever
+rewritten. Live binds a port and waits for a source
+([performing.md](../requirements/performing.md)); `bind`, `listen`, `accept` and `recv` are
+allowed, and only outbound initiation is refused. A blanket ban on `std::net` would forbid the
+input port Live is specified to open.
+
+The script prints its own scope on every run: it cannot see what a dependency does, so a pass
+means "we did not write one", never "none can happen".
+
+Observed failing on a planted `TcpStream::connect` and passing on a planted `UdpSocket::bind`,
+both reverted.
 
 ### 5. Windows and macOS build jobs — `todo`
 

@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   gates:
-    name: gates 1, 2, 4
+    name: gates 1, 2, 4, 5
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -50,3 +50,6 @@ jobs:
 
       - name: Gate 4 — documentation
         run: ./scripts/docs-check.sh
+
+      - name: Gate 5 — no outbound connection
+        run: ./scripts/no-outbound.sh
