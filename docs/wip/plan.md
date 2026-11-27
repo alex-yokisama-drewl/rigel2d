@@ -72,13 +72,13 @@ measurements are in
 
 ### Raised by the S1 review and not settled
 
-Neither blocks a subsystem. Both are the owner's.
+Nothing here blocks a subsystem. The licence is the owner's; the unadopted entries are for
+`finish-cycle`.
 
 | | |
 |---|---|
 | **The project has no licence** | S1 wrote `MIT OR Apache-2.0` into the workspace manifest without authority and it was removed; nothing in `docs/` settles one, and a manifest is not where that is decided. There is no `LICENSE` file. Due before anything is published |
 | **Proposed checklist entries not adopted** | The S1 review proposed more `docs/concerns/` entries than were approved — a secret scan in CI, a committed fixture set for gate 5, a `Cargo.lock` checksum assertion, a `panic = "abort"` grep, and a container job for the documented setup. They are in the review's record on `feature/s1-workspace-and-gates`. `finish-cycle` should revisit them rather than re-derive them |
-| **`.claude/hooks/pre-commit-guard.sh` picks the wrong feature document** | It takes the first file in `docs/wip/`, so it can name another branch's document, it demands `open-questions.md` once a finish commit stages the deletion of the real one — blocking the very commit [documentation.md](../documentation.md) mandates — and it demands a document on branches that have none. S0's finish commit passed only because it touched nothing outside `docs/`; S1's had to be split in two. **The fix is to derive the document from the branch name**, and it has been written and verified against the cases that must still block. **It needs the owner to apply it**: an agent editing the hook that constrains its own commits is refused, which is the correct shape for that action even when the change is right |
 
 ## Acceptance criteria
 
