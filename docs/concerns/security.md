@@ -94,19 +94,22 @@ Record the threat model, the roles, and anything exempt here on the first planni
   → `script` scanning platform manifests and entitlements, failing on any. **Revisit before plugins ship**: the scan covers our own manifests, and a plugin is not our code.
   Seeded at planning, 2026-11-26.
 - **No outbound network connection is opened** — `judgment`
-  → `script`: `scripts/no-outbound.sh`, run as gate 5. Same caveat as above: the assertion covers our code, so its scope needs restating before plugins ship. **It also reads first-party source and cannot see the dependency graph.** A crate that pulls in an HTTP client transitively is invisible to it, and that is the likeliest way this decision actually breaks. A pass means "we did not write one", never "none can happen". See `docs/decisions.md`.
+  → `script`: `scripts/no-outbound.sh`, run as gate 5. Same caveat as above: the assertion covers our code, so its scope needs restating before plugins ship. **It also reads first-party source and cannot see the dependency graph.** A crate that pulls in an HTTP client transitively is invisible to it, and that is the likeliest way this decision actually breaks. A pass means "we did not write one", never "none can happen". See `docs/decisions.md`. **The other half now exists** — `scripts/locked-graph.sh`, below — so the pair covers both "we did not write one" and "nothing we build on brought one".
+  Covered, S2 task 2, 2026-11-27.
   Seeded at planning, 2026-11-26.
 
 ### Supply chain
 
 - **Dependencies are locked with hashes, CI actions pinned to commit hashes, scan clean or triaged** — `judgment`
-  → `script`. The manifest now exists, and only part of this is covered: `--locked` on every cargo invocation in CI, `Cargo.lock` committed, and `actions/checkout` pinned to a commit hash by hand. Not covered: any check that the pinning stays, a vulnerability scan, and a place to record a triage decision. There are no registry dependencies yet, so the checksum half is satisfied vacuously.
+  → `script`. Now mostly covered: `--locked` on every cargo invocation in CI, `Cargo.lock` committed, `scripts/actions-pinned.sh` checking that the pinning stays, and `scripts/locked-graph.sh` requiring a checksum on every registry dependency — no longer vacuous, since S2 added the first ones. **Still not covered: a vulnerability scan, and a place to record a triage decision.**
   Seeded at planning, 2026-11-26.
 - **Every `uses:` in `.github/workflows/` is pinned to a 40-hex commit SHA** — `script`
-  A check over the workflow files failing on any action ref that is not a full commit hash. The pinning is a comment convention today, and one `@v4` would pass every gate. A tag can be moved; a hash cannot.
+  → `script`: `scripts/actions-pinned.sh`, run as gate 5. Fails on any ref that is not a 40-hex commit hash, and on a tree with no workflow file, so the check cannot pass by having stopped looking. A local `./` action is this repository's own code and is exempt. Scope: the refs named here, never what a pinned action does or what it calls in turn.
+  Covered, S2 task 2, 2026-11-27.
   Seeded at the S1 review, 2026-11-27.
 - **The locked dependency graph contains no network-client crate, and no git or alternative-registry source** — `script`
-  `cargo deny check bans sources`, or a `cargo metadata` check against a deny-list, in CI. This is the only thing that can see what gate 5 cannot, and it binds from the first registry dependency.
+  → `script`: `scripts/locked-graph.sh`, run as gate 5. Reads `Cargo.lock` and refuses a named network client, a TLS stack, a `git+` source, an alternative registry, and a registry dependency carrying no checksum. A TLS stack is refused although it is not itself a client: a project that opens no outbound connection has no use for one, so its arrival is the signal. A deny-list, like `no-outbound.sh`, so it catches the named forms and no others. Chosen over `cargo deny` to add no dependency to the gate itself.
+  Covered, S2 task 2, 2026-11-27.
   Seeded at the S1 review, 2026-11-27.
 - **Signing keys and release tokens are unreachable from pull-request jobs** — `judgment`
   → `script` once releases exist.

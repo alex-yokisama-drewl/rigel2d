@@ -47,14 +47,36 @@ jobs:
       - name: Gate 1 — lint
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      # Through test-record.sh rather than cargo directly, because the next step reads
+      # the record rather than re-running the suite to find out what happened
+      # (.claude/rules/testing.md: test results are state on disk).
       - name: Gate 2 — tests
-        run: cargo test --workspace --locked
+        run: ./scripts/test-record.sh
+
+      # cargo test over a workspace with no test exits zero, so a green gate above is
+      # indistinguishable from a suite that never ran. docs/concerns/ops.md.
+      - name: Gate 2 — the suite was not empty
+        run: ./scripts/tests-ran.sh
+
+      # The committed fixtures are what the acceptance tests assert against, so a
+      # corpus that has drifted from its builder quietly changes what they mean.
+      - name: Gate 2 — the fixture corpus matches its builder
+        run: ./scripts/fixtures-check.sh
 
       - name: Gate 4 — documentation
         run: ./scripts/docs-check.sh
 
       - name: Gate 5 — no outbound connection
         run: ./scripts/no-outbound.sh
+
+      # The other half of gate 5. no-outbound.sh greps first-party source and cannot
+      # see the dependency graph at all; docs/concerns/security.md records that as the
+      # likeliest way the no-outbound decision actually breaks.
+      - name: Gate 5 — the locked graph carries no network client
+        run: ./scripts/locked-graph.sh
+
+      - name: Gate 5 — every action is pinned to a commit hash
+        run: ./scripts/actions-pinned.sh
 
   # docs/stack.md: the build is additionally exercised on Windows and on a hosted
   # macOS runner, "which can say that it builds and that structural assertions pass

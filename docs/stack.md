@@ -175,10 +175,10 @@ for the Windows and macOS builds.
 | | Gate |
 |---|---|
 | 1 | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` |
-| 2 | `cargo test --workspace --locked` — unit and acceptance tests, and the structural UI assertions |
+| 2 | `cargo test --workspace --locked` — unit and acceptance tests, and the structural UI assertions — run through `scripts/test-record.sh`, then `scripts/tests-ran.sh` and `scripts/fixtures-check.sh` |
 | 3 | The per-frame counters against their committed baseline, on the reference and stress puppets |
 | 4 | `scripts/docs-check.sh` |
-| 5 | The no-outbound-connection assertion over our own code |
+| 5 | `scripts/no-outbound.sh` over our own code, `scripts/locked-graph.sh` over the dependency graph, `scripts/actions-pinned.sh` over the workflow files |
 
 Gate 3 is the one that carries the frame budget, and it runs without a GPU — see
 [runtime.md](runtime.md#counters-are-the-requirement-proposed). **It is not wired**, and the
@@ -188,10 +188,28 @@ run on Linux; the build is additionally exercised on Windows and on a hosted mac
 can say that it builds and that structural assertions pass and nothing more
 ([platform.md](requirements/platform.md) is explicit that no stronger macOS claim is founded).
 
-`scripts/no-outbound.sh` runs `--self-test` before every real scan, planting each forbidden and
-each allowed form and asserting the verdict. A deny-list verified only on the day it was written
-will one day be green for the wrong reason; on its first run the self-test caught a live bug in
-the script's own pattern table.
+**Gate 2 is three steps, because a passing suite is not by itself evidence.** `cargo test` over a
+workspace with no test exits zero, so the second step reads the `tests_run` the record carries and
+fails on zero — the entry in [ops.md](concerns/ops.md), bound from the first subsystem with tests
+to lose. The third checks the committed fixture corpus still reproduces from its builder, because
+the acceptance tests assert against those files and a drifted corpus quietly changes what they
+mean. The suite runs through `scripts/test-record.sh` so that the step after it reads a record
+rather than re-running the suite to find out what happened
+([testing.md](../.claude/rules/testing.md) makes results state on disk).
+
+**Gate 5 is three scripts, and the split is the point.** `scripts/no-outbound.sh` greps
+first-party source, so it is structurally blind to the dependency graph: a crate that pulls in an
+HTTP client transitively is invisible to it, which
+[security.md](concerns/security.md) records as the likeliest way the no-outbound decision actually
+breaks. `scripts/locked-graph.sh` is the other half — it refuses a network client, a git source,
+an alternative registry and a registry dependency with no checksum. `scripts/actions-pinned.sh`
+refuses any `uses:` that is not a 40-hex commit hash, because a tag is a mutable pointer in
+somebody else's repository and one `@v4` would otherwise pass every gate here.
+
+**Every one of those scripts runs `--self-test` before its real scan**, planting each forbidden
+and each allowed form and asserting the verdict. A deny-list verified only on the day it was
+written will one day be green for the wrong reason; on its first run `no-outbound.sh`'s self-test
+caught a live bug in the script's own pattern table.
 
 **Trap: branch protection on `master` requires the CI checks by name, as strings.** Renaming a
 workflow job fails nothing — protection simply stops covering it, and the check quietly stops

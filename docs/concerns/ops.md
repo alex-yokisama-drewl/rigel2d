@@ -281,7 +281,8 @@ application open a connection, so it does not touch the rule in
   Seeded at the S1 review, 2026-11-27.
 
 - **Gate 2 fails when the workspace runs zero tests** — `script`
-  CI reads `tests_run` from the recorded result, or counts the runner's summary lines, and fails on zero. Binds from the first subsystem that adds tests; until then an empty suite is the intended state. Without it a green gate 2 over an empty suite is indistinguishable from a passing one.
+  → `script`: `scripts/tests-ran.sh`, run as gate 2's second step. Gate 2 now runs the suite through `scripts/test-record.sh`, and this reads the `tests_run` that record carries. Fails on zero, and equally on `null` or a missing field — a count that cannot be read is the same silent decay as a zero, not a pass. Bound from S2, the first subsystem with tests to lose.
+  Covered, S2 task 2, 2026-11-27.
   Seeded at the S1 review, 2026-11-27.
 
 ### Universal entries that do not apply here **[decided]**

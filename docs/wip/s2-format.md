@@ -18,9 +18,11 @@ untouched.
 
 ## Status
 
-**Current task:** 1 `done`. The encoding promotion that stood between tasks 1 and 3 is `done`
-too — see the section above the task list. **Next: task 2 or task 3, either order.**
+**Current task:** tasks 1 and 2 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 3, the acceptance tests.**
 **Blocked on:** nothing.
+
+**Deferred out of task 1 and now closed:** `scripts/fixtures-check.sh` is wired into gate 2.
 
 **The branch is expected to be red from task 3 until task 7.** Acceptance tests are written
 before the implementation and are confirmed failing by being written
@@ -235,17 +237,28 @@ from `rigged` in exactly one way, so a rejection cannot be attributed to the wro
 fixture declares the current format version unless its name says otherwise. No user gate — this
 is checkable by reading the catalogue against the builder.
 
-### 2. Dependency and workflow gates — `todo`
+### 2. Dependency and workflow gates — `done`
 
 Due with the first registry dependency, not later ([plan.md](plan.md)). A check that every
 `uses:` in `.github/workflows/` is a 40-hex commit SHA, and a check that the locked dependency
 graph contains no network-client crate and no git or alternative-registry source. Both as
 scripts, wired into gate 5's job.
 
-**Done when:** both scripts fail on a deliberately broken input and pass on the tree; gate 5's
-job runs them; the `security` entries they close are marked covered.
-[decisions.md](../decisions.md)'s no-outbound-connection claim stops diverging from what gate 5
-can actually see, which is the point of doing this now. No user gate.
+**Done:** `scripts/actions-pinned.sh` and `scripts/locked-graph.sh`, both wired into gate 5, and
+`scripts/tests-ran.sh` into gate 2 alongside `scripts/fixtures-check.sh` — the latter deferred
+out of task 1 because wiring it needed this same workflow edit. Each carries a `--self-test` that
+plants every forbidden and every allowed form and runs before its real scan, matching
+`no-outbound.sh`; each fails rather than passes when it finds nothing to look at.
+[stack.md](../stack.md#on-push-proposed)'s gate table and the `security` and `ops` entries are
+updated.
+
+Gate 2 now runs the suite through `scripts/test-record.sh` so the step after it reads the record
+rather than re-running the suite — `.claude/rules/testing.md` makes results state on disk. That
+also starts producing the record the release entry in [ops.md](../concerns/ops.md) wants and
+notes nothing yet produces.
+
+**Still open in those entries, deliberately:** a vulnerability scan and a place to record a triage
+decision. Both are `finish-cycle`'s, not this task's.
 
 ### 3. Acceptance tests — `todo`
 
