@@ -115,7 +115,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
 ### Texture lifetime, copy, paste and symmetry
 
 - **Load limits bind every entry in a file, referenced or not and parsed or only carried** — `judgment`
-  → `test`: an oversized texture that no part references, and an authoring-only entry whose declared size and actual size disagree, each refused on Studio's path and on the player's carry-without-parsing path. Data nothing renders is where a limit evasion would be put, because it has no visible effect until it has been allocated.
+  → `test`: an oversized texture that no part references, and a structural entry whose declared size and actual size disagree, each refused on Studio's path and on the player's. Data nothing renders is where a limit evasion would be put, because it has no visible effect until it has been allocated. Revised 2026-11-27: there is no longer a carry-without-parsing path, since the player loads the whole structure.
   Seeded at planning, 2026-11-26, on the texture-lifetime and symmetry revision.
 
 - **Data moved between puppets is renumbered, and no reference crosses by numeric coincidence** — `judgment`
