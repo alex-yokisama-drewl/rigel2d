@@ -18,8 +18,9 @@ untouched.
 
 ## Status
 
-**Current task:** not started
-**Blocked on:** nothing
+**Current task:** 1 `done` and committed. **Next: the encoding promotion below, then task 2.**
+**Blocked on:** nothing — but *see "Before task 3" under Tasks*. Task 3 cannot be dispatched
+until the encoding the fixture builder settled is in [format.md](../format.md).
 
 **The branch is expected to be red from task 3 until task 7.** Acceptance tests are written
 before the implementation and are confirmed failing by being written
@@ -161,7 +162,16 @@ cleanup.
 Approaches discarded during this branch. Not worth a permanent record; worth keeping until the
 branch ends so nobody re-proposes them.
 
-- *(none yet)*
+- **Encoding the node tree as nested `children`.** It is the more legible shape and it is wrong
+  here: a nested tree cannot express a cycle, a second root or no root at all, so `rigged:cycle`,
+  `rigged:two-roots` and `rigged:no-root` would have no fixture and *the tree is acyclic with one
+  root* nothing to reject. The tree is a flat `nodes` array, each node naming its parent by
+  identifier, with the puppet naming its root.
+- **Hand-rolling the whole archive writer to keep the `zip` crate out of the locked graph.** It
+  would shrink the dependency set, and it would remove the only independent check that these
+  files are real zips — which is exactly what task 9's gate rests on. The `zip` crate writes
+  every canonical fixture; hand-assembled bytes are used only where the fixture's purpose is a
+  malformed container, and no library will emit one of those.
 
 ## Caught at gate
 
@@ -172,11 +182,41 @@ What the user caught that automation did not. **Each becomes a checklist entry i
 
 ---
 
+## Before task 3 — the encoding must land in `format.md`
+
+**Read this before dispatching anything.** Task 1 turned up the one thing that changes this
+plan, and it is recorded here rather than inside a task because it sits between them.
+
+[format.md](../format.md) names JSON keys for the physics fields and for extension data **and
+for nothing else**. Encoding `rigged` therefore meant settling the key names, the tree encoding,
+the collection orders, the current version number, the compression per entry kind and the gravity
+default. Those are now settled — by a fixture builder, in `crates/rigel-fixtures/README.md`,
+which is not a document anybody is told to read.
+
+That is the wrong home for them, for the reason [vocabulary.md](../vocabulary.md) gives about
+terms invented by an implementer: they do not propagate, they collide. The next agent to touch
+this subsystem reads `format.md`, finds no key names, and invents a second set.
+
+**So the next commit on this branch promotes that table into [format.md](../format.md)**, under
+the `[proposed]` sections it belongs to, and the builder's README becomes a pointer. It is a
+`doc-writer` job with the routing done first; the full list is in *Decisions made* and
+*Assumptions* below.
+
+It is listed before task 2 only because task 3 depends on it — a test that loads a file has to
+know the encoding, so the acceptance tests cannot be commissioned until this lands. Task 2 is
+independent of it and may go either side.
+
+**The other `Contradicts docs` findings are routed at task 10, not now**, with one exception
+already closed: every member crate now inherits the workspace `license`, so that entry is fixed
+rather than outstanding.
+
+---
+
 ## Tasks
 
 One commit each. Status: `todo` / `awaiting approval` / `done`.
 
-### 1. The hand-authored fixture corpus — `todo`
+### 1. The hand-authored fixture corpus — `done`
 
 `rigged` and every defect variant the in-scope criteria name, built by a committed builder that
 uses **no project code** — third-party zip and JSON only, driven from
@@ -298,12 +338,152 @@ than deleting it.
 
 **Built:**
 
+Task 1. `crates/rigel-fixtures`, a workspace member that depends on no other crate here and
+writes the corpus to a directory given on the command line, and the corpus itself at
+`crates/rigel-format/tests/fixtures`. `scripts/fixtures-check.sh` regenerates into a temporary
+directory and asserts the committed bytes are reproduced exactly; each of its failure paths — a
+changed artifact, a missing one, a stray one — was run against a broken tree.
+`crates/rigel-fixtures/README.md` records the
+encoding decisions the specification left open and is the document tasks 3 to 7 need. The
+builder's own tests check the `rigged` catalogue row clause by clause, the current-version rule
+across the whole corpus, canonical JSON, the differential pairs EXT-8 and VAL-20 rest on, and
+that nothing but `rigged:ext-hostile` carries a path-, URL- or command-shaped string. The corpus
+also carries `catalogue.json`, mapping each catalogue name to its file, the expected load outcome
+and its one distinguishing feature, so a test reaches a fixture by name rather than by path.
+
 **Decisions made:**
+
+- **The current format version is `1.1`.** `rigged:old-version` must declare "an earlier version
+  this build upgrades", and an earlier *minor* exists only if the current one is not the first.
+- **The node tree is a flat `nodes` array with `parent` references and a top-level `root`.** See
+  *Tried and rejected*. Canonical order is depth-first preorder, and order among siblings is draw
+  order; every other collection is ordered by identifier, keypoints by position.
+- **Every JSON key not named by `format.md` is the term `vocabulary.md` sanctions, in
+  `snake_case`.** `format.md` names keys for the physics fields and for extension data and for
+  nothing else, so encoding `rigged` meant choosing the rest. The full list is the table in
+  `crates/rigel-fixtures/README.md` and **it belongs in `format.md`** — nobody but this builder
+  has settled any of it. This touches `format.md`'s `[proposed]` sections throughout.
+- **Compression is Deflate for JSON and Stored for PNG**, at the zip crate's default level pinned
+  by `Cargo.lock`; modification times are 1980-01-01; external attributes are a pinned `0644`.
+  `format.md` requires each of these fixed and names a value for none.
+- **Fixtures beyond those the criteria name.** `format.md`'s validation list states four rules
+  that no criterion gives a fixture: the root being a kind that contains, at most one base driver
+  per parameter, identifiers below the high-water mark, and the reserved zero. Each has one —
+  `root-is-part`, `rigged:two-base-drivers`, `rigged:id-above-high-water-mark`, `rigged:id-zero`.
+  The two criteria [puppet-acceptance.md](../requirements/puppet-acceptance.md#criteria-not-written-open)
+  records as writable and unwritten have theirs — `rigged:two-tracks-one-parameter` and
+  `rigged:no-gravity` — so task 3 has a subject when it writes them. `VAL-23` is table-driven over
+  the containment declaration in both directions, so every pair the table forbids has a fixture
+  and `rigged:containment-permitted` carries every pair it permits in one file.
+- **Dependencies**, all `MIT` or `MIT OR Apache-2.0`: `zip` (the container, default features off
+  to keep bzip2, lzma, zstd, aes-crypto and `time` out of the graph), `flate2` with the pure-Rust
+  backend (zip's and png's deflate, and the bomb's), `png` (texture payloads), `serde_json` (its
+  map is a `BTreeMap`, which is `format.md`'s sorted keys for free), `crc32fast` (the
+  hand-assembled archives). The locked graph gained no network-client crate, no git source and no
+  alternative registry — which is task 2's check, now with a subject.
 
 **Contradicts docs:**
 
+- **`one-part` cannot be what both documents say it is.**
+  [puppet-acceptance.md](../requirements/puppet-acceptance.md) calls it "the smallest valid
+  puppet: one root part, one texture, nothing else"; [format.md](../format.md) says the root is a
+  kind that contains and argues the case from what an import produces. A root part is therefore
+  invalid. The fixture keeps *valid* and wraps the part in a composite, and `root-is-part` is the
+  same file without the wrapper. **`ART-19`'s premise dies with it** — it deletes `one-part`'s
+  root part expecting a tree with no root, and the root is now a composite that survives. `ART-19`
+  is out of scope here, so it is reported rather than fixed.
+- **`rigged`'s catalogue row leaves one texture unreferenced on its plain reading.** Three parts,
+  two of which share a texture, reference two of the three textures. That would put an
+  unreferenced texture in the base fixture, which makes `rigged:orphan-texture` nearly redundant
+  and `COLL-8`'s premise already true in `rigged`. Read instead as four parts — the masking part
+  being its own rather than one of the three — every texture is referenced and
+  `rigged:orphan-texture` is a real variant. The fixture takes that reading; the row should say
+  which it meant.
+- **`format.md` requires every number finite, and JSON cannot express a NaN.** `rigged:nan`
+  therefore carries the bare `NaN` token, which is what a writer that is not ours emits — Python's
+  `json` module does, by default — and is not strict JSON. A strict parser rejects the file
+  before the finiteness rule is reached, so this one rejection may not be able to name an
+  offending identifier the way `VAL-12` asks. The infinity pair uses `1e400`, which is strict JSON
+  and overflows on parse, and those two can.
+- **`format.md` describes no version-upgrade backup**, while `VER-4` and `VER-5` require one and
+  task 7 is scoped to build it. Its version table says a lower minor opens normally and says
+  nothing about upgrading or about writing anything.
+- **`format.md` defines no shape for a track or a keyframe**, while `VAL-26`, carried from
+  `concerns/security.md`, requires "a track's keyframe times, values and blend durations" to be
+  validated. The fixtures carry `blend_duration` per track because the criterion needs a subject.
+- **`format.md` says the puppet's gravity "is absent when it is the default" and never says what
+  the default is.** The fixtures assume `1.0`, matching the per-node multiplier's default.
+- **`format.md` names no file extension for a puppet file**, and nothing else in `docs/` does
+  either. The corpus uses `.rigel2d` as a fixture convention, which decides nothing.
+- **`format.md`'s canonical-zip list asks for "no external attributes".** A zip entry written
+  through a Unix version-made-by always carries some; what the rule protects against is the
+  writing machine's umask, which a pinned `0644` does not carry. Worth a word in the document, so
+  the writer in task 7 is not asked for something no archive can hold.
+- **`testing.md`'s harness table puts acceptance tests in `tests/acceptance/`** without saying
+  whose. The workspace is virtual — there is no root package — so a workspace-level `tests/`
+  directory is not compiled by anything. For S2 they have to live in `crates/rigel-format/tests/`,
+  and the fixtures are committed there with them.
+- **`LIM-1`, `LIM-2` and `LIM-7` cannot be satisfied in this subsystem.** They want a fixture just
+  over each declared load limit; `LIM-4` fixes every limit at four times a `stress` workload
+  dimension; [s2-format.md](s2-format.md) puts that workload out of scope. No limit figure exists
+  to build a fixture against. See *Deferred*.
+- **`rigged:near-limit` serves no in-scope criterion.** Its only consumer is `EDIT-2`, inside the
+  `EDIT-*` surface this subsystem's *Out of scope* table assigns to Studio. It was named as in
+  scope in the assignment given to this task, so it was built, against an invented node-count
+  limit.
+- **`rigged:ext-unknown` and `rigged:ext-declares-plugin` are named by `MSG-1` and `EXT-6` but
+  have no row in the fixture catalogue**, so their contents were inferred. For `EXT-6` the
+  inference matters: `I6` says a puppet may declare it carries data for a named plugin at a named
+  version, and `format.md` defines no mechanism for that beyond the ordinary `x` marker, which
+  already carries an identifier, a version and a human-readable name. The fixture treats the
+  marker as the declaration.
+- **The workspace declared `license` under `[workspace.package]` and no member inherited it**, so
+  the key reached cargo for nothing. **Fixed in task 1's commit** — every member crate now sets
+  `license.workspace = true`. A defect in the licence change that landed on `master` just before
+  this branch opened, found here because `rigel-fixtures` matched the existing crates rather than
+  introducing an inconsistency. Nothing to route at task 10.
+
 **Traps:**
+
+- **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
+  `deflate-flate2` feature on, `SimpleFileOptions::compression_level(Some(6))` fails at runtime
+  with `UnsupportedArchive("Unsupported compression level")`, and so does `Some(9)`. Leaving the
+  level unset gives a deterministic default. This cost real time and the error names nothing.
+- **A node appended to the end of `nodes` silently breaks depth-first preorder** whenever its
+  parent is not the last subtree. Nothing fails; the fixture is simply not canonically ordered,
+  and a later byte-identity criterion would have found it instead. `Doc::push_node` inserts at
+  the end of the parent's run.
+- **`serde_json`'s map is a `BTreeMap` only while `preserve_order` is off.** Any crate anywhere in
+  the graph turning that feature on would de-canonicalise every fixture, through feature
+  unification, with nothing failing. The canonical-JSON test catches it; the hazard is worth
+  knowing before it is diagnosed.
+- **A `:` in a fixture file name fails at checkout on Windows, not at build.** The catalogue's
+  `rigged:<defect>` becomes `rigged.<defect>` on disk. A test asserts it.
 
 **Assumptions:**
 
+- Every JSON key name, the current version, the gravity default, the compression per entry kind
+  and the canonical collection orders, as *Decisions made* records. All unresolved: they belong
+  in `format.md` and were settled by this builder alone.
+- `uvs` are in the texture's **authored** pixel space, which is the reading that makes
+  `format.md`'s cropping paragraph — the record carrying the crop rectangle and the authored
+  dimensions so the runtime can reconstruct the space — do its stated work.
+- `rigged`'s catalogue row describes four parts, not three. See *Contradicts docs*.
+- `PROVISIONAL_NODE_LIMIT`, the figure `rigged:near-limit` sits under, is invented and will be
+  wrong. The builder is committed so the fixture regenerates when the real figure lands.
+
 **Deferred:**
+
+- **A just-over fixture per declared load limit** (`LIM-1`, `LIM-2`, `LIM-7`). The limits do not
+  exist yet and `LIM-4` ties them to a workload S3 generates; a fixture built against a guessed
+  figure would be rebuilt anyway. When the figures land they go in one table in
+  `crates/rigel-fixtures` and the corpus regenerates.
+- **`reference` and `stress`** — S3's generated workloads, out of scope.
+- **`rigged:paired`, `rigged:far-axis`, `source-without-polarity`** — they serve
+  `authoring-acceptance.md` criteria this subsystem puts out of scope.
+- **`rigged:dup-texture`** (`TEX-1`, needs resident-byte accounting, S5), **`rigged:solo-animation`**
+  (`ART-18`, Studio), **`rigged:three-deform`** (`DET-4`, S4).
+- **Wiring `scripts/fixtures-check.sh` into the push gates.** It belongs with task 2, which
+  already edits `.github/workflows/push-gates.yml` and `stack.md`'s gate table; adding a step here
+  would leave that table disagreeing with the workflow. Until it is wired, drift between the
+  committed corpus and its builder is caught only by running the script.

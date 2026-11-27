@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/rigel-fixtures",
     "crates/rigel-format",
     "crates/rigel-runtime",
     "crates/rigel-studio",

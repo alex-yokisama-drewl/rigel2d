@@ -1,0 +1,458 @@
+{
+  "fixtures": [
+    {
+      "expect": "accepted",
+      "file": "rigged.rigel2d",
+      "name": "rigged",
+      "note": "the base valid puppet every other fixture is a variant of"
+    },
+    {
+      "expect": "accepted",
+      "file": "one-part.rigel2d",
+      "name": "one-part",
+      "note": "the smallest valid puppet: a root that contains, one part, one texture"
+    },
+    {
+      "expect": "rejected",
+      "file": "root-is-part.rigel2d",
+      "name": "root-is-part",
+      "note": "the root is a part, which is not a kind that contains"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.deep.rigel2d",
+      "name": "rigged:deep",
+      "note": "a second mesh group inside the first, with a part and a binding of its own"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.physics-chain.rigel2d",
+      "name": "rigged:physics-chain",
+      "note": "the physics subtree extended to a chain of twelve links under one anchor"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.physics-drives-ancestor.rigel2d",
+      "name": "rigged:physics-drives-ancestor",
+      "note": "the binding on the physics-driven parameter moved onto that node's ancestor"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.no-gravity.rigel2d",
+      "name": "rigged:no-gravity",
+      "note": "the puppet's gravity absent, so the default stands"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.near-limit.rigel2d",
+      "name": "rigged:near-limit",
+      "note": "padded to one node under the provisional node-count load limit"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.future-minor.rigel2d",
+      "name": "rigged:future-minor",
+      "note": "a later minor version, licensing an unmarked core field, an unknown node kind and an unfamiliar enumerated value"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.future-minor-nonfinite.rigel2d",
+      "name": "rigged:future-minor-nonfinite",
+      "note": "bytes that read as a non-finite number inside the opaquely preserved material"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.future-minor-nan-interpreted.rigel2d",
+      "name": "rigged:future-minor-nan-interpreted",
+      "note": "a non-finite value in a known numeric field of a later-version file"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.future-minor-polarity-unfamiliar.rigel2d",
+      "name": "rigged:future-minor-polarity-unfamiliar",
+      "note": "an axis polarity value the format does not define, in a later-version file"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.old-version.rigel2d",
+      "name": "rigged:old-version",
+      "note": "an earlier minor version, which this build upgrades on save"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.breaking-version.rigel2d",
+      "name": "rigged:breaking-version",
+      "note": "a later major version, which is a declared break in compatibility"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.ext-unmarked.rigel2d",
+      "name": "rigged:ext-unmarked",
+      "note": "the same extension values with the marker removed, at the current version"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.ext-no-version.rigel2d",
+      "name": "rigged:ext-no-version",
+      "note": "extension data with no declared version"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.ext-no-label.rigel2d",
+      "name": "rigged:ext-no-label",
+      "note": "extension data with no human-readable name"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.unmarked-core-data.rigel2d",
+      "name": "rigged:unmarked-core-data",
+      "note": "a key the core format does not define, outside `x`"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-moved.rigel2d",
+      "name": "rigged:ext-moved",
+      "note": "`rigged`'s two extension namespaces written in the other order"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-unknown.rigel2d",
+      "name": "rigged:ext-unknown",
+      "note": "a further extension namespace no build understands, with its own name and version"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-declares-plugin.rigel2d",
+      "name": "rigged:ext-declares-plugin",
+      "note": "a declaration that the file carries data for a named extension at a named version"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-references-texture.rigel2d",
+      "name": "rigged:ext-references-texture",
+      "note": "extension data in an unreadable namespace that also names a referenced texture"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-hostile.rigel2d",
+      "name": "rigged:ext-hostile",
+      "note": "path-, URL-, command- and format-string-shaped values in every string-bearing field"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.cycle.rigel2d",
+      "name": "rigged:cycle",
+      "note": "the head of the physics chain reparented under its own child"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.no-root.rigel2d",
+      "name": "rigged:no-root",
+      "note": "the puppet names no root"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.two-roots.rigel2d",
+      "name": "rigged:two-roots",
+      "note": "a second node with no parent beside the root"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.dangling-node-ref.rigel2d",
+      "name": "rigged:dangling-node-ref",
+      "note": "a mask naming a node that is not there"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.dangling-texture-ref.rigel2d",
+      "name": "rigged:dangling-texture-ref",
+      "note": "a part naming a texture that is not there"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.dangling-param-ref.rigel2d",
+      "name": "rigged:dangling-param-ref",
+      "note": "a binding naming a parameter that is not there"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.part-with-child.rigel2d",
+      "name": "rigged:part-with-child",
+      "note": "a part contains a part"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.part-contains-mesh-group.rigel2d",
+      "name": "rigged:part-contains-mesh-group",
+      "note": "a part contains a mesh group"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.part-contains-composite.rigel2d",
+      "name": "rigged:part-contains-composite",
+      "note": "a part contains a composite"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.part-contains-physics.rigel2d",
+      "name": "rigged:part-contains-physics",
+      "note": "a part contains a physics node"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-contains-part.rigel2d",
+      "name": "rigged:physics-contains-part",
+      "note": "a physics node contains a part"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-contains-mesh-group.rigel2d",
+      "name": "rigged:physics-contains-mesh-group",
+      "note": "a physics node contains a mesh group"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-contains-composite.rigel2d",
+      "name": "rigged:physics-contains-composite",
+      "note": "a physics node contains a composite"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.containment-permitted.rigel2d",
+      "name": "rigged:containment-permitted",
+      "note": "every container-and-child pair the containment table permits, in one file"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.keypoints-unordered.rigel2d",
+      "name": "rigged:keypoints-unordered",
+      "note": "a keypoint out of order along its axis"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.keypoint-outside-declared-range.rigel2d",
+      "name": "rigged:keypoint-outside-declared-range",
+      "note": "a keypoint past the range its parameter declares"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.no-neutral-keypoint.rigel2d",
+      "name": "rigged:no-neutral-keypoint",
+      "note": "a parameter with no neutral keypoint"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.two-neutral-keypoints.rigel2d",
+      "name": "rigged:two-neutral-keypoints",
+      "note": "a parameter with two neutral keypoints"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.missing-polarity.rigel2d",
+      "name": "rigged:missing-polarity",
+      "note": "a parameter axis declaring no polarity at all"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.polarity-value-unfamiliar.rigel2d",
+      "name": "rigged:polarity-value-unfamiliar",
+      "note": "an axis polarity value the format does not define, at the current version"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.unknown-enum-unmarked.rigel2d",
+      "name": "rigged:unknown-enum-unmarked",
+      "note": "an unfamiliar value in a known enumerated field, at the current version"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.binding-count-mismatch-unmarked.rigel2d",
+      "name": "rigged:binding-count-mismatch-unmarked",
+      "note": "a deformation binding whose value count no longer matches its mesh, unmarked"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.binding-count-mismatch-marked-stale.rigel2d",
+      "name": "rigged:binding-count-mismatch-marked-stale",
+      "note": "the same mismatch, marked stale — the valid case"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.binding-count-match-marked-stale.rigel2d",
+      "name": "rigged:binding-count-match-marked-stale",
+      "note": "a binding marked stale whose value count does match its mesh"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.keyframes-unordered.rigel2d",
+      "name": "rigged:keyframes-unordered",
+      "note": "a track's keyframes out of order in time"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.keyframe-outside-declared-range.rigel2d",
+      "name": "rigged:keyframe-outside-declared-range",
+      "note": "a keyframe value past the range its parameter declares"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.blend-duration-negative.rigel2d",
+      "name": "rigged:blend-duration-negative",
+      "note": "a track's blend duration below zero"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.two-tracks-one-parameter.rigel2d",
+      "name": "rigged:two-tracks-one-parameter",
+      "note": "one animation carrying two tracks for one parameter"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.two-base-drivers.rigel2d",
+      "name": "rigged:two-base-drivers",
+      "note": "one parameter fed by a channel mapping and a physics output at once"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.nan.rigel2d",
+      "name": "rigged:nan",
+      "note": "a number this build interprets that is not a number"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.positive-infinity.rigel2d",
+      "name": "rigged:positive-infinity",
+      "note": "a number this build interprets that overflows to positive infinity"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.negative-infinity.rigel2d",
+      "name": "rigged:negative-infinity",
+      "note": "a number this build interprets that overflows to negative infinity"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.nonfinite-after-narrowing.rigel2d",
+      "name": "rigged:nonfinite-after-narrowing",
+      "note": "a value finite at 64 bits and infinite at the precision evaluation uses"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.dup-id-same-kind.rigel2d",
+      "name": "rigged:dup-id-same-kind",
+      "note": "two parameters sharing an identifier"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.dup-id-cross-kind.rigel2d",
+      "name": "rigged:dup-id-cross-kind",
+      "note": "a node and a texture sharing an identifier"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.id-above-high-water-mark.rigel2d",
+      "name": "rigged:id-above-high-water-mark",
+      "note": "an identifier above the high-water mark the puppet records"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.id-zero.rigel2d",
+      "name": "rigged:id-zero",
+      "note": "an entity carrying the reserved identifier zero"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-length-zero.rigel2d",
+      "name": "rigged:physics-length-zero",
+      "note": "`length` at zero"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-length-negative.rigel2d",
+      "name": "rigged:physics-length-negative",
+      "note": "`length` negative"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-frequency-zero.rigel2d",
+      "name": "rigged:physics-frequency-zero",
+      "note": "`frequency` at zero"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-frequency-negative.rigel2d",
+      "name": "rigged:physics-frequency-negative",
+      "note": "`frequency` negative"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-gravity-negative.rigel2d",
+      "name": "rigged:physics-gravity-negative",
+      "note": "`gravity` negative"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-angle-damping-negative.rigel2d",
+      "name": "rigged:physics-angle-damping-negative",
+      "note": "`angle_damping` negative"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.physics-length-damping-negative.rigel2d",
+      "name": "rigged:physics-length-damping-negative",
+      "note": "`length_damping` negative"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.orphan-texture.rigel2d",
+      "name": "rigged:orphan-texture",
+      "note": "a fourth texture no part references"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.texture-payload-corrupt.rigel2d",
+      "name": "rigged:texture-payload-corrupt",
+      "note": "one texture payload present and undecodable"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.flipped-pair.rigel2d",
+      "name": "rigged:flipped-pair",
+      "note": "three parts sharing one texture with none, one and both flip axes set"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.decompression-bomb.rigel2d",
+      "name": "rigged:decompression-bomb",
+      "note": "an entry declaring 1 KiB and expanding to 256 MiB"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.entry-name-overlong.rigel2d",
+      "name": "rigged:entry-name-overlong",
+      "note": "an entry name 65535 bytes long"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.duplicate-entry-names.rigel2d",
+      "name": "rigged:duplicate-entry-names",
+      "note": "two entries named `puppet.json`, with different contents"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.overlapping-local-header-data.rigel2d",
+      "name": "rigged:overlapping-local-header-data",
+      "note": "a central-directory offset landing inside another entry's data"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.undefined-entry-name.rigel2d",
+      "name": "rigged:undefined-entry-name",
+      "note": "an entry the format's table does not define"
+    }
+  ],
+  "version": {
+    "major": 1,
+    "minor": 1
+  }
+}
