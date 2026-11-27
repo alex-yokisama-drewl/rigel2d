@@ -4,9 +4,9 @@ A free and open-source 2D vtubing toolkit. **The editor** builds a layered drawi
 animated puppet; **the player** performs that puppet live from tracking input into streaming
 software. Same ground as Inochi Creator and Inochi Session, aimed at beginners and smaller
 streamers on weak hardware. Both applications and the runtime they share live in this
-repository. Nothing is built yet, beyond one throwaway spike. Requirements are complete;
-technical design has settled the format, the evaluation pass, the scene, the runtime's
-boundaries and the stack. Phase 1 is in flight (`docs/wip/plan.md`); there is no production code.
+repository. The workspace builds and the push gates run; no production code is implemented yet.
+Requirements are complete; technical design has settled the format, the evaluation pass, the
+scene, the runtime's boundaries and the stack. Phase 1 is in flight (`docs/wip/plan.md`).
 
 The project is **Rigel2D**; the two applications are **Studio** and **Live**.
 
@@ -31,8 +31,8 @@ attempted is project configuration, not an agent's judgment call.
 
 | | |
 |---|---|
-| Install | `cargo build --workspace`, with rustup installed; the compiler is the one `rust-toolchain.toml` pins — **neither the workspace nor that file exists yet**; the plan's S1 creates both |
-| Run locally | `cargo run -p rigel-studio`, `cargo run -p rigel-live` — same caveat: those crates do not exist yet |
+| Install | `cargo build --workspace`, with rustup installed; the compiler is the one `rust-toolchain.toml` pins. Linux needs `curl build-essential` and nothing else yet |
+| Run locally | `cargo run -p rigel-studio`, `cargo run -p rigel-live` — both are shells that print and exit |
 | Tests | `scripts/test-record.sh` (reads `.claude/test-cmd`) |
 | Documentation check | `scripts/docs-check.sh` |
 

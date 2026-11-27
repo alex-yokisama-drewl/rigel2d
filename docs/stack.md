@@ -103,20 +103,28 @@ thing a third party can run.
 
 ## Running locally **[proposed]**
 
-**Unverified.** Nothing is built yet, so these steps describe the intended shape rather than a
-path anyone has walked. The ops checklist entry that asserts this document works when followed
-literally cannot pass until there is something to run; the first feature to land code is what
-makes these steps real, and it must correct them here.
+**Walked on a clean Ubuntu 24.04 container with nothing preinstalled**, rather than remembered.
 
 ```
-cargo build --workspace              # with rustup installed: the compiler is the one rust-toolchain.toml pins
+sudo apt install curl build-essential   # rustup arrives over https; cargo needs a linker
+curl -sSf https://sh.rustup.rs | sh     # installs the toolchain rust-toolchain.toml pins
+cargo build --workspace
 cargo run -p rigel-studio
 cargo run -p rigel-live
 ```
 
-Linux additionally needs the usual Wayland or X11 development headers and a Vulkan loader; the
-exact package list belongs here once it has been established on a clean machine rather than
-remembered.
+rustup installs the pinned toolchain itself on the first `cargo` command, so no version is named
+here and none goes stale.
+
+**That package list is a floor and it will grow.** It was established against a workspace whose
+crates have no dependencies at all. The Wayland or X11 development headers and the Vulkan loader
+are pulled in by the windowing and GPU dependencies, which do not exist yet; whichever subsystem
+adds them establishes their packages the same way and extends the list here.
+
+**A container is not a desktop.** The walk establishes that the build and these commands work
+from nothing. It says nothing about a display server, a GPU driver or a compositor — which is
+where the render surface described above actually lives, and where the S0 spike found that the
+interesting failures are.
 
 ## Configuration **[proposed]**
 

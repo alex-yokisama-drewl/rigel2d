@@ -17,7 +17,7 @@ intended.
 
 ## Status
 
-**Current task:** 6 — correct *Running locally* and *Running it*. Task 3 is `awaiting approval` on branch protection, which blocks nothing else
+**Current task:** 7 — discard the S0 spike scaffolding. Tasks 3 and 6 are each `awaiting approval`, on separate questions
 **Blocked on:** nothing
 
 ---
@@ -200,23 +200,21 @@ stronger claim than it makes, and [platform.md](../requirements/platform.md) is 
 stronger macOS claim is founded. The structural UI assertions that `stack.md` expects here join
 when there is a surface to assert against.
 
-### 6. Correct *Running locally* and *Running it* — `todo`
+### 6. Correct *Running locally* and *Running it* — `awaiting approval`
 
-[stack.md](../stack.md#running-locally-proposed) asks for the Linux package list "established on
-a clean machine rather than remembered", and carries an **Unverified** warning that this task
-removes. `CLAUDE.md`'s *Running it* table currently says the workspace and `rust-toolchain.toml`
-do not exist; after task 1 they do, and both documents move together.
+**Walked** on a clean `ubuntu:24.04` container. The documented path needed `curl` and
+`build-essential` and nothing else: the first walk failed on `linker cc not found`, which is the
+kind of thing remembering does not produce. Every command in the block was run, including both
+`cargo run` targets.
 
-The walk is done in a container with nothing preinstalled, which establishes the package list
-honestly. **A container is not a desktop**: it says nothing about a real install with a display
-server and a GPU driver.
+**The list is a floor.** The crates have no dependencies, so nothing yet pulls in the Wayland or
+X11 headers or the Vulkan loader. Both documents say so rather than implying the list is final.
 
-**Done when:** both documents describe steps that were walked, and the
-`ops` entry *The project runs locally from its documented setup* has something true to bind to.
-**Needs the user's eyes.** What to look at: the package list, on your own clean install if you
-have one to spare — a container cannot tell you whether a real desktop needs something it already
-had. What would count as wrong: a package that turns out to be unnecessary, or a missing one that
-the container happened not to need.
+**`awaiting approval`.** What to look at: the package list in
+[stack.md](../stack.md#running-locally-proposed), against your own clean install if you have one
+to spare. What would count as wrong: a package listed that turns out to be unnecessary, or one
+missing that the container happened already to have. A container has no display server, no GPU
+driver and no compositor, so it cannot speak for any of those.
 
 ### 7. Discard the S0 spike scaffolding — `todo`
 
@@ -251,11 +249,25 @@ that a pass means nothing was checked.
   in *Decisions* above with their reasons. Two touch `[proposed]` sections and say so.
 
 **Contradicts docs:**
-- `CLAUDE.md`'s *Running it* table and `stack.md`'s *Running locally* both describe a path nobody
-  has walked. Task 6 is the correction; recorded here because it is a known contradiction on
-  entry rather than one discovered during the work.
+- `CLAUDE.md`'s *Running it* table and `stack.md`'s *Running locally* both described a path
+  nobody had walked. Corrected in task 6, from a container walk.
+- **`stack.md`'s *On push* gives gate 1 as `cargo clippy -- -D warnings`.** On a workspace root
+  that lints neither the other members nor any test target. The workflow runs
+  `--workspace --all-targets`, which is what the gate is understood to mean. The document's
+  shorthand is weaker than its intent.
+- **`concerns/ops.md`'s *The project runs locally from its documented setup* is tagged `test`,
+  and no test exists.** The container walk in task 6 was done by hand. `concerns/README.md` is
+  explicit that a `script` or `test` tag whose check does not exist "reads as covered", so this
+  entry is currently making a promise nothing keeps. Automating the walk is a CI job that
+  installs an OS and a toolchain on every run, which is why it was not simply added here — it
+  needs a decision about cadence.
 
 **Traps:**
+- **The documented build needed a package nobody had written down.** `cargo build` on a clean
+  Ubuntu fails with `linker cc not found`; `build-essential` was never in `stack.md` because
+  every machine that had ever run the command already had it. This is the whole argument for the
+  `ops` entry that says the instructions are followed literally on a clean environment rather
+  than remembered.
 - **A recorded `passed: true` meant "the runner exited 0", not "anything was checked."** With an
   empty workspace the suite is green and the session-start hook reports it as a result for
   `HEAD`, so a session would read "tests pass" where nothing existed to pass. This is the failure
@@ -266,6 +278,9 @@ that a pass means nothing was checked.
 **Assumptions:**
 
 **Deferred:**
+- **The Linux package list beyond `curl build-essential`**, to whichever subsystem first depends
+  on windowing or the GPU. Nothing pulls those in yet, so a list naming them now would be
+  remembered rather than established — the exact failure task 6 exists to prevent.
 - **The glibc 2.31 floor**, to the release job. See *Decisions*.
 - **Gate 3, the counter gate**, to S5 and S6, which create its subject and its baseline.
 
