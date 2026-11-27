@@ -2,14 +2,15 @@
 //!
 //! No GPU, no window, no toolkit — see `docs/stack.md`.
 //!
-//! # This is a contract, not an implementation
+//! # This was a contract, and is being filled in
 //!
-//! Every function body in this crate is `unimplemented!()`. The surface was
-//! declared by `acceptance-planner` from the criteria in
+//! The surface was declared by `acceptance-planner` from the criteria in
 //! `docs/requirements/puppet-acceptance.md`, before any implementation existed and
 //! without sight of one, so that the acceptance tests in `tests/acceptance/` have
 //! something to compile against. Tasks 4 to 7 of `docs/wip/s2-format.md` fill it
-//! in.
+//! in. **The writer and the validator's algorithm are still `unimplemented!()`**
+//! — [`save`] is task 7 and [`validate`] and [`validate_file`] are task 6 — so a
+//! load that gets as far as validating panics there rather than returning.
 //!
 //! Each item says what it must do and names the criterion that drives it. Where
 //! this surface and a criterion disagree, **the criterion wins** — this crate is
@@ -34,7 +35,10 @@
 
 #![forbid(unsafe_code)]
 
+mod archive;
 pub mod containment;
+mod decode;
+mod json;
 pub mod limits;
 pub mod load;
 pub mod puppet;
@@ -43,15 +47,16 @@ pub mod validate;
 pub mod version;
 
 pub use containment::{NodeKind, may_be_root, may_contain};
-pub use limits::{LimitKind, declared_limit};
+pub use limits::{Basis, Figure, LimitKind, declared_limit};
 pub use load::{
     ArchiveFault, ExtensionNotice, LoadReport, Loaded, Rejection, VersionGap, load, read_version,
 };
 pub use puppet::{
     Animation, Axis, AxisPolarity, Binding, BindingKind, BindingValues, ChainDeformer,
     ChannelMapping, CompositionMode, ExtensionEntry, Extensions, Id, Joint, Keyframe, Keypoint,
-    Mesh, MeshGroup, Node, NodeBody, OutputSource, Parameter, Part, PhysicsNode, Provenance,
-    Puppet, ResponseCurve, TextureFlip, TextureRecord, Track, Transform,
+    Mesh, MeshGroup, Node, NodeBody, OpaqueNode, OutputSource, Parameter, Part, PhysicsNode,
+    Preserved, PreservedMembers, Provenance, Puppet, ResponseCurve, TextureFlip, TextureRecord,
+    Track, Transform,
 };
 pub use save::{SaveError, SaveOutcome, SaveStep, save, save_as, save_with_injected_failure};
 pub use validate::{

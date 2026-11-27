@@ -70,6 +70,103 @@ pub struct Puppet {
     /// Marked, namespaced values the core format does not define, carried on the
     /// puppet itself.
     pub extensions: Extensions,
+    /// Everything a file declaring a **later minor version** carried that this
+    /// build has no code for, kept so that it survives a save untouched
+    /// (`VER-1`, `VER-6`, `EXT-7`, `TOOL-4`).
+    ///
+    /// Empty for a file at this version or an earlier one, where the same
+    /// material is invalid rather than preserved
+    /// ([`crate::Rule::UnmarkedData`], `EXT-8`).
+    pub preserved: Preserved,
+}
+
+/// Material a later-version file carried that this build has no code for.
+///
+/// `docs/format.md`: *the loader keeps the parsed source alongside its typed
+/// structures rather than discarding it. That is a cost paid on every load, and
+/// it is the mechanism the whole preserve-what-you-do-not-understand rule rests
+/// on.* This is that parsed source, reduced to the parts the typed structures
+/// have nowhere to put.
+///
+/// It hangs off [`Puppet`] rather than off each entity **because the acceptance
+/// suite constructs [`Node`], [`Part`], [`Parameter`] and their neighbours by
+/// struct literal**, so a field added to any of them would force an edit to a
+/// test. Keying on the owner's identifier costs nothing by comparison: every
+/// entity a puppet contains carries one, uniquely ([I3](../../../docs/invariants.md)).
+///
+/// Contents are verbatim and position is canonical, which is the pair `EXT-4`
+/// asserts: the bytes are what arrived, and where they are written is set by the
+/// canonical ordering rather than by where they were found.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Preserved {
+    /// Members of an object that the core format does not define, located by the
+    /// identifier of the entity that carried them — the puppet's own identifier
+    /// for the puppet object itself. Ordered by owner, then by name.
+    pub members: Vec<PreservedMembers>,
+    /// Whole node entries of a kind this build does not know, in the order they
+    /// arrived. **Not** members of [`Puppet::nodes`]: an unknown kind is opaque
+    /// material rather than a reported entity (`EXT-7`).
+    pub opaque_nodes: Vec<OpaqueNode>,
+}
+
+impl Preserved {
+    /// Whether nothing was preserved at all, which is the ordinary case.
+    pub fn is_empty(&self) -> bool {
+        self.members.is_empty() && self.opaque_nodes.is_empty()
+    }
+
+    /// The members preserved at one place inside one entity.
+    ///
+    /// `path` is empty for the entity's own object — see
+    /// [`PreservedMembers::path`].
+    pub fn at(&self, owner: Id, path: &[&str]) -> &[(String, Vec<u8>)] {
+        self.members
+            .iter()
+            .find(|entry| {
+                entry.owner == owner
+                    && entry.path.len() == path.len()
+                    && entry.path.iter().zip(path).all(|(held, want)| held == want)
+            })
+            .map(|entry| entry.members.as_slice())
+            .unwrap_or_default()
+    }
+}
+
+/// The members one object inside one entity carried that the core format does
+/// not define.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreservedMembers {
+    /// The entity that carried them — the one whose identifier the stored
+    /// object declares, which is what makes this survive the entity being
+    /// reordered ([I3](../../../docs/invariants.md)).
+    pub owner: Id,
+    /// Where inside that entity's object they sat: empty for the object
+    /// itself, `["transform"]` for its transform, `["axes", "1"]` for its
+    /// second axis. A step is a member name, or an array position spelled in
+    /// decimal — which of the two is never in doubt, because the shape at each
+    /// step is one the core format defines.
+    ///
+    /// Only two arrays here are addressed by position, `axes` and `keyframes`,
+    /// and both are positional in the format already. Everything else a puppet
+    /// holds carries an identifier and is addressed by [`PreservedMembers::owner`].
+    pub path: Vec<String>,
+    /// `(name, the value's canonical JSON text)`, ordered by name. The text is
+    /// never reparsed through our own number formatter, because values we by
+    /// definition do not understand would be damaged silently (`EXT-9`).
+    pub members: Vec<(String, Vec<u8>)>,
+}
+
+/// One node entry of a kind this build does not know.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpaqueNode {
+    /// The identifier the entry carries. Read **only** to place the entry back
+    /// in the canonical order, never to resolve anything: nothing in the puppet
+    /// may reference a node this build cannot interpret.
+    pub id: Id,
+    /// The parent the entry names, read for the same reason and no other.
+    pub parent: Id,
+    /// The whole entry, as canonical JSON text.
+    pub source: Vec<u8>,
 }
 
 impl Puppet {
@@ -678,6 +775,7 @@ mod tests {
                 payload: Vec::new(),
             }],
             extensions: Extensions::default(),
+            preserved: Preserved::default(),
         }
     }
 

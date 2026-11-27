@@ -86,6 +86,44 @@ pub enum Rule {
     PhysicsConstantWithinRange,
 }
 
+impl Rule {
+    /// The rule's name, as a person and a test can both read it.
+    ///
+    /// Added by task 5 because every rejection the reader produces has to name
+    /// its rule ([`Rejection::rule_name`], `VAL-12`), and the reader reaches
+    /// three rules of its own before the validator runs at all.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Rule::IdentifiersUnique => "identifiers-unique",
+            Rule::IdentifierWithinHighWaterMark => "identifier-within-high-water-mark",
+            Rule::IdentifierZeroReserved => "identifier-zero-reserved",
+            Rule::TreeAcyclic => "tree-acyclic",
+            Rule::ExactlyOneRoot => "exactly-one-root",
+            Rule::RootIsAKindThatContains => "root-is-a-kind-that-contains",
+            Rule::Containment => "containment",
+            Rule::ReferenceResolves => "reference-resolves",
+            Rule::KeypointsOrdered => "keypoints-ordered",
+            Rule::KeypointWithinDeclaredRange => "keypoint-within-declared-range",
+            Rule::ExactlyOneNeutralKeypoint => "exactly-one-neutral-keypoint",
+            Rule::AxisPolarityDeclared => "axis-polarity-declared",
+            Rule::EnumeratedValueKnown => "enumerated-value-known",
+            Rule::UnmarkedData => "unmarked-data",
+            Rule::ExtensionDeclaresVersion => "extension-declares-version",
+            Rule::ExtensionDeclaresName => "extension-declares-name",
+            Rule::AtMostOneBaseDriver => "at-most-one-base-driver",
+            Rule::BindingValueCountAgreesWithStaleMark => {
+                "binding-value-count-agrees-with-stale-mark"
+            }
+            Rule::NumbersFinite => "numbers-finite",
+            Rule::KeyframesOrdered => "keyframes-ordered",
+            Rule::KeyframeWithinDeclaredRange => "keyframe-within-declared-range",
+            Rule::BlendDurationNonNegative => "blend-duration-non-negative",
+            Rule::AtMostOneTrackPerParameter => "at-most-one-track-per-parameter",
+            Rule::PhysicsConstantWithinRange => "physics-constant-within-range",
+        }
+    }
+}
+
 /// One broken rule, with enough to act on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Violation {

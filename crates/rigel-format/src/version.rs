@@ -1,5 +1,13 @@
 //! The format version, which `rigel2d.json` carries on its own.
 
+/// The format name `rigel2d.json` declares beside the version.
+///
+/// `docs/format.md`: that entry carries *the format name and version, and
+/// nothing else*. A reader checks it so that a zip which happens to hold a
+/// `rigel2d.json` is refused for what it is rather than part-way through the
+/// parse.
+pub const FORMAT_NAME: &str = "rigel2d-puppet";
+
 /// The two numbers `rigel2d.json` holds.
 ///
 /// `docs/format.md`, *The version is readable on its own*: a major that differs

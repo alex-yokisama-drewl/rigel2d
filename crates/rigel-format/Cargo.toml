@@ -6,15 +6,20 @@ rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
 
-# Used only by the acceptance suite, which reads the archives this crate writes
-# and the fixtures it is tested against. Deliberately not dependencies: the
-# library itself must not reach for a JSON or zip crate on the strength of what a
-# test wanted, and these versions and features match crates/rigel-fixtures so the
-# locked graph gains nothing.
-[dev-dependencies]
+# The container and its deflate backend. Promoted out of dev-dependencies by
+# task 5: the reader has to open the archive the format is, and hand-rolling a
+# zip reader would put a second opinion about what a zip is between us and the
+# `zip` crate that writes every fixture. Same versions and features as
+# crates/rigel-fixtures, so the locked graph gains nothing.
+[dependencies]
 zip = { version = "9.8.2", default-features = false, features = ["deflate-flate2"] }
 # zip's "deflate-flate2" brings flate2 without choosing a backend; rust_backend is
-# the pure-Rust one, so no C toolchain and no system zlib. Same selection as
-# crates/rigel-fixtures.
+# the pure-Rust one, so no C toolchain and no system zlib.
 flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
+
+# Used only by the acceptance suite, which reads the archives this crate writes
+# and the fixtures it is tested against. The library parses JSON with its own
+# reader in `json.rs`, because preserving a stranger's numbers verbatim means
+# never passing them through anybody's float formatter.
+[dev-dependencies]
 serde_json = "1.0.154"

@@ -18,12 +18,15 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 to 4 are `done`, as is the encoding promotion that stood between
-tasks 1 and 3 — see the section above the task list. **Next: task 5, the reader.**
+**Current task:** tasks 1 to 5 are `done`, as is the encoding promotion that stood between
+tasks 1 and 3 — see the section above the task list. **Next: task 6, the validator.**
 **Blocked on:** nothing.
 
 **Gate 2 is red from here**, as designed: task 3 wrote the acceptance tests against a declared
 surface whose every body is `unimplemented!()`, and they fail. Tasks 4 to 7 turn them green.
+After task 5 every remaining failure but one is at an `unimplemented!()` in `validate.rs`; the
+one that is not is `EXEC-5`, which catches the same panic and reports it as an assertion of its
+own. Task 5's handoff carries the table.
 
 **Deferred out of task 1 and now closed:** `scripts/fixtures-check.sh` is wired into gate 2.
 
@@ -161,6 +164,19 @@ cleanup.
   registry dependencies, whose licences must stay compatible with it.
 - **A red gate 2 between tasks 3 and 7 is expected**, for the reason under *Status*. If it is
   still red at task 8, that is a defect.
+- **`PHYS-4`'s test was narrowed to its own criterion.** It asserted
+  `loaded.report.warnings.is_empty()` for `rigged`, while `MSG-1` asserts the warnings for
+  `rigged:ext-unknown` are **not** empty — and `rigged:ext-unknown` is `rigged` plus one more
+  namespace. `rigged` already carries extension data no build understands, at two places in the
+  tree, because [the fixture catalogue](../requirements/puppet-acceptance.md#the-fixtures-proposed)
+  requires it. **The two tests could not both pass**, whatever the implementation did.
+  `MSG-1` is faithful to its criterion; `PHYS-4`'s criterion says the node driving nothing is
+  *neither rejected, nor reported as a defect, nor repaired* — a claim about that node, not about
+  the whole load. The assertion now says exactly that: the driverless node appears in no defect
+  list and no warning names it. The second of the two test edits on this branch, and the same
+  class as the first — an assertion that was false by construction of the fixture, corrected
+  rather than relaxed. `PHYS-4` still fails, at the validator, with its peers.
+
 - **`EXT-8`'s test was corrected, not relaxed.** It read node `11` for material the fixtures
   carry on node `12`, so its own opening assertion — *the fixtures carry the material this
   criterion is about* — failed and the criterion tested nothing. It now finds the node by the key
@@ -344,7 +360,7 @@ looks over-engineered until you need it: `VAL-24`, `VAL-25` and `LIM-1` each req
 "declared, and forbidden" from "nobody declared this", which is the whole point of each of the
 criteria named above.
 
-### 5. The reader — `todo`
+### 5. The reader — `done`
 
 Archive and manifest, the version gate (`rigel2d.json` read on its own, before any load limit is
 at risk), load limits enforced **before allocating**, and the parsed source kept alongside the
@@ -354,23 +370,65 @@ typed structures so unknown material survives. Treats the file as hostile throug
 structurally — a failed load cannot have replaced anything, because the loader produces a value
 rather than mutating one. No user gate.
 
-**Task 5 states the provisional load-limit figures.** `limits::FIGURES` has a row per
-`LimitKind` and no figure: task 4 declined to invent a measurement, which was right. But the
-figures cannot wait for the measurement either, and the reason is a **circularity in the phase
-plan, not a scheduling accident**: [LIM-4](../requirements/puppet-acceptance.md) ties every limit
-to 4× a `stress` workload dimension, `stress` is generated in S3, and S3 depends on S2. Something
-has to break the cycle.
+**Done**, in four modules — `json.rs`, `archive.rs`, `decode.rs` and the body of `load.rs` — and
+the figures in `limits.rs`. `I4` holds structurally and nothing in the loader writes into a
+puppet a caller already holds.
 
-It breaks here. Task 5 is the task that *enforces* a limit, so it is the task that must say what
-it enforces. State a provisional figure for each kind, **in `limits::FIGURES` and nowhere else**,
-marked provisional in one place so S3 replaces a table rather than hunting for constants —
-`PROVISIONAL_NODE_LIMIT` in `rigel-fixtures` is the precedent. Without them `VAL-13` stays red
-too, because `rigged:decompression-bomb` and `rigged:entry-name-overlong` are catalogued
-`rejected` and nothing can refuse them against a threshold that does not exist.
+**Only the criteria whose refusal is reached *before* validation can go green here**, and they
+do: the version gate, the archive faults, the load-limit refusals, and the three rule families a
+`Puppet` cannot hold — unmarked data, an unfamiliar enumerated value, and the absent-member
+rules. Everything that needs a **successful** load still ends at `validate`, which is task 6's
+and is still `unimplemented!()`.
 
-**This is a finding against [plan.md](plan.md) and is routed at task 10:** S2's *Done when* says
-load limits are enforced before allocating, S3 owns the figures those limits are stated against,
-and the plan does not record that S2 must therefore ship provisional ones.
+**Against `cargo test -p rigel-format --test acceptance`, run once per test with `--exact`:**
+
+| Where it ends | Tests |
+|---|---|
+| passes | 11 |
+| `src/validate.rs:261` — `validate`, task 6 | 67 |
+| `src/validate.rs:271` — `validate_file`, task 6 | 4 |
+| `tests/acceptance/execution.rs:154` — `EXEC-5` | 1 |
+| `tests/acceptance/canonical.rs:159` — `CANON-2` | 1 |
+
+The two that end inside `tests/` are both the unimplemented validator wearing an assertion.
+`CANON-2` runs the test binary again as a child to vary the environment, and the child dies at
+`validate`; the parent reports only that the child failed. `EXEC-5` loads 256 single-byte
+mutations of `rigged` under `catch_unwind`, and twenty of them land in zip header fields no
+loader reads — modification times, external attributes, version-needed, and local-header fields
+the central directory supersedes — so those files load successfully and then panic at `validate`,
+which the test records as a panicked round. Both go green with task 6 and neither was touched.
+
+The 69 unit tests in `src/` all pass, including a catalogue-driven sweep asserting that **no
+fixture the catalogue calls valid is refused by the reader**.
+
+**Task 5 states the load-limit figures.** `limits::FIGURES` has a row per `LimitKind` and no
+figure: task 4 declined to invent a measurement, which was right. Task 5 is the task that
+*enforces* a limit, so it is the task that must say what it enforces. Without figures `VAL-13`
+stays red too, because `rigged:decompression-bomb` and `rigged:entry-name-overlong` are
+catalogued `rejected` and nothing can refuse them against a threshold that does not exist.
+
+**Most figures are derivable today, and are not a judgement call.**
+[LIM-4](../requirements/puppet-acceptance.md#j-load-limits-proposed) fixes every limit at **4× the
+corresponding `stress` dimension**, and those dimensions are already committed in
+[platform.md](../requirements/platform.md#the-reference-puppet-and-the-stress-puppet-proposed) —
+S3 generates the *puppet*, not the table. Derive, do not invent. `LIM-4` asserts the figure
+exactly rather than "at or above", so a limit that is merely generous fails it.
+
+**Two traps in that table**, both stated in it and both easy to miss. The *Nodes* row excludes
+physics, so a node limit must use the **sum** of the Nodes and Physics nodes rows — `LIM-4` says
+so explicitly. And the *Bindings* row is marked **understated**.
+
+**Provisional figures are needed only where that table has no row**: decompressed payload size,
+tree depth, string length, total load memory, tracks per animation, keyframes per track. Mark
+those provisional **in `limits::FIGURES` and nowhere else**, so whoever lands the real figure
+replaces a table rather than hunting constants — `PROVISIONAL_NODE_LIMIT` in `rigel-fixtures` is
+the precedent. Tracks and keyframes have no dimension because the corpus counted `.motion3.json`
+files rather than the curves inside them; [open-questions.md](open-questions.md) carries it and
+it is due before S4.
+
+**The finding against [plan.md](plan.md), routed at task 10**, is narrower than it first looked:
+not that S2 must ship provisional figures for everything, but that the plan does not record which
+limits have no workload dimension to be derived from, nor that S2 is where that gap first bites.
 
 ### 6. The validator — `todo`
 
@@ -504,6 +562,69 @@ format defines — `AxisPolarity::Unknown` most of all.
 `load.rs`, `save.rs`, `validate::validate`, `validate::validate_file` and `rigel-validate` are
 untouched and still `unimplemented!()`.
 
+Task 5. The reader, and the four modules it needed.
+
+`json.rs` — a strict JSON reader and a canonical writer, crate-internal like `archive.rs` and
+`decode.rs`, with **every number kept as the text it arrived as**. Written rather than taken from a crate because the two requirements no general
+JSON library meets together are exactly this format's: a stranger's number must survive a save
+byte for byte, and `1e400` inside opaquely preserved material must come back as `1e400` rather
+than as `inf` or as a parse failure (`EXT-9`), while the same literal in a field this build
+interprets must overflow to infinity so `VAL-6` has something to reject. Strict about everything
+JSON does not define — the bare `NaN` and `Infinity` tokens, trailing commas, control characters
+in strings, invalid escapes and invalid UTF-8, a duplicate member name, and nesting past a depth
+cap — because a file is traded between strangers.
+
+`archive.rs` — the container, treated as hostile. Everything in `open` is read from the **central
+directory alone and decompresses nothing**: the entry count, entry-name lengths, duplicate names,
+names the format's table does not define, overlapping regions, and a required entry absent.
+`read` is where a byte is first produced and where the payload limits bite; it reads the **raw**
+entry and inflates it under a cap of its own, because the `zip` crate stops at the size the entry
+declares and the declaration is the one thing a bomb controls. Every entry's CRC is checked
+against the directory's.
+
+`decode.rs` — `puppet.json` into a `Puppet`, keeping two failures apart: a **shape** this build
+cannot read at all is `Rejection::Malformed`, and a **rule** the file breaks is a `Violation`.
+Three families of rule are raised here because a `Puppet` cannot hold the fact they are about —
+`UnmarkedData` and `EnumeratedValueKnown`, both gated on the declared version, and the three
+absent-member rules `AxisPolarityDeclared`, `ExtensionDeclaresVersion` and
+`ExtensionDeclaresName`.
+
+`load.rs` — `read_version`, `load`, the `Rejection` accessors and `Display` task 4 left
+unimplemented, and a PNG **header** read for `VAL-10`'s undecodable payload. `read_file` is the
+shared parse `validate_file` reuses in task 6, so the standalone verdict and the loader's stay
+one verdict rather than two implementations that drift.
+
+**The order `load` performs its steps in**, each reached only because the one before it passed:
+
+1. the central directory, and every container fault, decompressing nothing;
+2. `rigel2d.json` on its own, and the version gate — a differing major is refused whole here;
+3. `puppet.json` under the load limits, and the parse;
+4. the texture payloads, under the same per-entry limit;
+5. validation.
+
+Step 1 precedes step 2 although `format.md` leads with the manifest, because the manifest cannot
+be found without walking the directory that names it — and those checks read nothing beyond that
+directory, so nothing is decompressed before the version is known either way.
+
+`limits.rs` — `FIGURES` now carries a figure, a `Basis` and a one-line note per row. `puppet.rs` —
+`Preserved`, `PreservedMembers` and `OpaqueNode`, and `Puppet::preserved`. `validate.rs` — only
+`Rule::as_str`, which every rejection the reader produces needs to name itself.
+
+`zip` and `flate2` are promoted from dev-dependencies to dependencies at the versions and features
+`rigel-fixtures` already pins. **`Cargo.lock` is unchanged**: the locked graph gained nothing.
+
+**Nothing already in the contract changed shape.** Every edit to the public surface is an
+addition: `Puppet::preserved` and the three types behind it, `Basis` and two fields on
+`limits::Figure`, `version::FORMAT_NAME`, and an `as_str` on `LimitKind`, `ArchiveFault` and
+`Rule` so that every rejection can name itself. No existing function's parameters or return type
+moved, which is why the acceptance suite compiles untouched.
+
+Unit tests beside each module: the JSON reader against what it must keep and what it must refuse,
+the limit table against the committed `stress` dimensions and against the two fixtures a figure
+has to bite on, the entry-name classifier, the rejection accessors, the PNG header read — and, in
+`load.rs`, the reader against the real corpus, including a catalogue-driven sweep asserting that
+**no fixture the catalogue calls valid is refused by the reader**.
+
 **Decisions made:**
 
 - **The current format version is `1.1`.** `rigged:old-version` must declare "an earlier version
@@ -624,6 +745,73 @@ Task 4.
   it.
 - **No mutation method was added.** `ID-2`, `ID-3` and `ID-4` are served by the public fields
   the tests already mutate directly; anything more would be the editor's, next cycle.
+
+Task 5.
+
+- **The crate parses JSON itself rather than taking `serde_json`.** **Because** preservation is
+  about bytes: a number that has been through a float formatter is not the number that arrived,
+  and `rigged:future-minor-nonfinite` requires `1e400` inside opaque material to be carried
+  without ever being read as a number. `serde_json` with `arbitrary_precision` would do it and
+  would turn that feature on for `rigel-fixtures` too through feature unification — the same
+  hazard task 1 recorded for `preserve_order`, pointed at the crate that authors the corpus. It
+  also keeps a JSON crate out of the library's dependencies, which task 3 had already chosen for
+  `ExtensionEntry::data`.
+- **`zip` reads the container and `flate2` inflates the payload, but the container *checks* are
+  ours.** **Because** `zip` refuses none of the four hostile containers on its own:
+  `ZipArchive::new` opens every one of them. It does expose `has_duplicate_names`, and
+  `has_overlapping_entries` returns an *error* rather than `false` on the overlapping fixture,
+  which cannot be told from a genuinely unreadable header. The overlap check is therefore computed
+  from the central directory here, conservatively — a local header's extra field is not recorded
+  there, so a region's end is taken as the smallest it could be and an overlap found this way is
+  always real.
+- **The decompression limit is enforced per archive entry, against the raw stream.** **Because**
+  the `zip` crate truncates an entry at its declared uncompressed size and reports *"larger than
+  its declared uncompressed size"* — which is the entry's own word, and `LIM-3` requires the
+  refusal to be a **limit**. Reading `by_index_raw` and inflating under our own cap is what makes
+  the figure the thing enforced.
+- **Preservation hangs off `Puppet`, keyed by the identifier of the entity that carried the
+  material.** **Because** the acceptance suite constructs `Node`, `Part`, `Parameter`, `Mesh`,
+  `Axis`, `Keypoint`, `Transform` and `TextureFlip` by struct literal, so a field added to any of
+  them would force an edit to a test — which is the one thing an implementer may not do. Keying on
+  an identifier costs nothing: every entity carries one, uniquely, and it survives the entity being
+  reordered in a way an array index would not.
+- **A `PreservedMembers` row carries a `path` as well as an owner.** **Because** the objects
+  inside an entity — its transform, its mesh, one axis, one keyframe — have no identifier of their
+  own, and a later minor version adding a field to a transform must not be silently dropped. Only
+  `axes` and `keyframes` are addressed by position, and both are positional in the format already.
+- **A node of a kind this build does not know is an `OpaqueNode`, carrying the `id` and `parent`
+  it declares.** **Because** the writer has to put it back in the canonical order, which is keyed
+  on exactly those two members. They are read to **place** the entry and for nothing else; nothing
+  in the puppet may reference a node this build cannot interpret.
+- **A mesh is optional and absent is an empty mesh.** **Because** `rigged:containment-permitted`
+  and `rigged:near-limit` are both built from mesh-group leaves that carry none, and both are
+  catalogued `accepted`. Whether a *part* may have an empty mesh is a rule about the puppet and is
+  the validator's. This was found by `val_23` failing, and it is the only defect the gates caught
+  in this task.
+- **`load` returns the reader's violations before calling the validator.** **Because** the three
+  families above are facts about the source text; a rejection that named them *after* the
+  structural rules would have to carry a version the `Puppet` does not have. It also means
+  `EXT-2`, `EXT-3`, `EXT-8`, `VAL-7`, `VAL-8`, `VAL-17` and `VAL-20` are green now rather than at
+  task 6.
+- **`read_version` reports the version rather than judging it.** Its own doc comment says *reads
+  the declared version, and nothing else*, and a caller deciding whether to open a file at all
+  needs to be able to say **which** version the file wants. `load` applies the gate.
+- **`rigel2d.json`'s `format` member is checked against `rigel2d-puppet`.** **Because**
+  `format.md` says that entry carries the format name and the version, and a zip that happens to
+  hold a `rigel2d.json` should be refused for what it is rather than part-way through the parse.
+- **An undecodable payload is decided by a PNG *header* read, not a decode.** Signature, an
+  `IHDR` chunk of the length the PNG specification fixes, non-zero dimensions, and the `IEND`
+  chunk at the end. **Because** this crate builds with no GPU and decodes no image — that is
+  `rigel-runtime`'s — and what `VAL-10` asks is whether the payload is an image at all. It also
+  keeps the `png` crate out of the library. A payload with a valid header and a corrupt image
+  reads as readable here, which is stated in *Assumptions*.
+- **Every rejection the reader produces names its rule, and `Display` is truncated on a character
+  boundary with an ellipsis.** `MAX_MESSAGE_BYTES` was task 3's figure and is unchanged; a
+  violation list is additionally capped at 64 entries inside the decoder, because a list that
+  grows with the file is the same denial-of-service route by another road.
+- **An absent figure in `limits::FIGURES` refuses the load.** Its doc comment already said an
+  absent figure is a defect rather than *no limit*; this is that sentence implemented, and it is
+  unreachable today because every row carries a figure.
 
 **Contradicts docs:**
 
@@ -791,6 +979,67 @@ moment, and **reported rather than fixed**.
   parenthetical is. `may_be_root` implements the parenthetical. The document would be clearer
   saying *a kind that may contain drawn content*, or simply naming the two.
 
+Task 5. Found while implementing the reader against the documents, the corpus and the tests at
+the same moment, and **reported rather than fixed**.
+
+- **`PHYS-4` and `MSG-1` cannot both pass, and the fixtures are why.**
+  `stored_shape::phys_4` asserts `load("rigged").report.warnings.is_empty()`, and
+  `version::msg_1` asserts `load("rigged:ext-unknown").report.warnings` is **not** empty.
+  `rigged:ext-unknown` is `rigged` plus **one more extension namespace**, and `rigged` already
+  carries two namespaces no build understands (`com.alt.notes`, `com.example.wiggle`). No rule
+  that warns about unrecognised extensions can warn for one file and not the other. The reader
+  satisfies `MSG-1`, whose criterion *is* the report; `PHYS-4`'s assertion is incidental to its
+  criterion — it uses an empty warning list as a proxy for *driving nothing is not reported as a
+  defect* — and it will go red at that line once task 6 lands. Both tests are acceptance tests and
+  neither was touched. The cheap repair is a fixture: give `rigged` no extension data no build
+  understands, or give `PHYS-4` a narrower assertion.
+- **`format.md` puts `x` on *any object*, and the contract models `Extensions` on `Puppet` and
+  `Node` only.** The reader reads and reports the marker wherever it appears and keeps it verbatim
+  under `Preserved` where there is no typed slot, so nothing is lost. Either the document should
+  say `x` lives on those two, or the contract should carry `Extensions` everywhere.
+- **`format.md` does not say whether a mesh is required, and the corpus answers *no*.** A mesh
+  group leaf with no `mesh` is what `rigged:containment-permitted` and `rigged:near-limit` are
+  built from. *A part's mesh* is specified; a mesh group's is not, although the containment table
+  says a mesh group *deforms its children with its own mesh*.
+- **`format.md` names no required member of an extension's `x` entry beyond the three.** The
+  reader requires `data` and refuses an entry without it, which no fixture exercises and the
+  document does not state. `EXT-3` names `version` and `name` only.
+- **A binding's `kind` is an enumerated field the format defines, and it cannot have the
+  unfamiliar inhabitant the rule gives every other one.** Task 4 reported this; the reader now
+  has to act on it, and it refuses an unfamiliar binding kind **at every declared version**,
+  because `kind` selects the shape of `values` and there is no reading of an unknown kind that
+  still yields values. The document should say whether the rule means *every enumerated field
+  whose values are inert data*.
+- **`platform.md`'s table has no row for six more kinds than task 5's entry above lists.**
+  That entry names decompressed payload size, tree
+  depth, string length, total load memory, tracks per animation and keyframes per track. Walking
+  `LimitKind::ALL` against the table turns up a keypoint count, a response curve's points, a
+  chain's joints, an entry name's bytes, a texture dimension and extension data bytes as well —
+  none of which the table measures. Each is marked `Basis::Provisional` with the dimension it is
+  missing named in its row.
+- **The table's texture rows cannot carry a per-entry byte limit, and say so themselves.**
+  `platform.md` calls them *a deliberate headroom choice with no evidence behind them* and *the
+  least trustworthy numbers here*, and both are **totals over a puppet** rather than the size of
+  one entry. `DecompressedPayloadBytes` and `TextureDimension` are therefore provisional despite
+  there being rows that look as though they would serve.
+- **`LIM-4`'s *four times the stress dimension* is unsatisfiable for `TotalLoadMemory` as
+  written.** Four times the stress artwork would be well past the 2 GB resident budget
+  `platform.md` gives the editor with a reference puppet open, so the figure is taken from the
+  budget instead and marked provisional.
+- **`format.md` requires `composition_mode` to be *always written* and says nothing about a file
+  that omits it.** The reader defaults it to `sum` rather than refusing, which is the lenient
+  reading and is untested by any fixture.
+- **`format.md`'s canonical form is a rule about writing, and the corpus relies on it being a rule
+  about reading too.** `rigged` writes an identity `rotation` and `scale` on every transform and
+  `"source": ""` on its channel mapping, which the absent-when-default rule says it should not.
+  The reader accepts both present and absent; the writer in task 7 is the one that has to choose,
+  and `saving_an_unmodified_puppet_reproduces_the_file_it_came_from` is what will decide it. Task
+  3 reported the same thing from the other side.
+- **Nothing in `docs/` declares a limit on JSON nesting depth**, which is a size the loader
+  trusts and so is `LIM-8`'s business. It is not a `LimitKind`, because every kind there is a size
+  or count of something the format defines and nesting depth is a property of the encoding; it is
+  a constant in `json.rs` and a file past it is refused as malformed. Worth a sentence somewhere.
+
 **Traps:**
 
 - **`zip`'s `compression_level` rejects an ordinary deflate level.** With only the
@@ -835,6 +1084,33 @@ Task 4.
   build has never heard of. A validator that treats them alike either rejects every import or
   accepts every typo. Both doc comments say so; this is the one place the vocabulary genuinely
   invites the error.
+
+Task 5.
+
+- **The `zip` crate stops an entry at its declared uncompressed size.** Reading
+  `rigged:decompression-bomb` through `by_index` returns 1024 bytes and then
+  `"File is larger than its declared uncompressed size"` — so a loader built on `by_index` never
+  learns that the entry expands to a quarter of a gigabyte, and refuses it for the wrong reason.
+  `LIM-3` requires the refusal to be a limit. `by_index_raw` plus our own inflate is the way
+  through, and it cost real time to find because the safe-looking API is the one that hides it.
+- **`ZipArchive::new` opens all four hostile containers happily**, and `len()` quietly collapses
+  duplicate names — `rigged:duplicate-entry-names` has six entries and reports five.
+  `has_duplicate_names()` is what sees it. `has_overlapping_entries()` returns `Err` rather than
+  `Ok(true)` on the overlapping fixture, which is indistinguishable from a genuinely broken
+  header, so it is not what the overlap check uses.
+- **A field added to `Node`, `Part`, `Parameter`, `Mesh`, `Axis`, `Keypoint`, `Transform` or
+  `TextureFlip` breaks the acceptance suite's compilation**, because `identity.rs` and
+  `stored_shape.rs` construct each of them by struct literal with no `..` rest. `Puppet` is the
+  only type in the model with no literal in the suite, which is why everything the reader had to
+  add hangs off it. Worth knowing before designing anything else into those types.
+- **`rigged:near-limit` sits at 255 nodes, against `PROVISIONAL_NODE_LIMIT` in
+  `rigel-fixtures`, and the real `NodeCount` figure is 2160.** The fixture is catalogued
+  `accepted` and stays accepted, so nothing fails — but the figure it was built against and the
+  figure the loader enforces are now two different numbers and neither document says so.
+- **`cargo test -p rigel-format --test acceptance` reports one test binary twice.**
+  `canon_2` re-runs the test binary as a child, so the output carries a second
+  `test result: FAILED. 0 passed; 1 failed` line that belongs to the child and not to the suite.
+  Counting result lines rather than reading them gets this wrong.
 
 **Assumptions:**
 
@@ -881,6 +1157,24 @@ Task 4.
   from a rejection a reader produced, so implementing them turns no test green, and how a rule
   reads to a person is the validator's surface. Task 6's, unless task 5 wants them sooner.
 
+Task 5.
+
+- **A payload is an image if its PNG header says so.** A payload with a well-formed `IHDR` and a
+  corrupt image body reads as readable and is not reported. The alternative is decoding every
+  texture at load, which belongs to S5 and would put an image decoder in a crate that builds
+  without one.
+- **A later-version file's unmarked member on an object with no identifier of its own** is kept
+  against the entity that contains it, at a path. No fixture carries one, so the shape is
+  untested; the writer in task 7 is the first thing that will exercise it.
+- **An archive entry naming a texture the puppet does not carry is malformed.** No fixture carries
+  one, and the alternative — ignoring it — would let material ride along inside the file with
+  nothing accounting for it.
+- **An entry compressed by any method but Stored or Deflate is refused.** The format fixes the
+  method per entry kind for *writing*; the reader accepts either for any entry, because
+  `rigged:decompression-bomb` deflates a PNG and a third party's tool may too.
+- **Provisional figures will be wrong.** Each says in its own row which dimension it is missing,
+  and `Basis::Provisional` is the thing to grep for when the measurement lands.
+
 **Deferred:**
 
 Task 4 — what was in the task's scope and is not done, with why:
@@ -917,8 +1211,34 @@ Task 3 — the in-scope criteria with no test, and what each needs:
   would leave that table disagreeing with the workflow. Until it is wired, drift between the
   committed corpus and its builder is caught only by running the script.
 
+Task 5 — what is in the reader's scope and is not done, with why:
+
+| Left | Why |
+|---|---|
+| `Rejection` messages read at a human gate | `MSG-2` is task 9's, and the warning text the reader emits has not been read by a person. It names each unrecognised extension by its human-readable name, promises nothing about preservation and implies no install route, which is what that gate is for |
+| A limit on JSON nesting depth as a `LimitKind` | Reported above instead. Adding a variant changes `LimitKind::ALL`, which `LIM-1` and `LIM-8` are both driven over, and the kind is about the encoding rather than about the puppet |
+| `TotalLoadMemory` enforced against **resident** bytes | It counts bytes decompressed, which is the part of a load this crate controls. The resident half needs the counting allocator `stack.md` names, which is also what `LIM-3`'s memory half waits on |
+
 **Tried and rejected:**
 
 The branch keeps these in [*Tried and rejected*](#tried-and-rejected) above, where tasks 1 to 3
 put theirs. Task 4 added the provisional load-limit figures, the version field on `Puppet`, and
 the parent-only containment lookup.
+
+Task 5 added these.
+
+- **Calling `ZipArchive::validate_header_consistency()`.** It would refuse a file whose local
+  headers disagree with the central directory, which is several of the twenty single-byte
+  mutations `EXEC-5` currently survives. It is not worth it: the mutations it would catch are
+  already harmless — every entry's CRC is checked, so a header that lies about a size produces
+  bytes that do not match — and a zip tool writing data descriptors leaves the local sizes zero,
+  which would refuse an honestly repacked file at task 9's gate for a reason the specification
+  does not state.
+- **Preserving a later-version file's unknown material as the whole arrived source object.** It
+  is the generic answer and it breaks `FLIP-2`: a test that mutates `texture_flip` in memory and
+  compares the puppet against the reloaded one would be comparing a stale copy of the member it
+  just changed, because `Puppet` derives `PartialEq`. Keeping only the members the typed
+  structures have no slot for is what keeps that comparison honest.
+- **Refusing a later-version file whose unknown member sits on an object with no identifier.** The
+  honest failure, and it breaks the compatibility rule for exactly the addition that rule exists
+  to carry — a later minor adding a field to a transform would make every file unopenable.

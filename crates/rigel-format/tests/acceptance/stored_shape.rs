@@ -575,10 +575,27 @@ fn phys_4_driving_a_parameter_is_optional() {
         .collect();
     assert!(!driving.is_empty(), "one physics node drives a parameter");
     assert!(!driverless.is_empty(), "and one drives none");
-    assert!(
-        loaded.report.warnings.is_empty(),
-        "driving nothing is not reported as a defect"
-    );
+    // "Nor reported as a defect" is a claim about *this node*, not about the
+    // whole load. `rigged` carries extension data in a namespace no build
+    // understands — the fixture catalogue requires it, at two places in the tree
+    // — and `MSG-1` requires exactly that to be warned about. So a blanket
+    // `warnings.is_empty()` here asserts something the fixture makes false by
+    // construction, and contradicts `MSG-1` rather than testing `PHYS-4`.
+    for node in &driverless {
+        assert!(
+            !loaded.report.stale_bindings.contains(&node.id)
+                && !loaded.report.unreadable_textures.contains(&node.id),
+            "driving nothing is not reported as a defect"
+        );
+        assert!(
+            !loaded
+                .report
+                .warnings
+                .iter()
+                .any(|w| w.contains(&node.name) || w.contains(&node.id.0.to_string())),
+            "and no warning names the node that drives nothing"
+        );
+    }
     assert!(
         validate(&loaded.puppet).is_ok(),
         "and is not rejected or repaired"
