@@ -9,7 +9,7 @@
 #
 #   * It cannot see what a dependency does. A crate that pulls in an HTTP client
 #     transitively is invisible here, and that is the likeliest way this decision
-#     actually gets broken. docs/wip/open-questions.md records the dependency and
+#     actually gets broken. docs/concerns/security.md records the dependency and
 #     plugin cases as deliberately unresolved. Closing that needs a check over the
 #     locked graph, not over source text.
 #   * It is a deny-list, so it catches the forms named below and no others.

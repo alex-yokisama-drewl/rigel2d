@@ -4,7 +4,11 @@ The current phase: which subsystems get built, in what order where order matters
 
 **Status:** agreed 2026-11-26. **S0 and S1 are done** (2026-11-27); S2 onward are not started.
 The workspace builds, the push gates run and block a merge, and no production code is
-implemented yet — the four crates are shells.
+implemented yet — the crates are shells.
+
+**The next work is requirements, not code.** S2 is blocked until the gaps named under
+*What blocks S2* below are settled. Starting S2 first means settling them by accident, in code,
+which is the thing commissioning the criteria early was meant to prevent.
 
 ## Where this phase ends, and why there
 
@@ -28,11 +32,11 @@ Ordered. `Blocks on` names what genuinely must come first; everything else may m
 |---|---|---|---|
 | S0 | **Transparency and alpha-output spike** | **Done 2026-11-27** — measured on Linux and Windows, recorded in [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md). The `[open]` in [performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-decided) is resolved and the Game Capture capability tension answered. **macOS was not attempted** — no Mac was reachable — so Syphon alpha stays unobserved, which [platform.md](../requirements/platform.md) permits at its tier | Nothing |
 | S1 | **Workspace and the push gates** | **Done 2026-11-27** — the workspace builds from a clean clone with `--locked`, the gates that have a subject run and are required on `master`, `scripts/test-record.sh` records a result, and *Running locally* and *Running it* were corrected from a verbatim container walk. Gate 3 waits for a counter baseline; [stack.md](../stack.md#on-push-proposed) says which gates are live and why | S0 |
-| S2 | **`rigel-format`: read, validate, write** | A puppet archive round-trips byte-identically; the validator rejects a hand-written malformed corpus and accepts stale bindings as a state; load limits are enforced before allocating; extension data survives untouched; every write goes through the one atomic path | S1 |
+| S2 | **`rigel-format`: read, validate, write** | A puppet archive round-trips byte-identically; the validator rejects a hand-written malformed corpus and accepts stale bindings as a state; load limits are enforced before allocating; extension data survives untouched; every write goes through the one atomic path | S1, **and the requirements gaps below** |
 | S3 | **The workload generator and the fixture corpus** | The reference and stress puppets are generated from the committed dimension table in [platform.md](../requirements/platform.md), both validate, and the generated puppet doubles as the conformance fixture [puppet.md](../requirements/puppet.md) requires | S2 |
 | S4 | **The evaluation pass** | A generated puppet evaluates to a posed tree for given channel input, in the order [evaluation.md](../evaluation.md) sets; one parameter has one driver, enforced by the validator; stale bindings behave as specified; the name-resolution counter is zero | S2 |
 | S5 | **The render stage: command stream and backend** | Evaluation output produces an explicit command stream countable with no GPU present; the wgpu backend submits it; the warm-up pass begins every configuration the loaded puppet can reach, enumerated from puppet data; GPU resource creations after the first presented frame are zero on both workloads | S3, S4 |
-| S6 | **The counter gate, growth and soak** | Counters have a committed baseline, CI fails above it, growth is asserted per dimension on the stress workload, and the soak shows counters and resident bytes flat | S5, and the soak question below |
+| S6 | **The counter gate, growth and soak** | Counters have a committed baseline, CI fails above it, growth is asserted per dimension on the stress workload, and the soak shows counters and resident bytes flat | S5 |
 
 ### What does not block what
 
@@ -42,26 +46,15 @@ hand-built fixture.
 
 S0 blocked everything, and that was the point rather than an inconvenience — see below.
 
-### Why S0 was first, and what it found
+### Why S0 was first
 
-S0 went before everything else because a bad answer would have reopened the stack choice.
-[stack.md](../stack.md) named transparency as the first thing that choice was exposed to, and
-every claim about it was drawn from reading source and documentation rather than from running
-anything.
-
-**The stack survives.** A decoration-free winit window emits correct premultiplied alpha into a
-real compositor on Linux/X11, and alpha reaches OBS on both Linux and Windows. Transparency was
-never the problem: it was bit-exact at every probe, on every route measured. It is no longer on
-stack.md's exposure list, and the conditions that came out of the spike are in
-[*What the transparency spike settled*](../stack.md#what-the-transparency-spike-settled-decided).
-
-**What the spike found instead was a colour hazard no document anticipated.** Each host silently
-assumes an encoding of the buffer it is handed, the two measured hosts assume different ones, and
-neither reports a mismatch — so a renderer correct for one is wrong for the other by an amount
-that reads as a plausible picture rather than a fault. That is now the rule in
-[runtime.md](../runtime.md), and it is why the route decision in
-[decisions.md](../decisions.md) went to a plugin of our own on Linux rather than to the one
-third-party route that was measured working end to end.
+S0 went before everything else because a bad answer would have reopened the stack choice. It did
+not: the stack survives, and what the spike found instead was a colour hazard no document had
+anticipated. The conditions it imposed are in
+[stack.md](../stack.md#what-the-transparency-spike-settled-decided), the rule it produced is in
+[runtime.md](../runtime.md), the route it decided is in [decisions.md](../decisions.md), and the
+measurements are in
+[research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md).
 
 ### What S2 onward inherit
 
@@ -94,20 +87,36 @@ different points.
 | Area | When | Why then |
 |---|---|---|
 | [puppet.md](../requirements/puppet.md) | **Done** — [puppet-acceptance.md](../requirements/puppet-acceptance.md) | Its `[open]` on the compatibility promise is a signal from the owner and changes no criterion |
-| [platform.md](../requirements/platform.md) | With S6 | The counter half can be commissioned now; the soak length and the tolerated deadline-miss rate are `[open]` |
+| [platform.md](../requirements/platform.md) | With S6 | The counter half can be commissioned now. The soak length is settled at four hours and the deadline-miss figures stand as written, provisional until the calibration sitting |
 | [performing.md](../requirements/performing.md) | **Due now** | S0 is done and the `[open]` that decides the output path is resolved |
 | [authoring.md](../requirements/authoring.md) | **Partly done** — the operations settled on 2026-11-26 are in [authoring-acceptance.md](../requirements/authoring-acceptance.md); the rest is next cycle | Studio is not in this phase |
 
 The planner's most useful output is the gaps it finds in the requirements. Those route back into
 `docs/requirements/` before the subsystem they affect starts.
 
-**S2 is gated on the gaps the puppet criteria found, not just on S1.** Writing criteria against
-[puppet.md](../requirements/puppet.md) turned up specification defects that an implementer would
-otherwise settle by accident — including two `[decided]` sections that contradict each other on
-whether a newer version's unmarked core field opens or is rejected. They are listed in the
-closing table of [puppet-acceptance.md](../requirements/puppet-acceptance.md). **Resolving them
-is requirements work and comes before S2 starts**; it is the reason the criteria were
-commissioned early rather than written alongside the code.
+### What blocks S2
+
+**S2 is gated on requirements gaps, not just on S1.** Writing criteria against
+[puppet.md](../requirements/puppet.md) turned up places where the requirement does not say
+enough for a criterion to exist without inventing the answer. They are the *Criteria not
+written* table at the foot of
+[puppet-acceptance.md](../requirements/puppet-acceptance.md#criteria-not-written-open), and
+**resolving the ones that bear on the format is requirements work that comes before S2 starts**.
+That is why the criteria were commissioned early rather than written alongside the code.
+
+Which of that table's rows block the format subsystem, as scoped by this plan:
+
+| Row | Why it blocks S2 |
+|---|---|
+| **Which kinds of data are authoring-only** | The format declares it per kind, which `FILE-6` and `FILE-7` assert. S2 writes the format; it cannot declare a membership nobody has written down |
+| **Whether physics is a node** | Node-tree membership is format structure. [vocabulary.md](../vocabulary.md) and the pieces list say parts, mesh groups and composites; [platform.md](../requirements/platform.md)'s workload table counts physics nodes |
+| **The term for the part of an animation that drives one parameter** | S2 names fields, and a name in a stored format is expensive to change later. [vocabulary.md](../vocabulary.md) settles terms with the owner rather than letting whoever needs one first invent it |
+
+The table's other rows do not block S2: the determinism tolerance is a figure the evaluation
+pass needs, the unparseable-extension texture case is disclosed rather than fixable, and the
+unknown-polarity import path decides whether a criterion is live or dormant on a path Studio
+owns. **That scoping is the agent's call** — see *Who decides what* in `CLAUDE.md` — and the
+three rows above are the owner's to settle.
 
 **The criteria and the tests separate here, and on a greenfield phase they must.** The
 `plan-phase` lane closes on *acceptance criteria and tests exist and have been confirmed
@@ -124,9 +133,11 @@ discovered late.
 
 | Question | Due before | Lives in |
 |---|---|---|
-| The tolerated deadline-miss rate, and the stream length the soak targets | S6 | [platform.md](../requirements/platform.md) — *Behaviour under contention and over budget*. The other two bullets in that section are Live's behaviour and belong to a later cycle |
-| Whether Studio refuses or asks when a puppet changed on disk since it loaded | S2 | Unowned. Live writes puppets for channel mappings ([runtime.md](../runtime.md)) while Studio may hold the same puppet open. No document covers the collision |
-| Whether configuration is inside the one write path, and how logs are exempted from it | S2 | [runtime.md](../runtime.md) — *One write path* names puppet, scene and autosave only |
+| What blocks S2 | S2 | *What blocks S2* above, and the table it points at |
+
+The rows that stood here on the soak length, on a puppet changed on disk, and on configuration
+in the write path have all been answered in the documents that own them, and were struck when
+that was noticed rather than left to be rediscovered.
 
 ## Carried out of this phase
 
