@@ -17,8 +17,8 @@ intended.
 
 ## Status
 
-**Current task:** 3 — the Linux push-gate workflow, gates 1, 2 and 4
-**Blocked on:** nothing
+**Current task:** 3 — `awaiting approval`. The workflow is in and green; what needs the owner is branch protection
+**Blocked on:** nothing — task 4 can proceed while the gate is open
 
 ---
 
@@ -161,17 +161,19 @@ Staleness was already handled — the session-start hook compares the newest rec
 carries `assertions_run`, and the script says on a zero that a pass means nothing was checked.
 Read that field before trusting a green record, in CI or at a session start.
 
-### 3. The Linux push-gate workflow — gates 1, 2 and 4 — `todo`
+### 3. The Linux push-gate workflow — gates 1, 2 and 4 — `awaiting approval`
 
-`cargo fmt --check` and `cargo clippy -- -D warnings`; `cargo test --workspace`;
-`scripts/docs-check.sh`. In the order [stack.md](../stack.md#on-push-proposed) sets, each
-blocking a merge. CI actions pinned to commit hashes, per the supply-chain concern entry.
+`.github/workflows/push-gates.yml`. One job with ordered steps rather than parallel jobs,
+because the ordering is the point — a formatting mistake fails in seconds instead of after the
+suite. Steps are named for the gate numbers in [stack.md](../stack.md#on-push-proposed), so the
+correspondence to that table can be checked rather than trusted. `actions/checkout` is pinned to
+a commit hash; no toolchain action is used, because `rust-toolchain.toml` and the runner's
+rustup do the job with one less third-party dependency.
 
-**Done when:** a push to this branch runs all three and they pass, observed on GitHub rather
-than reasoned about. **Needs the user's eyes**: the branch protection that makes a gate actually
-block a merge is a repository setting, not a file, and only the repository owner can set it. What
-to look at: the gates are *required* on `master`, not merely present and green. A gate that runs
-and reports but does not block is the failure this task exists to prevent.
+**Done when:** the run is green on GitHub — and **the gates are *required* on `master`**. That
+second half is a repository setting only the owner can make. A gate that runs and reports but
+does not block is exactly the failure this task exists to prevent, and it looks identical to a
+working one on the runs page.
 
 ### 4. Gate 5 — the no-outbound-connection assertion — `todo`
 
