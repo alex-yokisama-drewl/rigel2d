@@ -191,7 +191,14 @@ whitespace, a fixed number format, UTF-8.
 
 **Ordering is part of the canonical form.** `nodes` is in depth-first preorder, and order among
 siblings is draw order — the one thing order is allowed to decide. Every other collection is
-ordered by identifier, keypoints by position along their axis and keyframes by time.
+ordered by identifier, with these exceptions: keypoints by position along their axis, keyframes
+by time, and an animation's triggers by event name, because a trigger has no identifier.
+
+**A segment's two control points are not in this list**, and the distinction matters: they are
+not *sorted* by anything. The pair is the handle leaving the earlier keyframe and the handle
+arriving at the later one, so their order is what each one **means** and a writer stores them as
+authored. Sorting them — by time, or by anything else — would silently exchange two different
+things.
 
 **A parameter's presentation order is a stored field, not the order of the collection.** The
 rigger arranges the parameters and Live presents them that way
@@ -416,7 +423,8 @@ the right segment.
 
 **A Bézier segment stores its control points on the segment's earlier keyframe, as
 `control_points`: two entries, each shaped like a keyframe (a time and a `value`).** Their times
-lie inside the segment. Outside, the curve stops being a function of time: the solve has several
+lie inside the segment, **endpoints included** — the closed interval, which is what makes the
+degenerate segment, with a control point on an endpoint, legal. Outside, the curve stops being a function of time: the solve has several
 roots and the iteration can leave the segment. Cubism guarantees this; a stranger's writer need
 not, so the validator checks it, along with every control value being finite
 ([Validation](#validation-proposed)). How the curve is solved is in
@@ -541,14 +549,14 @@ rules it cannot:
 - **every parameter carrying at most one base driver** — a channel mapping, a physics output, or
   none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
 - a track's keyframes ordered in time, with values within the parameter's range;
-- **a Bézier segment's control times inside the segment.** The reader checks it because Cubism
+- **a Bézier segment's control times inside the segment, endpoints included.** The reader checks it because Cubism
   guarantees it and a stranger's writer need not. This rule is gated on the mode, deliberately: a
   control time means nothing without a segment to lie inside;
 - **every control point's value finite, whatever mode its keyframe declares, and wherever the
-  keyframe sits in its track.** Stated apart from the rule above because it is **not** gated.
-  Folded into the mode-gated check, a keyframe with no `interpolation` member, or any keyframe
-  last in its track, carried a non-finite control value through validation to the writer, which in
-  a release build substituted `0.0` — altering a stranger's file on save;
+  keyframe sits in its track.** Stated apart from the rule above because it is **not** gated
+  on the mode, and a keyframe with no `interpolation` member, or last in its track, is checked
+  all the same. [security.md](concerns/security.md) carries what happened when it was folded
+  into the gated check;
 - **a Bézier segment declares its control points**, and a segment of any other mode may carry
   them: the reader accepts them and the writer writes them back unchanged, since a stranger's
   file or a rigger's mode change can leave them behind and dropping them would alter the file;
@@ -594,8 +602,8 @@ one. A payload's bytes and the structure parsed out of them are therefore limite
 stops a hostile file and a budget describes what is tuned for
 ([requirements/puppet.md](requirements/puppet.md#a-limit-stops-a-hostile-file-a-budget-describes-what-is-tuned-for-decided)).
 `KeyframesPerTrack` is **65536**: one keyframe per frame is about eighteen minutes at 60 fps,
-where the earlier figure of 4096 is reached at 68 seconds, which the minute-plus animations
-this format must carry already exceed. **A total keyframe limit for the whole puppet is new**,
+which admits the minute-plus animations this format must carry.
+**A total keyframe limit for the whole puppet is new**,
 at **262,144**. Per-track limits multiply — the animation, track and keyframe figures together
 permit billions of keyframes — so an aggregate is needed, and this is the figure that decides
 whether a load can exhaust memory.
@@ -615,24 +623,30 @@ is really held by roughly a fifth. The 262,144 figure stands, because its margin
 ceiling still holds with the under-count; the point of stating it is that a reader retuning the
 charge should retune it toward the measurement.
 
-**The ceilings below are in charge units, because that is what the budget is enforced in**, and
-the parse-tree row was found by running files through the reader rather than by dividing. So a
-file at that ceiling holds nearer 326 MB live than the 256 MiB it is charged. Do not read the
-under-count above as an error in that row and revise it downward: the two are different
-quantities, and conflating them is how the aggregate figure came to be wrong twice.
+**Each ceiling below is in the unit it is enforced in, and the rows do not share one.** The
+payload ceiling counts text bytes; the parse-tree ceiling counts **charge**, which is an estimate
+of live memory and not a measurement of it. The parse-tree row was found by running files
+through the reader rather than by dividing. So a file at that ceiling holds nearer 326 MB live
+than the 256 MiB it is charged. Do not read the under-count above as an error in that row and
+revise it downward: the two are different quantities, and conflating them sets the aggregate
+figure wrong.
 
 **Three ceilings sit above any figure here, and only the lowest one matters.** A reader setting
-or revising this limit has to check it against all of them, because two earlier figures were set
-against one and were unreachable:
+or revising this limit has to check it against all of them, not only the first: a figure set
+against one ceiling can sit above the next and never fire, and a file just over it is then
+refused for the wrong rule, so it cannot have the fixture
+[requirements/puppet-acceptance.md](requirements/puppet-acceptance.md)'s `LIM-1` requires of
+every declared limit. [decisions.md](decisions.md) carries the figures this lesson was learned on.
 
-| Ceiling | Admits, in keyframes | Moves with number spelling? |
-|---|---|---|
-| `DecompressedPayloadBytes`, 64 MiB of text | about 2.9 million | **Yes** — barely half that at full double precision |
-| `ParseTreeBytes`, 256 MiB parsed | **about 586,000**, measured | No — structure is some 418 of the 458 bytes |
-| This limit | 262,144 | No |
+| Ceiling | Unit | Admits, in keyframes | Moves with number spelling? |
+|---|---|---|---|
+| `DecompressedPayloadBytes`, 64 MiB | text bytes | about 2.9 million | **Yes** — barely half that at full double precision |
+| `ParseTreeBytes`, 256 MiB | charged | **about 586,000**, measured | No — structure is some 418 of the 458 bytes |
+| This limit | keyframes | 262,144 | No |
 
 **So the parse tree is the real constraint**, binding roughly five times tighter than the
-payload limit and nineteen times tighter than residency. The figure sits below it with more than
+payload limit, and tighter than residency by about nineteen times in charge and about
+twenty-three by live cost. The figure sits below it with more than
 double the margin deliberately: the per-keyframe charge above is an estimate that may be retuned
 as the reader changes, and a limit set close under it would quietly stop firing when that
 happened, with every completeness check still green.
@@ -645,15 +659,6 @@ is one animation driving two hundred tracks at that density for the eighteen min
 reason the stress workload carries one animation at extreme density and the rest at corpus
 density. The per-track and aggregate figures therefore disagree about what a single animation may
 hold, and **the aggregate wins**: it is the one bounding what is actually held.
-
-**Two earlier figures could never fire, and both failed the same way** — set against one ceiling
-without checking the next one down. 16,777,216 was derived from residency alone, some six times
-what the payload limit admits. 1,048,576 was then checked against the payload limit but not
-against the parse tree, which admits barely half of it. A file just over either was refused for
-the wrong rule, so neither could have the fixture
-[requirements/puppet-acceptance.md](requirements/puppet-acceptance.md)'s `LIM-1` requires of
-every declared limit. Both corrected 2026-11-28; the crossover above was measured against the
-reader rather than derived.
 
 **`CoordinateCount` bounds a keypoint's `position`, a keyframe's `value` and a control point's
 `value`, at 1024, `Provisional`.** Its figure is chosen so as **not** to answer the keypoint and

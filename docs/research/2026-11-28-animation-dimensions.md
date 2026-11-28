@@ -6,9 +6,16 @@ animation cost unbounded · **Method:** parsed every `.motion3.json` in the Cubi
 corpus recorded in [2026-11-26-puppet-corpus.md](2026-11-26-puppet-corpus.md). Completes that
 measurement, which counted animation *files* and never opened them.
 
+> **Erratum, 2026-11-28.** This file says in several places that the load limit should bound
+> total keyframes **per animation**. The format binds it **per puppet**, and
+> [format.md](../format.md#load-limits-proposed) governs, as does
+> [platform.md](../requirements/platform.md). The measurements below stand as found, and the
+> per-animation figures remain a true description of the corpus; only the recommendation about
+> what a limit should bind is superseded.
+
 ## Verdict
 
-**Two rows, with the table's own convention applied — reference at the corpus median, stress
+**The rows below, with the table's own convention applied — reference at the corpus median, stress
 above the largest rig measured:**
 
 | | Reference | Stress | |

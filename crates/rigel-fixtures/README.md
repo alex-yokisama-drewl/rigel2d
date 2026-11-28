@@ -53,6 +53,20 @@ parser rather than from the finiteness rule, so it cannot name an offending iden
 `VAL-12` asks. `rigged:positive-infinity` and `rigged:negative-infinity` use `1e400`, which is
 strict JSON and overflows on parse, so those two can.
 
+## `rigged` is the control fixture
+
+Most criteria read a variant against `rigged` as a baseline: one defect, nothing else changed.
+**Adding a field to `rigged` silently disarms any criterion that compares against it**, because
+the baseline and the variant then differ by more than the defect, and nothing fails. A change to
+`rigged` is a change to every criterion that reads it, and wants that checked before it is made.
+
+## What the aggregate fixture costs
+
+`rigged:keyframes-over-aggregate` is large by necessity, since an aggregate limit can only be
+exceeded by building most of what it admits. Measured, it carries about 145 MB and about five
+seconds into every acceptance run, and the fixtures suite peaks near 900 MB. That is the price of
+the criterion and not a defect in it, but a machine with little memory will meet it here first.
+
 ## The load limits
 
 **Most of them are no longer here.** S2 landed `crates/rigel-format/src/limits.rs`, which is the

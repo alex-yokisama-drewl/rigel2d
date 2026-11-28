@@ -170,7 +170,8 @@ may assume an answer.
 
 **A track declares its interpolation per segment**: linear, stepped, inverse stepped or Bézier.
 They are Cubism's own, because importing animation that already exists is a case this project
-serves. A single track may mix them. **A Bézier segment's control times lie inside the segment
+serves. A single track may mix them. **A Bézier segment's control times lie inside the segment,
+its endpoints included
 and every control value is finite**, and evaluating one yields a finite value inside the segment
 for every input, degenerate control points included. **Interpolation between a parameter's
 keypoints stays linear and only linear** — a different question, unchanged.
@@ -480,7 +481,7 @@ code, and the same validator gates loading and saving.
 | Keypoints are ordered and within range | The range is the one the parameter declares |
 | An animation carries at most one track per parameter | More than one is a malformed file. Two tracks driving one parameter over one timeline is the same ambiguity the one-driver rule refuses, arriving by another route |
 | A track's keyframes are ordered in time, and its values within its parameter's range | The keypoint rule above, applied to the other thing that stores values against a parameter. Animation lookup seeks rather than scans, so unordered times give wrong answers rather than slow ones |
-| A Bézier segment's control times lie inside the segment, and every control value is finite | Outside, the curve stops being a function of time and the solve can leave the segment. Cubism guarantees it; a stranger's writer need not, so the reader checks. The range rule above does not reach control values |
+| A Bézier segment's control times lie inside the segment, endpoints included, and every control value is finite | Outside, the curve stops being a function of time and the solve can leave the segment. Cubism guarantees it; a stranger's writer need not, so the reader checks. The range rule above does not reach control values |
 | Each of a parameter's axes declares an **axis polarity** | Bilateral, unipolar or unknown, per dimension. An unfamiliar value follows the enumerated-values row below. A **missing** polarity is invalid in a file whose declared version this build knows — *unknown* is how a file says nobody has decided, and it is a value that must be written rather than an absence that may be inferred. The distinction is what stops a guessed polarity from being indistinguishable from a declared one |
 | Every parameter has exactly one neutral keypoint | None and more than one are both invalid. *Easing to neutral* ([performing.md](performing.md)) has no meaning without it, and a rule stated and never checked is a hope |
 | Each node's children are of a kind its own kind may contain | Declared **per kind** ([What a puppet is](#what-a-puppet-is-proposed)): a part contains nothing, a mesh group or a composite contains any kind, a physics node contains only physics. A rule written as prose naming kinds is one a fifth kind escapes silently; a declaration is one it has to answer |
@@ -508,7 +509,10 @@ memory rather than from the workload** — the animation keyframe limits, which
 explains. The multiple is provisional, to be revised the first time a legitimate file is refused.
 
 **The memory bound is assertable and the time bound is not.** Peak resident bytes during a
-failed load stay below the declared payload limit, which is exact. For time there is no
+failed load stay below the declared payload limit, which is exact for every limit **except an
+aggregate count**: such a fixture must be read almost to its end before the count can be exceeded,
+so the bound cannot hold there. The reason and what is asserted instead are in
+[puppet-acceptance.md](puppet-acceptance.md#j-load-limits-proposed). For time there is no
 reference machine, so a wall-clock figure would gate nothing; the honest form is that the work
 is linear in the declared size, with no unbounded loop. This is the same split between an
 asserted half and a recorded half that

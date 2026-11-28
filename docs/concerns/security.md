@@ -77,16 +77,16 @@ Record the threat model, the roles, and anything exempt here on the first planni
   Harvested at the S2 review, 2026-11-28.
 - **Every allocation sized from a file-derived length is preceded by a limit check on that length** — `script`
   A grep over the decoding module for capacity reservation and collection over a length taken from the file, failing where no limit check precedes it. *Would have caught:* a parameter's axes and a physics node's output sources and output scales being unbounded, which the load-limit rule says cannot happen.
-  **No script implements this yet.** Nothing in `scripts/` or `tests/` does the work, which is why the S2b review found by hand what the grep would have found unasked: four violations in one change, one of them only because an agent went looking past what it had been told to check. It is owed before the next subsystem adds decode paths. Tagged `script` for what it is meant to be, not for what exists.
+  **No script implements this yet.** Nothing in `scripts/` or `tests/` does the work, which is why the S2b review found by hand what the grep would have found unasked: violations in one change, one of them only because an agent went looking past what it had been told to check. It is owed before the next subsystem adds decode paths. Tagged `script` for what it is meant to be, not for what exists.
   Harvested at the S2 review, 2026-11-28.
 - **Every collection the decoder reads has a declared limit, checked mechanically** — `test`
-  *Catches:* an allocation sized from a file-derived length with no limit check. Four such sites existed in the S2b change and a hand audit found them; see the allocation entry above.
+  The test half of the allocation entry above, which owns the class and the sites it was found at.
   Harvested at the S2b review, 2026-11-28.
 - **Evaluation never indexes one stored array by a count taken from another without a rule making them agree** — `test`
   *Catches:* a keyframe's `value` or a keypoint's `position` disagreeing with the parameter's axes. Validation zips them today, so a surplus coordinate is range-checked against nothing and an empty one against nothing at all. Ties to the arity `[open]` in `docs/format.md`, which nothing may assume an answer to.
   Harvested at the S2b review, 2026-11-28.
 - **Every stored number the format defines is covered by the finiteness walk, wherever it sits** — `test`
-  *Catches:* a numeric field reachable only through a conditional branch that the walk never visits. A Bézier control point's value was exactly this: checked only inside a mode-gated branch, so a keyframe with no mode, or the last in its track, carried a non-finite value to the writer.
+  *Catches:* a numeric field reachable only through a conditional branch that the walk never visits. A Bézier control point's value was exactly this: checked only inside a mode-gated branch, so a keyframe with no mode, or the last in its track, carried a non-finite value through validation to the writer, which in a release build substituted `0.0` — altering a stranger's file on save.
   Harvested at the S2b review, 2026-11-28.
 - **A member the format defines only under a condition is rejected when the condition does not hold** — `test`
   The same escape from the other side: a conditional member is where ordering, range and finiteness checks quietly do not run.
@@ -183,6 +183,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
   Seeded at planning, 2026-11-27, on the physics-and-track revision.
 - **An aggregate limit exists wherever per-item limits multiply** — `script`
   Extend the limits completeness walk above to require it. *Catches:* animation × track × keyframe limits permitting hundreds of millions of keyframes, bounded only by the parse-tree cap.
+  **No script implements this yet.** Nothing in `scripts/` or `tests/` does the work. Tagged `script` for what it is meant to be, not for what exists.
   Seeded at the animation planning sweep, 2026-11-28.
 - **Animation evaluation is finite for every finite file** — `test`
   Property test over keyframe times, Bézier control points, durations, a stalled frame interval and the representable extremes. Extends the physics finiteness entry above to animation. *Catches:* `f32::clamp` propagating NaN to geometry, `inf − inf` in a sum of in-range contributions whose range reaches the float limit, a zero derivative in a Newton step, and a zero-duration loop that never exits.

@@ -89,6 +89,12 @@ unmarked data and on unfamiliar enumerated values are gated on the declared vers
 material in a file declaring a later version is **accepted**. A defect fixture that declared a
 later version would therefore pass, and the criterion would silently stop testing anything.
 
+**A just-over limit fixture must clear every neighbouring limit, or it tests the wrong rule.** A
+file just over one limit that is also over another is refused by whichever fires first, and the
+criterion passes while asserting nothing about the limit it names. The check is mechanical: build
+the fixture and run `rigel-validate` on it, whose rejection line names the rule that fired. If
+that is not the limit the fixture is for, the fixture is wrong.
+
 Defect fixtures are listed where they are used. Every fixture in this document is committed, and
 [LIM-1](#j-load-limits-proposed) makes a declared load limit with no fixture a failure.
 
@@ -255,7 +261,7 @@ on it; the licensed counterpart is [EXT-7](#f-unrecognised-data-is-marked-as-suc
 | **VAL-18** | `:nonfinite-after-narrowing` | Every number is finite, **judged at the precision the runtime evaluates in**. **Wrong build:** checks at the precision the file was parsed in, so a value that is finite as a literal and infinite once narrowed reaches the frame loop, and two tools reading one file disagree about whether it is valid |
 | **VAL-22** | `:physics-contains-part`, `:physics-contains-mesh-group` | **A physics node contains only physics.** What each kind may contain is declared per kind, and this is the declaration a cascade would otherwise ride through to artwork — [ART-26](#m-adding-artwork-when-the-art-and-the-rig-disagree-proposed) is the behavioural half. *No part has children*, above, is the same rule for a different kind, and [VAL-23](#h-a-puppet-that-fails-its-integrity-rules-is-rejected-not-repaired-proposed) asserts both from the declaration rather than one at a time |
 | **VAL-27** | `:two-tracks-one-parameter` | **An animation carries at most one track per parameter.** More than one is malformed rather than a shape the format cannot express: the tracks are a list, so the duplicate is expressible and must be rejected naming the animation as well as the parameter. The alternative — keying the collection by parameter identifier, which makes the duplicate inexpressible and needs no rule — makes that identifier serve as both key and reference, and a third party reading the JSON is the case this format exists to serve. The rejection half of [TRACK-1](#q-physics-tracks-and-the-puppets-gravity-proposed), which asserts the valid shape |
-| **VAL-28** | `:bezier-control-time-outside-segment`, `:bezier-control-value-nonfinite` | **A Bézier segment's control times lie inside the segment and every control value is finite.** Each is rejected naming the rule, the animation and the track. Outside the segment the curve stops being a function of time, so the fixture also asserts what the rule is for: no build is asked to evaluate it. **Wrong build:** checks keyframe values against the parameter's range and stops there, which control values are not subject to, and lets a segment whose solve leaves the segment reach the frame loop |
+| **VAL-28** | `:bezier-control-time-outside-segment`, `:bezier-control-value-nonfinite` | **A Bézier segment's control times lie inside the segment, its endpoints included, and every control value is finite — the value rule whatever mode the keyframe declares.** Each is rejected naming the rule, the animation and the track. Outside the segment the curve stops being a function of time, so the fixture also asserts what the rule is for: no build is asked to evaluate it. **Wrong build:** checks keyframe values against the parameter's range and stops there, which control values are not subject to, and lets a segment whose solve leaves the segment reach the frame loop |
 | **VAL-29** | `:interpolation-value-invalid`, `:end-behaviour-invalid` | At the **current** version an interpolation mode or an end behaviour that is none of the values the requirement defines is **rejected**, because a writer at this version had the whole list. The later-version counterparts are accepted and inert, asserted at [UNF-1](#r-animation-composition-interpolation-ending-and-triggers-proposed) |
 
 Duplicate identifiers are [ID-5](#a-every-entity-has-a-stable-identity-proposed).
@@ -311,14 +317,14 @@ A **load limit** is not a ceiling and not an authoring limit.
 
 **An aggregate count limit is the class LIM-2's peak bound cannot bind.** A fixture one item over
 an aggregate must be read almost to its end before a running count can exceed it, so the parse
-tree for every admitted item is built whatever the counting strategy. The measured peak for the
-aggregate keyframe limit is 145.8 MB against a payload limit of 64 MiB. Put plainly, the bound
+tree for every admitted item is built whatever the counting strategy. Put plainly, the bound
 would require a limit to refuse more cheaply than it is required to accept: a lawful file one
-keyframe smaller must load, and costs some 120 MB of tree. What is asserted instead is the
-**whole-load and parse-tree budgets**, which are what bound the structure a payload builds.
-Neither does a peak measurement separate a reader that counts as it goes from one that counts a
-finished collection: at a just-over fixture the two differ by one item, some 458 bytes in about
-146 MB. [testing.md](../testing.md#not-tested-and-why-proposed) records that as untested.
+item smaller must load, and builds nearly the same tree. What is asserted instead is the
+**whole-load and parse-tree budgets**, which are what bound the structure a payload builds; what
+an item costs is in
+[format.md](../format.md#load-limits-proposed). Whether the limit fires before or after its
+collection is built is not asserted at all, and
+[testing.md](../testing.md#not-tested-and-why-proposed) owns why.
 
 **LIM-9 is the exception to the multiple**, because a limit set from memory is a different
 number from a budget set from the workload
