@@ -22,12 +22,12 @@ the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) 
 
 ## Status
 
-**Current task:** 1, finishing the aggregate keyframe just-over fixture at the settled figure;
-task 2 can start
-**Blocked on:** nothing. The figure is **262,144**, settled by the owner on 2026-11-28 — see
-*Decisions*. Both earlier figures were unreachable and the record of why is in
-*Contradicts docs*, because the failure mode repeats: a figure checked against one ceiling and
-not the next one down.
+**Current task:** 1 done. Task 2 is next
+**Blocked on:** nothing. The aggregate keyframe limit is **262,144**, settled by the owner on
+2026-11-28, and `rigged:keyframes-over-aggregate` is built against it and verified to be
+refused for that rule and no other. Both earlier figures were unreachable and the record of why
+stays in *Contradicts docs*, because the failure mode repeats: a figure checked against one
+ceiling and not the next one down.
 
 ---
 
@@ -319,6 +319,9 @@ than deleting it.
   is; the builder section is `animation_shape` in
   [fixtures.rs](../../crates/rigel-fixtures/src/fixtures.rs).
 - `rigged` itself gains `end_behaviour` on its animation and nothing else — see *Decisions*.
+- `rigged:keyframes-over-aggregate`, the just-over fixture for the aggregate keyframe limit, at
+  the settled figure. It is the largest fixture in the corpus by an order of magnitude; what it
+  costs to build and to test is under *Traps*.
 - The encoding helpers the fixtures compose, in
   [puppet.rs](../../crates/rigel-fixtures/src/puppet.rs): the end behaviours, the interpolation
   modes beyond linear, the two named scene events, a trigger, a keyframe, a keyframe opening a
@@ -423,6 +426,10 @@ than deleting it.
   **262,144**, which fires with more than double the margin and commits a 0.67 MB fixture, over
   524,288, whose tenth of margin is thin against a figure already wrong twice. The table above
   was reproduced independently by the dispatching session before the figure was changed.
+  `rigged:keyframes-over-aggregate` is now built at 262,145 and carries 8.3 MB of text in a
+  0.68 MB archive. It was verified the same way the table was: `rigel-validate` parses it
+  through to `unmarked-data [end_behaviour]` — the expected S2b red — rather than refusing it
+  for any limit, and no `limit.*` rejection appears anywhere in the workspace suite.
 - **[README.md](../../crates/rigel-fixtures/README.md) stated *The load limits are not here*
   and that the just-over fixture per declared limit was deferred because the limits did not
   exist.** They landed in S2: [limits.rs](../../crates/rigel-format/src/limits.rs) carries a
@@ -455,9 +462,29 @@ than deleting it.
   `rigged:future-minor-…` variant must genuinely be the accepted half of a pair. The two new
   unfamiliar-value pairs are held to that by the differential test, which asserts the material
   is byte-identical across the version gate.
-- **The aggregate keyframe fixture is not merely large, it is impossible.** Two hours could be
-  spent making it smaller before noticing that the payload limit refuses it first. The
-  arithmetic is in *Contradicts docs* above so nobody redoes it.
+- **A just-over fixture for a limit has to clear every *neighbouring* limit, not just sit over
+  its own.** This one took three attempts and both failures were the same mistake at different
+  depths: a figure checked against one ceiling while the next one down was lower. Check a
+  candidate by building it and running `rigel-validate` over it — the rejection line names the
+  rule, so a fixture testing the wrong one is one command away from being obvious. The
+  measurements are in *Contradicts docs* so nobody redoes them.
+- **Its tracks are deliberately at half `KeyframesPerTrack`, not at it.** Filling them to
+  exactly the per-track figure is legal and needs fewer tracks, but it leaves the fixture
+  resting on whether that limit is read as admitting its own figure or refusing it. After two
+  rounds lost to limit-boundary readings, the daylight is worth four extra tracks.
+- **It is the largest fixture in the corpus by an order of magnitude, and it is not free.**
+  Measured warm, so the figures are the fixture rather than a compile:
+
+  | | Without it | With it |
+  |---|---|---|
+  | `cargo run -p rigel-fixtures` | 0.37 s, 10 MB peak | 0.68 s, 307 MB peak |
+  | `cargo test -p rigel-fixtures` | 7.43 s, 203 MB peak | 10.24 s, 907 MB peak |
+
+  `scripts/fixtures-check.sh` goes from about 4.0 s to 5.3 s. The test suite costs roughly twice
+  the generator because `the_builder_is_deterministic` builds the whole corpus a second time.
+  Nothing here is near a limit on any machine this project targets, but it is the first fixture
+  whose cost is visible at all, and S3's generated workloads are larger again — so if the suite
+  needs a diet, this is where it starts, and *Deferred* names the lever.
 
 **Assumptions:**
 
@@ -475,15 +502,14 @@ than deleting it.
 
 **Deferred:**
 
-- **`rigged:keyframes-over-aggregate`, the just-over fixture for the aggregate keyframe limit.**
-  Still not buildable at the figure `format.md` states, now because of `ParseTreeBytes` rather
-  than `DecompressedPayloadBytes` — see *Contradicts docs* for the measurements. It is a short
-  change once the figure sits below about 586,000: an added `animation_shape` entry that pads
-  rigged's four parameters with full tracks across added animations, the catalogue note, and a
-  unit test pinning the count to the constant, in the shape `rigged:triggers-over-limit`
-  already has.
 - **Regenerating `rigged:near-limit` against the real `NodeCount` limit.** Reported above;
   outside this task.
+- **Shrinking what `rigged:keyframes-over-aggregate` costs to build.** The builder materialises
+  its keyframes as `serde_json` values, which is what the memory under *Traps* is. The crate's
+  `Raws` escape hatch would let the keyframe array be composed as literal text instead and would
+  remove most of it. Not done: it means hand-spelling floats and matching `serde_json`'s
+  shortest-round-trip format exactly, which is a correctness risk taken for a cost nothing is
+  yet paying. The lever is here if S3's generated workloads make it worth pulling.
 
 ---
 

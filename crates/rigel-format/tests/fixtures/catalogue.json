@@ -434,6 +434,12 @@
     },
     {
       "expect": "rejected",
+      "file": "rigged.keyframes-over-aggregate.rigel2d",
+      "name": "rigged:keyframes-over-aggregate",
+      "note": "one keyframe more than the whole-puppet aggregate limit, with every per-track and per-animation count inside its own"
+    },
+    {
+      "expect": "rejected",
       "file": "rigged.nan.rigel2d",
       "name": "rigged:nan",
       "note": "a number this build interprets that is not a number"

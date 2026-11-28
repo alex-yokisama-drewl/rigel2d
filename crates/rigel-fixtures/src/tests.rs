@@ -990,3 +990,75 @@ fn the_trigger_limit_fixture_is_one_over_the_declared_figure() {
         "the fixture also duplicates an event"
     );
 }
+
+#[test]
+fn the_aggregate_keyframe_fixture_is_one_over_and_clear_of_every_neighbouring_limit() {
+    // The fixture that took three attempts. Two earlier figures for this limit
+    // could never fire, because a file just over either was refused by the
+    // payload limit or by the parse-tree limit first — and a fixture refused
+    // for a rule its catalogue note does not name tests the wrong thing while
+    // looking green. So this asserts both halves: that it is exactly one over
+    // the aggregate, and that nothing else is anywhere near firing.
+    let fixture = fixture("rigged:keyframes-over-aggregate");
+    let text = entry(&fixture.bytes, "puppet.json").expect("the fixture carries a puppet.json");
+    let puppet: Value = serde_json::from_slice(&text).expect("it parses");
+
+    let per_track: Vec<usize> = array(&puppet, "animations")
+        .iter()
+        .flat_map(|a| a["tracks"].as_array().unwrap())
+        .map(|t| t["keyframes"].as_array().unwrap().len())
+        .collect();
+
+    assert_eq!(
+        per_track.iter().sum::<usize>(),
+        AGGREGATE_KEYFRAME_LIMIT + 1,
+        "the just-over fixture is not just over"
+    );
+
+    // Every neighbouring count, with room to spare. `docs/format.md` *Load
+    // limits* carries the ceilings these are read against.
+    assert!(
+        *per_track.iter().max().unwrap() <= KEYFRAMES_PER_TRACK / 2,
+        "a track is close enough to the per-track limit that an inclusive \
+         reading of it would refuse this fixture first"
+    );
+    assert!(
+        array(&puppet, "animations").len() * 8 <= 128,
+        "too many animations"
+    );
+    assert!(
+        array(&puppet, "parameters").len() <= 600,
+        "too many parameters"
+    );
+    for animation in array(&puppet, "animations") {
+        assert!(animation["tracks"].as_array().unwrap().len() <= 600);
+        // An animation carries at most one track per parameter.
+        let driven: BTreeSet<u64> = animation["tracks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["parameter"].as_u64().unwrap())
+            .collect();
+        assert_eq!(
+            driven.len(),
+            animation["tracks"].as_array().unwrap().len(),
+            "an animation carries two tracks for one parameter"
+        );
+    }
+
+    // The payload text, against `DecompressedPayloadBytes` at 64 MiB. The
+    // parse tree is what actually binds and cannot be measured from here
+    // without the reader — `docs/format.md` carries that arithmetic — but the
+    // text is the half this crate can hold itself to.
+    assert!(
+        text.len() * 4 < 64 * 1024 * 1024,
+        "the payload is within a factor of four of its limit, which is less \
+         margin than this fixture was built with"
+    );
+
+    // And it stays committable.
+    assert!(
+        fixture.bytes.len() < 2 * 1024 * 1024,
+        "the committed fixture has grown past two megabytes"
+    );
+}

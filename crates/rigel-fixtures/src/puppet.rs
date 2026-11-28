@@ -95,6 +95,28 @@ pub const PROVISIONAL_NODE_LIMIT: usize = 256;
 /// `rigged:triggers-over-limit` stops being just over anything.
 pub const PROVISIONAL_TRIGGERS_PER_ANIMATION: usize = 64;
 
+/// The most keyframes one track may carry, from `docs/format.md` *Load limits*.
+///
+/// `rigged:keyframes-over-aggregate` has to stay at or under it on every track,
+/// or that fixture is refused for this limit instead of the aggregate one.
+pub const KEYFRAMES_PER_TRACK: usize = 65_536;
+
+/// The most keyframes one **puppet** may carry, over every animation and track,
+/// from `docs/format.md` *Load limits*.
+///
+/// Not a figure this crate invented, unlike [`PROVISIONAL_NODE_LIMIT`] and
+/// [`PROVISIONAL_TRIGGERS_PER_ANIMATION`]: `format.md` states it, states the
+/// arithmetic behind it, and records the two earlier figures that could never
+/// fire. It is repeated here only because this crate depends on no other crate
+/// in the workspace and so cannot read `limits.rs`. **Task 3's row must carry
+/// this figure.**
+///
+/// It is small because a keyframe costs about 458 bytes in the parse tree
+/// against 24 resident, so `ParseTreeBytes` binds some five times tighter than
+/// the payload limit does — the ceiling both earlier figures were set without
+/// checking.
+pub const AGGREGATE_KEYFRAME_LIMIT: usize = 262_144;
+
 /// The end behaviours `docs/format.md` *How an animation ends* defines. Always
 /// written, because no default is stated for the field.
 pub const END_LOOP: &str = "loop";

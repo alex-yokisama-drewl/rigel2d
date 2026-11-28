@@ -1394,6 +1394,117 @@ fn animation_shape(c: &mut Catalogue) {
             set_triggers(doc, A_IDLE, Value::Array(triggers));
         },
     );
+
+    c.variant(
+        "rigged:keyframes-over-aggregate",
+        Expect::Rejected,
+        "one keyframe more than the whole-puppet aggregate limit, with every per-track and \
+         per-animation count inside its own",
+        pad_past_the_aggregate_keyframe_limit,
+    );
+}
+
+/// The parameters the bulk tracks drive, with the arity of each one's keyframe
+/// values. All four of `rigged`'s, so that the fixture adds no parameter and
+/// the parameter count stays where `rigged` leaves it.
+///
+/// Zero is inside every one of these parameters' declared ranges, which is what
+/// lets every bulk keyframe carry the same value.
+const BULK_TRACK_PARAMETERS: &[(u64, usize)] = &[
+    (P_HEAD_TURN, 1),
+    (P_MOUTH_OPEN, 1),
+    (P_BODY_LEAN, 2),
+    (P_HAIR_SWAY, 1),
+];
+
+/// Pad `rigged` to exactly one keyframe over the aggregate limit.
+///
+/// **Every other limit has to stay clear**, or the fixture is refused for a
+/// rule its catalogue note does not name — which is precisely how the two
+/// earlier figures for this limit failed, and why `format.md` *Load limits* now
+/// carries all three ceilings in one table. So:
+///
+/// - **no track comes near [`KEYFRAMES_PER_TRACK`]**: the padding is spread at
+///   half that figure per track. Filling each track to exactly the per-track
+///   limit would also be legal and would need fewer of them, but it would leave
+///   this fixture resting on whether that limit is read as admitting its own
+///   figure or refusing it — and an inclusive-versus-exclusive reading of a
+///   neighbouring limit is the shape of mistake that has already cost this
+///   fixture two rounds. Daylight costs four more tracks;
+/// - the tracks drive parameters `rigged` already has, cycling through them and
+///   opening another animation each time the list wraps, because an animation
+///   carries at most one track per parameter. So neither the parameter count
+///   nor the animation count moves anywhere near its own limit;
+/// - the keyframes are spelled as plainly as the rest of the corpus, which
+///   keeps the payload text around 8 MB against a 64 MiB limit and the parse
+///   tree around 120 MB against 256 MiB.
+///
+/// Counting what `rigged` already carries rather than assuming it is what makes
+/// this exact: a keyframe added to the base fixture would otherwise push this
+/// one silently to two over, and *just over* would stop being true.
+fn pad_past_the_aggregate_keyframe_limit(doc: &mut Doc) {
+    let carried: usize = doc
+        .obj()
+        .get("animations")
+        .and_then(Value::as_array)
+        .expect("animations is an array")
+        .iter()
+        .flat_map(|animation| {
+            animation["tracks"]
+                .as_array()
+                .expect("an animation has tracks")
+        })
+        .map(|track| {
+            track["keyframes"]
+                .as_array()
+                .expect("a track has keyframes")
+                .len()
+        })
+        .sum();
+    let mut remaining = AGGREGATE_KEYFRAME_LIMIT + 1 - carried;
+
+    // Half the per-track limit, so every track sits clear of it on both sides
+    // of any reading.
+    let per_track = KEYFRAMES_PER_TRACK / 2;
+    let mut id = 5000;
+    let mut animation = 940;
+    let mut tracks = Vec::new();
+    let mut parameters = BULK_TRACK_PARAMETERS.iter().cycle();
+    let mut opened = 0;
+    while remaining > 0 {
+        if opened == BULK_TRACK_PARAMETERS.len() {
+            push_animation(
+                doc,
+                animation,
+                &format!("bulk_{animation}"),
+                END_LOOP,
+                Value::Array(std::mem::take(&mut tracks)),
+            );
+            animation += 1;
+            opened = 0;
+        }
+        let &(parameter, axes) = parameters.next().expect("the cycle never ends");
+        let count = remaining.min(per_track);
+        let keyframes: Vec<Value> = (0..count)
+            .map(|at| json!({"time": at as f64, "value": vec![0.0; axes]}))
+            .collect();
+        tracks.push(json!({
+            "blend_duration": 0.0,
+            "id": id,
+            "keyframes": keyframes,
+            "parameter": parameter,
+        }));
+        id += 1;
+        opened += 1;
+        remaining -= count;
+    }
+    push_animation(
+        doc,
+        animation,
+        &format!("bulk_{animation}"),
+        END_LOOP,
+        Value::Array(tracks),
+    );
 }
 
 /// The middle keyframe of the head-turn track is the earlier keyframe of the
