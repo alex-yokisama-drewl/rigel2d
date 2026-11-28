@@ -653,7 +653,29 @@ the fuzz deadline can actually interrupt a hang. No user gate.
 
 **Still to do:** nothing in this task. Task 10 follows.
 
-### 10. Finish — `todo`
+### 10. Finish — `in progress`
+
+Review is done — `code-reviewer` plus `concern-analyst` in review mode for data, security and
+ops. What they found is in tasks 10 and 11; the claims that drove a code change were each
+reproduced before being acted on, and two did not survive first contact with a measurement in
+the shape the report gave them.
+
+**The handoff is routed.** Every item in the slots below now lives in a document that outlives
+this file:
+
+| Went to | What |
+|---|---|
+| [format.md](../format.md) | *The reader accepts more than the writer emits*, a new section; the save's behaviour at a symlink; the keypoint/axis arity gap and the number-spelling gap, both `[open]`; the texture pixel-area gap under *Load limits* |
+| [puppet-acceptance.md](../requirements/puppet-acceptance.md) | The `one-part` row corrected against `format.md`'s root rule; the `rigged` row disambiguated to four parts; `ART-19` marked `[open]` because this branch killed its premise |
+| [platform.md](../requirements/platform.md) | The owner's priority ordering between the budgets, `[decided]` |
+| [decisions.md](../decisions.md) | The reader accepting a non-canonical container; `ParseTreeBytes` as a limit distinct from the payload's bytes; a save replacing a symlink |
+| [concerns/security.md](../concerns/security.md), [data.md](../concerns/data.md), [ops.md](../concerns/ops.md) | The checklist entries the review proposed, and the two harvested from the gate |
+| [testing.md](../testing.md) | Who may change an acceptance test once an implementation exists |
+| [open-questions.md](open-questions.md) | The pixel-area figure, `ART-19`'s restatement, and the two new `format.md` gaps |
+
+**What remains:** `plan.md` moved on, and this file deleted, in one commit.
+
+### 10. Finish — the original entry
 
 Review (`code-reviewer`, and `concern-analyst` in review mode for data, security and ops), route
 the handoff, `scripts/docs-check.sh`, move [plan.md](plan.md) on, delete this file. Steps 4 and 5

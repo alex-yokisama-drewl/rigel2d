@@ -140,6 +140,18 @@ These are different jobs. Tests written by the author of the code encode the cod
 assumptions, which is why the second kind is written first and never edited to make an
 implementation pass. An acceptance test that seems wrong is a finding, not an obstacle.
 
+**When an acceptance test genuinely has to change, the implementer is the one person who must
+not be the one to change it.** Two criteria can contradict each other, and then one of the tests
+is wrong and editing it is the only way forward — so the rule cannot be *never*. What it is
+instead: the change is raised as a finding, and made by someone who has not read the
+implementation. The reason is narrow and worth stating, because the honest-looking case is the
+dangerous one — an implementer who has just read the code can write a correct, well-argued
+weakening of a test, and nobody downstream can tell it apart from a correct, well-argued
+*necessary* one. S2 produced exactly that: a canonical-ordering test was rewritten by the author
+of the code it tests, the reasoning was sound, the reviewer agreed the result was right, and the
+test still ended up asserting less than the criteria had asked for, by the one hand the
+separation exists to keep off it.
+
 ## Not tested, and why **[proposed]**
 
 Each with its reason. A gap on record is a decision; an unmentioned gap is a surprise.

@@ -77,15 +77,30 @@ sweep.
 - **Every released format version has a committed fixture the current build loads; fixtures are append-only** — `judgment`
   → `script` once there is a released version. Note the compatibility promise does not harden until the project is shared with a community.
   Seeded at planning, 2026-11-26.
+- **A rule the specification states for the canonical writer is not enforced by the reader, and each such rule has a valid-but-non-canonical fixture the reader accepts and the writer canonicalises** — `test`
+  Table-driven over the canonical-serialisation list: unsorted entries, other modification times, the other compression method per entry kind, an extra field, other external attributes, a directory marker. Project-specific because the whole fixture corpus is written by our own canonical writer, so every fixture satisfies every writer rule and no test can see the difference. *Would have caught:* a puppet repacked with ordinary tooling being refused. It also covers the sibling rules nobody had tested.
+  Harvested from the S2 third-party gate, 2026-11-28.
+- **A tolerance added for third-party tooling is tested against the output of more than one such tool** — `test`
+  *Would have caught:* the first directory-marker fix, validated only against the tool that produced the original report and broken for another. One sample is not a boundary.
+  Harvested at the S2 review, 2026-11-28.
+- **A fixture exempted from a corpus-wide assertion is exempt from the named assertion only, and must still satisfy the rest** — `test`
+  *Would have caught:* an exemption written per fixture rather than per assertion, under which an unrelated stray entry in that fixture would pass unnoticed.
+  Harvested at the S2 review, 2026-11-28.
+- **Preserved unknown material follows its entity through in-memory edits, including entities addressed by position** — `test`
+  Material from a later-version file that the writer keys by position within a collection, after a keypoint, keyframe or axis is inserted or deleted. *Would have caught:* a stranger's data silently re-attaching to a different entity.
+  Harvested at the S2 review, 2026-11-28.
 
 ### Writing to disk
 
 <!-- Both applications write puppet files: Live writes channel mappings. These entries bind Live
      as much as Studio. -->
 
-- **Every write to a puppet, scene or autosave path goes through one atomic-write function** — `judgment`
-  → `script` once the function exists, failing on any write outside it. A paired test injects failure at each step and asserts the prior file is intact.
-  Seeded at planning, 2026-11-26.
+- **Every write to a puppet, scene or autosave path goes through one atomic-write function** — `script`
+  A grep failing on any write outside the function, with an allow-list for the single write path and the fixture builder. A paired test injects failure at each step and asserts the prior file is intact.
+  Seeded at planning, 2026-11-26. Function exists as of S2; script now required.
+- **A failed or refused save leaves the destination directory listing unchanged and never replaces an existing sibling** — `test`
+  Run for each injected failure step, for upgrading and non-upgrading saves, and with a backup sibling already present. *Would have caught:* an upgrading save overwriting an existing version-upgrade backup, the one file kept precisely because an upgrade cannot be undone by saving again.
+  Harvested at the S2 review, 2026-11-28.
 - **Saving an unmodified puppet is byte-identical, with no timestamps, paths or machine names** — `judgment`
   → `test`. Preserved extension data takes part in canonical serialisation, or carrying it makes files churn.
   Seeded at planning, 2026-11-26.

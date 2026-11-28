@@ -132,9 +132,11 @@ application open a connection, so it does not touch the rule in
   → `script`: the release job builds with `--locked`, fails without `rust-toolchain.toml`, and
   fails unless `scripts/test-record.sh` holds a passing result for the tag's commit SHA. A
   toolchain bump is its own commit and re-runs the counter gate.
-  **Nothing yet produces that record.** CI runs `cargo test --workspace --locked` directly, not
-  through `scripts/test-record.sh`, so no result is ever written there; whoever builds the release
-  job has to produce the record as well as check it.
+  **The record is not yet readable across jobs.** CI runs the suite through
+  `scripts/test-record.sh`, so the gate job writes a result. The results directory is gitignored
+  and nothing uploads it, so the record exists only on the gate job's runner; a later job on a
+  different runner cannot read it, and whoever builds the release job has to carry the record
+  across as well as check it.
   Seeded at planning, 2026-11-26.
 
 - **Each artifact runs on a clean machine with nothing installed beyond the platform's own components** — `judgment`
@@ -237,6 +239,10 @@ application open a connection, so it does not touch the rule in
   how a loop starts.
   Seeded at planning, 2026-11-26.
 
+- **A file that cannot be opened is reported as such, distinctly from a file that is refused** — `test`
+  A missing path, a directory and an unreadable file each produce a different rule name from a malformed or hostile file. *Would have caught:* the validator reporting a mistyped path identically to a hostile puppet, leaving a script no way to tell them apart. Fixed; this entry keeps it fixed.
+  Harvested at the S2 review, 2026-11-28.
+
 ### Observability with no operator
 
 - **Both applications keep a local log that is bounded, rotated, and never written synchronously or allocated for inside the frame loop** — `judgment`
@@ -284,6 +290,18 @@ application open a connection, so it does not touch the rule in
   → `script`: `scripts/tests-ran.sh`, run as gate 2's second step. Gate 2 now runs the suite through `scripts/test-record.sh`, and this reads the `tests_run` that record carries. Fails on zero, and equally on `null` or a missing field — a count that cannot be read is the same silent decay as a zero, not a pass. Bound from S2, the first subsystem with tests to lose.
   Covered, S2 task 2, 2026-11-27.
   Seeded at the S1 review, 2026-11-27.
+
+- **A test count never falls without a recorded reason** — `script`
+  The zero-test gate fails only at zero, so losing an entire suite leaves it green as long as something still runs. Compare the recorded count against a committed floor that rises with new tests and falls only in a commit that edits its stated reason. *Would have caught:* a dropped test-module declaration, or a nested test directory the build silently skips.
+  Harvested at the S2 review, 2026-11-28.
+
+- **Every continuous-integration job sets an explicit timeout** — `script`
+  Extend the existing workflow-checking script, or add a sibling. *Would have caught:* a hanging job holding a metered runner for the platform default, in a workflow that already manages metered-runner cost by other means.
+  Harvested at the S2 review, 2026-11-28.
+
+- **A fuzz failure's input is recoverable from the CI run** — `judgment`
+  → `script` asserting the workflow uploads the failing input on failure. **A mitigated gap, not a violation:** the failing input is written to disk and nothing uploads it, but the run is deterministic and prints its seed, so the failure can be reproduced from the log. Recovering the input directly is a convenience until the seed stops being enough.
+  Harvested at the S2 review, 2026-11-28.
 
 ### Universal entries that do not apply here **[decided]**
 

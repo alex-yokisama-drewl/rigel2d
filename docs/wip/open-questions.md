@@ -23,6 +23,7 @@ needs and survives this file being deleted. This file adds only the grouping.
 | What form crash recovery takes — a prompt, an autosave journal, or both | `requirements/authoring.md`, inline |
 | Whether Live yields or holds under contention, and whether it degrades, warns or refuses over budget | `requirements/platform.md` — *Behaviour under contention and over budget*. Live's behaviour, and not needed until Live is built |
 | Whether Windows code signing is funded, and whether macOS notarisation follows | `requirements/platform.md` — *Windows code signing* |
+| Whether a texture has a pixel-area limit, and what figure | `format.md` — *Load limits*. Only each side is capped today, so a texture at the maximum on both is a gigabyte of pixels; the allocation belongs to whatever uploads it |
 
 ## Waiting on design work, not on an answer
 
@@ -34,6 +35,9 @@ needs and survives this file being deleted. This file adds only the grouping.
 | How many tracks an animation carries, and how many keyframes a track carries | `requirements/platform.md`'s workload table. The corpus counted `.motion3.json` files rather than the curves inside them, so the dimension has no figures and no load limit covers it. Reading curve counts out of the same corpus is a research task, not a decision |
 | Composition modes for deformations | `requirements/puppet.md`. Waits on evidence about which are wanted |
 | Randomness, and first run | `requirements/authoring.md` |
+| How `ART-19` is restated now that its premise is gone | `requirements/puppet-acceptance.md` — ART-19. Belongs to the phase that owns Studio editing |
+| What relates a keypoint's coordinate count to its parameter's axis count, and a keyframe's value count to the same | `format.md` — *Validation*. No rule exists, so the validator zips the two and a surplus coordinate is checked against no range at all |
+| What textual form the writer spells a number in | `format.md` — *Canonical serialisation*. Unstated, so byte-identical round-tripping is checkable only against our own writer's choices |
 
 ## Waiting on a signal, not a decision
 

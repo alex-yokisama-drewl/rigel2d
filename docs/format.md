@@ -30,6 +30,26 @@ third-party claim: a reader opens one file rather than learning which of two hol
 
 What lost, and why, is in [decisions.md](decisions.md).
 
+### The reader accepts more than the writer emits **[proposed]**
+
+**The rules under [Canonical serialisation](#canonical-serialisation-and-where-zip-fights-it-proposed)
+bind the writer, not the reader.** A reader accepts an archive that is not canonical — any entry
+order, any timestamps, any compression — as long as every entry carrying data is one the entry
+table above defines.
+
+**One departure from the canonical form is named because ordinary archivers produce it: a
+zero-length `textures/` directory marker is accepted and ignored.** The tolerance depends on two
+things — the entry is empty, and the directory is one the entry table names. A marker anywhere
+else, or one carrying bytes, is an undefined entry like any other. The marker's compressed size
+and compression method are irrelevant, because the entry is never read: one archiver stores it
+and another deflates it, and a reader keyed on either refuses the other's puppet. The canonical
+writer never emits one.
+
+**Because** a third party must be able to repack a puppet with ordinary tooling, which is the
+whole case for an archive, and a specification that promises it while the reader refuses the
+result is wrong. [decisions.md](decisions.md) carries what was rejected. The reader's accepted
+set is wider than the writer's output, so the two are tested separately.
+
 ### The version is readable on its own **[proposed]**
 
 `rigel2d.json` exists so that deciding whether to refuse a file costs one small bounded read,
@@ -91,6 +111,14 @@ a bad frame. A sibling rather than a hidden location, because the person has to 
 it. It is also what `FILE-2` in [puppet-acceptance.md](requirements/puppet-acceptance.md) means
 when it says the directory afterwards holds the puppet "and nothing else but the version-upgrade
 backup".
+
+### A save replaces what is at the path **[proposed]**
+
+A save renames the new bytes over the puppet's path. A symlink there becomes a regular file and
+its old target is left untouched; the save never writes through a link.
+
+**Because** save and load touch nothing outside the file itself, and a saved file stays workable
+if it is moved. [decisions.md](decisions.md) carries what was rejected and the cost.
 
 ## Identifiers are integers, not UUIDs **[proposed]**
 
@@ -187,6 +215,13 @@ that churns in version control for no reason:
 The last two are also how a machine's identity leaks into a delivered file, which
 [the requirement](requirements/puppet.md#the-same-puppet-saves-to-the-same-bytes-proposed) rules out for
 its own reasons.
+
+**These bind the writer.** What a reader accepts is wider; see
+[the reader accepts more than the writer emits](#the-reader-accepts-more-than-the-writer-emits-proposed).
+
+**Number spelling is `[open]`.** Nothing here states the textual form a number is written in, so
+byte-identical round-tripping can be checked only against our own writer's choices, and a
+stranger's writer has no rule to match.
 
 ## The node tree **[proposed]**
 
@@ -397,6 +432,10 @@ rules it cannot:
   none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
 - binding value counts matching their mesh, or marked stale;
 - every number finite;
+- **the arity of a keypoint's coordinates and a keyframe's values against the parameter's axes —
+  `[open]`, and no rule exists.** Nothing relates the counts, and the validator today zips the
+  two: coordinates beyond the axes are validated against no range, and a keypoint with none is
+  validated against nothing. Nothing may assume an answer;
 - enumerated values known, or under `x`, or unfamiliar in a file declaring a later minor version
   — see [an unfamiliar value in a field this build knows](#an-unfamiliar-value-in-a-field-this-build-knows-proposed).
 
@@ -415,6 +454,16 @@ The archive makes one of these sharper than it would otherwise be: **a zip entry
 decompressed size, and that declaration is attacker-controlled.** The limit is enforced against
 bytes actually decompressed, with the declared size used only to refuse early. A loader that
 trusts the header has a decompression bomb.
+
+A second sharpening is that a size inside its own limit can still cost many times itself once it
+is held in memory, so what is bounded has to be the **held** quantity and not only the stored
+one. A payload's bytes and the structure parsed out of them are therefore limited separately.
+
+**Whether a texture has a limit on its pixel *area* is `[open]`.** Each side is capped, and
+nothing caps the product, so a texture at the maximum on both sides is a gigabyte of pixels once
+uploaded. The format reads only a payload's header, so the allocation belongs to whatever
+uploads it rather than to the loader — which is why no figure is stated here yet, and why one is
+owed before anything does.
 
 ## What the format does not define yet **[proposed]**
 

@@ -72,6 +72,21 @@ Record the threat model, the roles, and anything exempt here on the first planni
 - **A failed load leaves the displayed puppet unchanged** — `judgment`
   → `test`: load a hostile fixture while a good puppet renders, and assert the rendered buffer is unchanged. Asserts [I4](../invariants.md).
   Seeded at planning, 2026-11-26.
+- **Peak memory during a load stays under the whole-load budget, for the largest legal payload** — `test`
+  A fixture whose entry is just under the payload byte limit and dense with tiny array elements, loaded under the counting allocator. The JSON reader holds every number as a separately allocated string, which is what makes the amplification large. *Would have caught:* a tiny archive reaching nearly twice the whole-load budget resident, because the limit counted decompressed bytes and never saw the parse tree.
+  Harvested at the S2 review, 2026-11-28.
+- **Every allocation sized from a file-derived length is preceded by a limit check on that length** — `script`
+  A grep over the decoding module for capacity reservation and collection over a length taken from the file, failing where no limit check precedes it. *Would have caught:* a parameter's axes and a physics node's output sources and output scales being unbounded, which the load-limit rule says cannot happen.
+  Harvested at the S2 review, 2026-11-28.
+- **An archive entry is tolerated only as a defined name or as an empty directory marker for a defined directory, and each tolerated form has a fixture on both sides of the boundary** — `test`
+  The tolerance exists for third-party tooling and will attract pressure to widen. *Would have caught:* the first fix for the directory-marker defect, which keyed on the marker's compressed size and so accepted one archiver's marker while refusing another's.
+  Harvested at the S2 review, 2026-11-28.
+- **A save temporary is created exclusively, never with a call that truncates or follows a symlink** — `script`
+  A grep over the save path. *Would have caught:* the temporary being created with a truncating, symlink-following open on a predictable name in a directory the user chose.
+  Harvested at the S2 review, 2026-11-28.
+- **The JSON nesting depth limit has a fixture one past it** — `test`
+  The depth ceiling is deliberately not part of the limits table, so the table's completeness checks never reach it. *Would have caught:* a ceiling that is silently raised or removed with every completeness check still green.
+  Harvested at the S2 review, 2026-11-28.
 
 ### The input port
 

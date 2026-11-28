@@ -178,6 +178,12 @@ still a hitch on stream.
 | Puppet load | 2 s | | Including validation and texture upload |
 | Input latency | 2 frames | | From a packet arriving to the frame it affects, for a **directly driven** parameter. Latest value wins; the queue never grows. A **physics-driven** effect adds exactly one frame and no more, because physics reads the previous frame's transform ([evaluation.md](../evaluation.md)) — stated so that hair is not measured against a budget it cannot meet, nor the budget quietly stretched to let it pass |
 
+**Priority when budgets conflict. [decided]** Live's smoothness comes first: it is what is
+streamed, and it runs beside OBS, a game and whatever else the streamer is doing. Studio's
+performance is highly desired, but some issues are acceptable, since it is the heavier off-stream
+application. Taking longer to **load** a puppet is acceptable in both. This is an ordering for
+choosing what to sacrifice, not a licence to miss any figure above.
+
 The editor's responsiveness splits by interaction kind, because one figure is wrong for two of
 these three:
 
