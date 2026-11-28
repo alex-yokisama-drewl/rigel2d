@@ -74,7 +74,7 @@ measurements are in
 | **Every `ValidRange::max` is still `[open]`** | Pending the integrator-stability sweep due with the evaluation pass. The validator reads the table, so a figure landing there is the whole change — no code moves. **S4 owns this** |
 | **The fuzz target bounds one input, not the campaign** | `drive` runs on a worker thread with a per-input timeout, which is what catches a hang. A hung thread cannot be killed, so the run fails and the thread dies with the process. A subsystem adding a slower loader path should check the figure still has margin |
 | **The corpus is written by our own canonical writer** | So every fixture satisfies every writer rule, and no fixture can show that the *reader* accepts a container ordinary tooling wrote. This is what let a defect reach a human gate. The `data` entry that closes it is table-driven over the canonical-serialisation list and is not yet written |
-| **A texture's pixel area is unbounded** | Each side is capped; the product is not, so a legal texture is a gigabyte of pixels at upload. The format crate only reads the header, so **this binds whichever subsystem first uploads one**. It is in [open-questions.md](open-questions.md) |
+| **A texture's pixel area is unbounded** | Each side is capped; the product is not, so a legal texture is a gigabyte of pixels at upload. The format crate only reads the header. **Deferred by the owner rather than owed to a subsystem** — it is a hardening item, and nothing should block on it |
 
 ### Raised by the S1 review and not settled
 
@@ -167,7 +167,7 @@ discovered late.
 | Question | Due before | Lives in |
 |---|---|---|
 | Tracks per animation and keyframes per track, which no workload dimension covers | S4 | [open-questions.md](open-questions.md) |
-| Whether a texture has a pixel-area limit, and what figure | Whichever subsystem first uploads a texture | [open-questions.md](open-questions.md) |
+| Whether a texture has a pixel-area limit, and what figure | Not a subsystem — **deferred by the owner on 2026-11-28**, on the principle that the tool works first and is hardened second | [open-questions.md](open-questions.md) |
 
 The rows that stood here on the soak length, on a puppet changed on disk, and on configuration
 in the write path have all been answered in the documents that own them, and were struck when

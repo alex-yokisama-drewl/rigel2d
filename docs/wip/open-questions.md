@@ -23,7 +23,6 @@ needs and survives this file being deleted. This file adds only the grouping.
 | What form crash recovery takes — a prompt, an autosave journal, or both | `requirements/authoring.md`, inline |
 | Whether Live yields or holds under contention, and whether it degrades, warns or refuses over budget | `requirements/platform.md` — *Behaviour under contention and over budget*. Live's behaviour, and not needed until Live is built |
 | Whether Windows code signing is funded, and whether macOS notarisation follows | `requirements/platform.md` — *Windows code signing* |
-| Whether a texture has a pixel-area limit, and what figure | `format.md` — *Load limits*. Only each side is capped today, so a texture at the maximum on both is a gigabyte of pixels; the allocation belongs to whatever uploads it |
 
 ## Waiting on design work, not on an answer
 
@@ -44,6 +43,7 @@ needs and survives this file being deleted. This file adds only the grouping.
 | | |
 |---|---|
 | When the format compatibility promise becomes hard | `requirements/puppet.md`. It starts when the work is shared with a community, and the owner says when |
+| Whether a texture has a pixel-area limit, and what figure | `format.md` — *Load limits*. Each side is capped and the product is not, so a texture at the maximum on both is a gigabyte of pixels once uploaded. **Deferred by the owner on 2026-11-28**: make the tool work, then stop people breaking it. The signal is a build that actually uploads a texture, not a date |
 
 ## Due before plugins ship, not before the first release
 
