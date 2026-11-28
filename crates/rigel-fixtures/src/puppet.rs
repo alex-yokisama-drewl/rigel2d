@@ -84,6 +84,76 @@ pub fn notes_extension() -> Value {
 /// to happen when the real figure arrives.
 pub const PROVISIONAL_NODE_LIMIT: usize = 256;
 
+/// The provisional limit on one animation's `triggers`.
+///
+/// `triggers` is a new stored collection, so `LIM-8` requires a figure and
+/// `LIM-1` requires a fixture just over it. No `stress` dimension counts
+/// triggers and none ever will — an animation waits on a handful of scene
+/// events — so this is a `Provisional` figure in `limits.rs`'s sense: far past
+/// any authored rig and far below anything that costs memory. **The figure in
+/// `crates/rigel-format/src/limits.rs` must match this one**, or
+/// `rigged:triggers-over-limit` stops being just over anything.
+pub const PROVISIONAL_TRIGGERS_PER_ANIMATION: usize = 64;
+
+/// The end behaviours `docs/format.md` *How an animation ends* defines. Always
+/// written, because no default is stated for the field.
+pub const END_LOOP: &str = "loop";
+pub const END_HOLD: &str = "hold";
+pub const END_RELEASE: &str = "release";
+
+/// The interpolation modes `docs/format.md` *How a segment interpolates*
+/// defines beyond linear. **Linear is the absent form** and so has no constant:
+/// a track whose segments are all linear stores no mode anywhere.
+pub const INTERP_STEPPED: &str = "stepped";
+pub const INTERP_INVERSE_STEPPED: &str = "inverse_stepped";
+pub const INTERP_BEZIER: &str = "bezier";
+
+/// The two scene events `docs/format.md` *A trigger* names a use for. The set
+/// is open: an unrecognised name never fires and is never a validation failure,
+/// which is what `rigged:triggered` carries a third name for.
+pub const EVENT_ON_LOAD: &str = "on_load";
+pub const EVENT_SOURCE_LOST: &str = "source_lost";
+
+/// One trigger: the name of the scene event its animation waits for, and
+/// nothing else. No identifier, no target, no command — see `docs/format.md`.
+pub fn trigger(event: &str) -> Value {
+    json!({"event": event})
+}
+
+/// One keyframe of a one-axis track.
+pub fn keyframe(time: f64, value: f64) -> Value {
+    json!({"time": time, "value": [value]})
+}
+
+/// A keyframe that opens a segment interpolating in a stated mode. The mode
+/// belongs to the **earlier** keyframe of its segment.
+pub fn keyframe_with(time: f64, value: f64, mode: &str) -> Value {
+    let mut frame = keyframe(time, value);
+    frame
+        .as_object_mut()
+        .expect("keyframe is an object")
+        .insert("interpolation".into(), json!(mode));
+    frame
+}
+
+/// A keyframe opening a Bézier segment, carrying the two control points the
+/// cubic passes through.
+///
+/// A control point is shaped like a keyframe — a time and a value per axis — so
+/// that its arity follows the parameter's axes the way a keyframe's does, and
+/// so that a reader meets one shape rather than two.
+pub fn keyframe_bezier(time: f64, value: f64, controls: [(f64, f64); 2]) -> Value {
+    let mut frame = keyframe_with(time, value, INTERP_BEZIER);
+    frame.as_object_mut().unwrap().insert(
+        "control_points".into(),
+        json!([
+            keyframe(controls[0].0, controls[0].1),
+            keyframe(controls[1].0, controls[1].1),
+        ]),
+    );
+    frame
+}
+
 /// `rigel2d.json`: the format name and version, and nothing else.
 pub fn manifest(major: u64, minor: u64) -> String {
     serde_json::to_string(&json!({
@@ -480,8 +550,20 @@ fn bindings() -> Vec<Value> {
 }
 
 /// An animation carrying one track for each of two parameters.
+///
+/// **`end_behaviour` is written**, because `docs/format.md` states no default
+/// for it and a field with no stated default is always written. It is the one
+/// field of the 2026-11-28 animation round that `rigged` itself must carry:
+/// every other one is absent in its default form, and `rigged` is the control
+/// the variants below are read against.
+///
+/// So no track carries an `interpolation` — every segment here is linear, which
+/// is the absent form, and `INTERP-2` asserts that an all-linear track stores
+/// no mode anywhere. No animation carries `triggers`, no parameter carries an
+/// `order`, and no parameter carries `mappable`, which is absent when true.
 fn animations() -> Vec<Value> {
     vec![json!({
+        "end_behaviour": END_LOOP,
         "id": A_IDLE,
         "name": "idle",
         "tracks": [

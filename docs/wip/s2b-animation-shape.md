@@ -22,8 +22,11 @@ the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) 
 
 ## Status
 
-**Current task:** not started
-**Blocked on:** nothing
+**Current task:** 1 done except the aggregate keyframe just-over fixture; task 2 is next
+**Blocked on:** nothing for task 2. One question is owed to design and does not block it —
+[format.md](../format.md)'s aggregate keyframe limit of 16,777,216 cannot be reached by any file
+the payload limit admits, so `LIM-1`'s *every declared limit has a fixture just over it* cannot
+be satisfied for it. See *Contradicts docs* below.
 
 ---
 
@@ -205,7 +208,12 @@ cleanup.
 Approaches discarded during this branch. Not worth a permanent record; worth keeping until the
 branch ends so nobody re-proposes them.
 
--
+- **Committing a just-over fixture for the aggregate keyframe limit at any size.** Measured at
+  519 MB of text and 44 MB deflated, and refused by the payload limit rather than the aggregate
+  one. The arithmetic is in the handoff's *Contradicts docs*.
+- **A Bézier whose control times stay strictly inside its segment, for the degenerate case.**
+  There is no such curve: the zero derivative `INTERP-5` exists to sweep requires a control
+  point on a keyframe.
 
 ## Caught at gate
 
@@ -220,7 +228,7 @@ What the user caught that automation did not. **Each becomes a checklist entry i
 
 One commit each. Status: `todo` / `awaiting approval` / `done`.
 
-### 1. The fixtures — `todo`
+### 1. The fixtures — `done`
 
 Hand-author the fixtures section R's format half needs, in `rigel-fixtures`, from
 [format.md](../format.md) with third-party libraries only. That crate depends on no other crate
@@ -285,7 +293,65 @@ than deleting it.
 
 **Built:**
 
+- The animation-shape fixtures, in `crates/rigel-fixtures`. `catalogue.json` beside the corpus
+  names each one, what a conforming loader does with it, and the one thing that makes it what it
+  is; the builder section is `animation_shape` in
+  [fixtures.rs](../../crates/rigel-fixtures/src/fixtures.rs).
+- `rigged` itself gains `end_behaviour` on its animation and nothing else — see *Decisions*.
+- The encoding helpers the fixtures compose, in
+  [puppet.rs](../../crates/rigel-fixtures/src/puppet.rs): the end behaviours, the interpolation
+  modes beyond linear, the two named scene events, a trigger, a keyframe, a keyframe opening a
+  segment in a stated mode, and a keyframe opening a Bézier segment.
+- Unit tests over all of it in [tests.rs](../../crates/rigel-fixtures/src/tests.rs), including a
+  corpus-wide one asserting that no **accepted** fixture carries a malformed Bézier segment and
+  one asserting that no trigger outside `rigged:trigger-extra-field` carries anything but an
+  event name.
+
 **Decisions made:**
+
+- **`rigged` gains `end_behaviour` and no other new field.** It is the only one of the five that
+  is always written; the rest are absent in their default form (linear is the absent
+  interpolation, `mappable` is absent when true, an absent `order` is legal and sorts last, and
+  an empty `triggers` follows the corpus's existing treatment of empty collections — `one-part`
+  already omits `parameters` and `bindings`). Giving `rigged` an order, a flag, a trigger or a
+  mode would destroy the control that `INTERP-2`, `ORD-1` and `MAP-1` are each read against.
+- **A trigger is `{"event": "<name>"}`.** `docs/format.md` names the collection `triggers` and
+  says an entry carries the event name and nothing else, but not the key. `event` is the
+  vocabulary's word for the thing.
+- **A Bézier segment's control points are shaped like keyframes** — `control_points` on the
+  segment's earlier keyframe, a two-element list of `{"time", "value"}`, the value an array per
+  axis. `format.md` requires control times and finite control values and specifies no encoding.
+  Mirroring a keyframe makes the arity follow the parameter's axes automatically, the way a
+  keyframe's does, and leaves a reader one shape rather than two.
+- **The two scene event names are `on_load` and `source_lost`**, in the `snake_case` the crate
+  uses for every key. The set is open, so these are the two with a use rather than an enumeration.
+- **The committed sample expectations for `rigged:mixed-interpolation` ride as extension data**,
+  under `com.rigel2d.fixture-expectations`. The fixture row asks for them and there is nowhere
+  else in a puppet they can legally sit: outside `x` they would be unmarked core data and the
+  file would be invalid. They are marked, inert and carried untouched, which is exactly what a
+  committed expectation needs to be. Every one is exact and hand-derived — the stepped and
+  inverse-stepped values are the segment's own, the linear one is a midpoint, the symmetric
+  Bézier passes through the segment midpoint by the symmetry of its control points, and the
+  degenerate Bézier is sampled only at its endpoints, which every cubic reproduces exactly.
+- **`rigged:ordered-parameters` declares `mappable: false` on two parameters, not one.** The
+  fixture row names only the mapped one; `MAP-1` needs a parameter that is not mappable **and
+  carries no channel mapping**, and no other fixture carries one.
+- **The provisional trigger limit is 64**, declared as
+  `PROVISIONAL_TRIGGERS_PER_ANIMATION` in `puppet.rs` beside the existing
+  `PROVISIONAL_NODE_LIMIT`. No `stress` dimension counts triggers and none will — an animation
+  waits on a handful of scene events — so it is `Provisional` in `limits.rs`'s sense.
+  **Task 3's figure in `limits.rs` must be this one**, or `rigged:triggers-over-limit` stops
+  being just over anything; the crate's unit test asserts the fixture is exactly one over the
+  constant, so the two can only drift if both are edited.
+- **Defect fixtures beyond the four the assignment named.** The assignment called its list a
+  floor. Added from `format.md`'s *Validation* and from the enumerated-field rule: an end
+  behaviour that is absent, an interpolation mode on a track's last keyframe, a Bézier segment
+  declaring the mode and carrying no control points, and the current-version half of each
+  unfamiliar-value pair. Added from the data concern on the canonical writer binding no reader:
+  an explicit `linear`, an explicit `mappable: true`, and an out-of-order `triggers` list, each
+  **accepted** and canonicalised on save. Added from the security concern on triggers: an event
+  name shaped like a condition, which is **accepted**, because the set of names is open and an
+  unrecognised one is never a validation failure.
 
 **Contradicts docs:**
 
@@ -298,12 +364,73 @@ than deleting it.
   aggregate keyframe limit should bind **per animation**, in its *Verdict* table and again under
   *The distribution is the finding*. [format.md](../format.md) binds it per **puppet**. See
   *New load limits* above for which governs and why.
+- **[format.md](../format.md) *Load limits* sets the aggregate keyframe limit at 16,777,216, and
+  no file that limit could ever refuse is loadable.** A keyframe cannot be spelled in JSON in
+  fewer than about twenty bytes — `{"time":T,"value":[V]}` — and `DecompressedPayloadBytes` in
+  [limits.rs](../../crates/rigel-format/src/limits.rs) is 64 MiB, so the payload limit already
+  bounds a puppet at roughly three million keyframes. The aggregate limit sits above that by a
+  factor of five and can never fire. A just-over fixture is correspondingly impossible: the
+  smallest honest one — 128 animations at two or three tracks each, every track at the 65,536
+  per-track limit, 16,777,217 keyframes in all — measures **519 MB of `puppet.json` text and
+  44 MB deflated**, and would be refused for exceeding the payload limit rather than the
+  aggregate one, which is the wrong rule. The figure needs re-deriving against what the payload
+  limit admits, and that is a design decision rather than this feature's.
+- **[README.md](../README.md) in `crates/rigel-fixtures` states *The load limits are not here*
+  and that the just-over fixture per declared limit is deferred because the limits do not
+  exist.** They landed in S2: [limits.rs](../../crates/rigel-format/src/limits.rs) carries a
+  figure for every kind. The consequence is live rather than cosmetic —
+  `PROVISIONAL_NODE_LIMIT` in that crate is 256 while `NodeCount` is 2,160, so
+  `rigged:near-limit` is nowhere near the node limit and the fixture no longer tests what its
+  name says. Not touched here: regenerating it would add two thousand nodes to the committed
+  corpus and is outside this task.
+- **[format.md](../format.md) *How a segment interpolates* says a Bézier segment's control times
+  *lie inside the segment* and does not say whether the endpoints count.** They must: the only
+  way to make a degenerate Bézier — the one
+  [puppet-acceptance.md](../requirements/puppet-acceptance.md)'s fixture row asks for and
+  `INTERP-5` sweeps — is a control point coincident with a keyframe, which gives the zero
+  derivative that the Newton step divides by. A strictly-interior reading makes the degenerate
+  case inexpressible. The fixtures take the closed interval; see *Assumptions*.
+- **[format.md](../format.md) names `interpolation`, `end_behaviour`, `triggers`, `order` and
+  `mappable` but gives no key for a trigger's event name and no encoding for a Bézier segment's
+  control points.** Both were decided here; see *Decisions made*.
 
 **Traps:**
 
+- **`rigged` is the control, and a field added to it silently disarms a criterion.** Adding
+  `order`, `mappable`, a trigger or an interpolation mode to the base fixture would leave
+  `INTERP-2`'s *a track whose segments are all linear stores no mode anywhere*, `ORD-1` and
+  `MAP-1` passing against a fixture that no longer isolates what they name. A unit test now
+  asserts that `rigged` carries `end_behaviour` and none of the others.
+- **A defect fixture that declares a later version is accepted and its criterion stops testing
+  anything.** The crate's existing test keys on the fixture's *name*, so a new
+  `rigged:future-minor-…` variant must genuinely be the accepted half of a pair. The two new
+  unfamiliar-value pairs are held to that by the differential test, which asserts the material
+  is byte-identical across the version gate.
+- **The aggregate keyframe fixture is not merely large, it is impossible.** Two hours could be
+  spent making it smaller before noticing that the payload limit refuses it first. The
+  arithmetic is in *Contradicts docs* above so nobody redoes it.
+
 **Assumptions:**
 
+- **A Bézier control time may equal a segment endpoint.** Stated above; the degenerate fixture
+  depends on it, and task 3's validator must admit the closed interval or
+  `rigged:mixed-interpolation` is refused.
+- **An animation with no `end_behaviour` is invalid.** `format.md` says the field is always
+  written because no default is stated for it, and a reader meeting it absent has nothing to
+  fall back on. `rigged:end-behaviour-absent` is catalogued `rejected` on that reading.
+- **An interpolation mode on a track's last keyframe is invalid**, rather than ignored. The
+  storage rule says the last keyframe carries none, and a mode there names a segment that does
+  not exist. `rigged:interpolation-on-last-keyframe` is catalogued `rejected` on that reading.
+- **An empty `triggers` is absent rather than written empty.** Taken from the corpus's existing
+  treatment of empty collections rather than from a stated rule.
+
 **Deferred:**
+
+- **`rigged:keyframes-over-aggregate`, the just-over fixture for the aggregate keyframe limit.**
+  Impossible at the figure `format.md` states — the arithmetic is in *Contradicts docs*. It
+  returns when the figure does.
+- **Regenerating `rigged:near-limit` against the real `NodeCount` limit.** Reported above;
+  outside this task.
 
 ---
 

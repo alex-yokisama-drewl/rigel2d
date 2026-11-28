@@ -240,6 +240,7 @@ pub fn all() -> Vec<Fixture> {
     extensions(&mut c);
     tree(&mut c);
     parameters_and_tracks(&mut c);
+    animation_shape(&mut c);
     numbers(&mut c);
     identifiers(&mut c);
     physics(&mut c);
@@ -955,6 +956,464 @@ fn parameters_and_tracks(c: &mut Catalogue) {
                 .insert("parameter".into(), json!(P_HAIR_SWAY));
         },
     );
+}
+
+// ------------------ the animation shape: modes, endings, triggers and order
+
+/// The committed expectations `rigged:mixed-interpolation` carries.
+///
+/// Each row is a segment, a sample time inside it, and the value a conforming
+/// evaluator gives there — **derived by hand from `docs/format.md`, never from
+/// an implementation**, which is what `DET-4` asks of every expectation in the
+/// corpus. Each one is exact rather than approximate, which is why the
+/// fixture's keyframes are the values they are:
+///
+/// - stepped holds the earlier value, so any time in the segment gives it;
+/// - inverse stepped takes the later value immediately, likewise;
+/// - linear at a segment's midpoint is the midpoint of its two values;
+/// - the symmetric Bézier's control points are reflections of each other about
+///   the segment's midpoint, so by that symmetry the curve passes through that
+///   midpoint exactly — at the midpoint time, the midpoint value;
+/// - the degenerate Bézier is sampled at its two endpoints, which every cubic
+///   through them reproduces exactly whatever its control points are. Its
+///   interior is `INTERP-5`'s sweep and has no closed form to commit.
+const MIXED_INTERPOLATION_SAMPLES: &[(&str, f64, f64)] = &[
+    ("stepped", 0.5, -1.0),
+    ("inverse_stepped", 1.5, 0.0),
+    ("linear", 2.5, 0.25),
+    ("bezier_symmetric", 3.5, 0.75),
+    ("bezier_degenerate", 4.0, 1.0),
+    ("bezier_degenerate", 5.0, 0.0),
+];
+
+/// The namespace the committed expectations ride in.
+///
+/// They are not core format data, so outside `x` they would be unmarked and
+/// invalid. Inside it they are ordinary extension data: marked, inert, and
+/// carried untouched through a save, which is exactly what a fixture's
+/// expectations need to be.
+const EXPECTATIONS: &str = "com.rigel2d.fixture-expectations";
+
+/// `rigged`'s head-turn track rebuilt with one segment per interpolation mode.
+///
+/// Six keyframes, five segments: stepped, inverse stepped, linear (stored as
+/// nothing, because linear is the absent form), a symmetric Bézier and a
+/// degenerate one whose control points both sit on the segment's earlier
+/// keyframe. The last keyframe carries no mode, because it opens no segment.
+///
+/// The lean track is left alone, so the same file carries an all-linear track
+/// storing no mode anywhere — `INTERP-2`'s other half.
+fn mixed_interpolation(doc: &mut Doc) {
+    doc.track(A_IDLE, TR_HEAD).insert(
+        "keyframes".into(),
+        json!([
+            puppet::keyframe_with(0.0, -1.0, INTERP_STEPPED),
+            puppet::keyframe_with(1.0, -0.5, INTERP_INVERSE_STEPPED),
+            puppet::keyframe(2.0, 0.0),
+            puppet::keyframe_bezier(3.0, 0.5, [(3.25, 0.5), (3.75, 1.0)]),
+            puppet::keyframe_bezier(4.0, 1.0, [(4.0, 1.0), (4.0, 1.0)]),
+            puppet::keyframe(5.0, 0.0),
+        ]),
+    );
+
+    let samples: Vec<Value> = MIXED_INTERPOLATION_SAMPLES
+        .iter()
+        .map(|(segment, time, value)| json!({"segment": segment, "time": time, "value": value}))
+        .collect();
+    let animation = doc.entity("animations", A_IDLE);
+    let block = crate::json::extension_block(animation);
+    block.insert(
+        EXPECTATIONS.into(),
+        puppet::extension(
+            "1.0",
+            "Fixture expectations",
+            json!({"samples": samples, "track": TR_HEAD}),
+        ),
+    );
+}
+
+/// Put a Bézier segment on the head-turn track's middle keyframe, so that the
+/// segment from 0.5 to 1.0 is a cubic. The defect fixtures below each break one
+/// thing about it and nothing else.
+fn install_bezier(doc: &mut Doc, controls: Value) {
+    let keyframes = doc
+        .track(A_IDLE, TR_HEAD)
+        .get_mut("keyframes")
+        .and_then(Value::as_array_mut)
+        .expect("the track has keyframes");
+    let middle = keyframes[1]
+        .as_object_mut()
+        .expect("a keyframe is an object");
+    middle.insert("interpolation".into(), json!(INTERP_BEZIER));
+    if !controls.is_null() {
+        middle.insert("control_points".into(), controls);
+    }
+}
+
+/// Add an animation with a stated end behaviour and a stated set of tracks.
+fn push_animation(doc: &mut Doc, id: u64, name: &str, behaviour: &str, tracks: Value) {
+    doc.obj()
+        .get_mut("animations")
+        .and_then(Value::as_array_mut)
+        .expect("animations is an array")
+        .push(json!({
+            "end_behaviour": behaviour,
+            "id": id,
+            "name": name,
+            "tracks": tracks,
+        }));
+}
+
+/// Set one animation's list of triggers.
+fn set_triggers(doc: &mut Doc, animation: u64, triggers: Value) {
+    doc.entity("animations", animation)
+        .insert("triggers".into(), triggers);
+}
+
+/// The event name nothing raises. A plugin's, by its shape — the set of names
+/// is open precisely so that a puppet made for a plugin the recipient lacks
+/// still opens.
+const EVENT_UNRAISED: &str = "plugin_ribbon_snapped";
+
+fn animation_shape(c: &mut Catalogue) {
+    // ------------------------------------------------- the accepted fixtures
+
+    c.variant(
+        "rigged:mixed-interpolation",
+        Expect::Accepted,
+        "one track carrying every interpolation mode, a symmetric Bézier and a degenerate \
+         one, with the sample expectations committed as extension data",
+        mixed_interpolation,
+    );
+
+    // One animation per end behaviour, each with a known last keyframe,
+    // duration and blend. The releasing one carries two tracks with different
+    // blend durations, because `blend_duration` is the track's and tracks in
+    // one animation may release at different rates.
+    c.variant(
+        "rigged:endings",
+        Expect::Accepted,
+        "one animation per end behaviour, the releasing one blending out at two rates",
+        |doc| {
+            push_animation(
+                doc,
+                910,
+                "held",
+                END_HOLD,
+                json!([{
+                    "blend_duration": 0.5,
+                    "id": 911,
+                    "keyframes": [
+                        puppet::keyframe(0.0, 0.0),
+                        puppet::keyframe(2.0, 1.0),
+                    ],
+                    "parameter": P_MOUTH_OPEN,
+                }]),
+            );
+            push_animation(
+                doc,
+                920,
+                "released",
+                END_RELEASE,
+                json!([
+                    {
+                        "blend_duration": 0.75,
+                        "id": 921,
+                        "keyframes": [
+                            puppet::keyframe(0.0, 0.0),
+                            puppet::keyframe(1.5, -1.0),
+                        ],
+                        "parameter": P_HEAD_TURN,
+                    },
+                    {
+                        "blend_duration": 0.2,
+                        "id": 922,
+                        "keyframes": [
+                            {"time": 0.0, "value": [0.0, 0.0]},
+                            {"time": 1.5, "value": [0.5, 0.5]},
+                        ],
+                        "parameter": P_BODY_LEAN,
+                    },
+                ]),
+            );
+        },
+    );
+
+    // An event the scene raises on load, one for the loss of a source, and one
+    // nothing raises. Canonically ordered by event name, which here is also
+    // alphabetical: on_load, plugin_ribbon_snapped, source_lost.
+    c.variant(
+        "rigged:triggered",
+        Expect::Accepted,
+        "an animation waiting on the load event, the source-lost event and one nothing raises",
+        |doc| {
+            set_triggers(
+                doc,
+                A_IDLE,
+                json!([
+                    puppet::trigger(EVENT_ON_LOAD),
+                    puppet::trigger(EVENT_UNRAISED),
+                    puppet::trigger(EVENT_SOURCE_LOST),
+                ]),
+            );
+        },
+    );
+
+    // An event name shaped like a condition. The set of names is open at every
+    // version, so this is a valid puppet — and nothing in it is evaluated,
+    // which is the whole of the assertion and of I1.
+    c.variant(
+        "rigged:trigger-expression-shaped-event",
+        Expect::Accepted,
+        "an event name shaped like a condition, which is a name like any other",
+        |doc| {
+            set_triggers(
+                doc,
+                A_IDLE,
+                json!([puppet::trigger("head_turn > 0.5 and mouth_open == 1")]),
+            );
+        },
+    );
+
+    // The rigger's order, differing from identifier order; `mappable: false` on
+    // the parameter a channel mapping feeds *and* on one no mapping feeds; and
+    // a track on the mapped parameter, so one parameter is mapped, animated and
+    // declared not mappable at once. The physics-driven parameter carries no
+    // order, which is legal and sorts it last.
+    c.variant(
+        "rigged:ordered-parameters",
+        Expect::Accepted,
+        "a rigger's parameter order unlike identifier order, with `mappable: false` on a \
+         mapped parameter and on an unmapped one",
+        |doc| {
+            for (parameter, order) in [(P_HEAD_TURN, 3), (P_MOUTH_OPEN, 1), (P_BODY_LEAN, 2)] {
+                doc.parameter(parameter)
+                    .insert("order".into(), json!(order));
+            }
+            for parameter in [P_MOUTH_OPEN, P_HAIR_SWAY] {
+                doc.parameter(parameter)
+                    .insert("mappable".into(), json!(false));
+            }
+            doc.entity("animations", A_IDLE)
+                .get_mut("tracks")
+                .and_then(Value::as_array_mut)
+                .unwrap()
+                .push(json!({
+                    "blend_duration": 0.15,
+                    "id": 930,
+                    "keyframes": [
+                        puppet::keyframe(0.0, 0.0),
+                        puppet::keyframe(1.0, 1.0),
+                    ],
+                    "parameter": P_MOUTH_OPEN,
+                }));
+        },
+    );
+
+    // ---------------------- the canonical writer's rules, which bind no reader
+
+    c.variant(
+        "rigged:interpolation-linear-explicit",
+        Expect::Accepted,
+        "a segment spelling out `linear`, which is the absent form the writer canonicalises to",
+        |doc| {
+            doc.track(A_IDLE, TR_HEAD)
+                .get_mut("keyframes")
+                .and_then(Value::as_array_mut)
+                .unwrap()[1]
+                .as_object_mut()
+                .unwrap()
+                .insert("interpolation".into(), json!("linear"));
+        },
+    );
+
+    c.variant(
+        "rigged:mappable-true-explicit",
+        Expect::Accepted,
+        "a parameter spelling out `mappable: true`, which is absent when true",
+        |doc| {
+            doc.parameter(P_HEAD_TURN)
+                .insert("mappable".into(), json!(true));
+        },
+    );
+
+    c.variant(
+        "rigged:triggers-unsorted",
+        Expect::Accepted,
+        "an animation's triggers in an order the canonical writer would not emit",
+        |doc| {
+            set_triggers(
+                doc,
+                A_IDLE,
+                json!([
+                    puppet::trigger(EVENT_SOURCE_LOST),
+                    puppet::trigger(EVENT_ON_LOAD),
+                ]),
+            );
+        },
+    );
+
+    // ---------------------------- an unfamiliar value, on each side of the gate
+
+    c.variant(
+        "rigged:interpolation-value-unfamiliar",
+        Expect::Rejected,
+        "an interpolation mode the format does not define, at the current version",
+        unfamiliar_interpolation,
+    );
+
+    c.variant_at(
+        "rigged:future-minor-interpolation-unfamiliar",
+        Expect::Accepted,
+        "an interpolation mode the format does not define, on a segment in the middle of a \
+         track, in a later-version file",
+        VERSION_MAJOR,
+        VERSION_MINOR + 1,
+        unfamiliar_interpolation,
+    );
+
+    c.variant(
+        "rigged:end-behaviour-value-unfamiliar",
+        Expect::Rejected,
+        "an end behaviour the format does not define, at the current version",
+        unfamiliar_end_behaviour,
+    );
+
+    c.variant_at(
+        "rigged:future-minor-end-behaviour-unfamiliar",
+        Expect::Accepted,
+        "an end behaviour the format does not define, in a later-version file",
+        VERSION_MAJOR,
+        VERSION_MINOR + 1,
+        unfamiliar_end_behaviour,
+    );
+
+    // ------------------------------------------------------------ the defects
+
+    c.variant(
+        "rigged:end-behaviour-absent",
+        Expect::Rejected,
+        "an animation declaring no end behaviour, for which no default is stated",
+        |doc| {
+            doc.entity("animations", A_IDLE).remove("end_behaviour");
+        },
+    );
+
+    c.variant(
+        "rigged:interpolation-on-last-keyframe",
+        Expect::Rejected,
+        "an interpolation mode on a track's last keyframe, which opens no segment",
+        |doc| {
+            let keyframes = doc
+                .track(A_IDLE, TR_HEAD)
+                .get_mut("keyframes")
+                .and_then(Value::as_array_mut)
+                .unwrap();
+            let last = keyframes.len() - 1;
+            keyframes[last]
+                .as_object_mut()
+                .unwrap()
+                .insert("interpolation".into(), json!(INTERP_STEPPED));
+        },
+    );
+
+    c.variant(
+        "rigged:trigger-extra-field",
+        Expect::Rejected,
+        "a trigger carrying a condition beside its event name, which is unmarked data",
+        |doc| {
+            set_triggers(
+                doc,
+                A_IDLE,
+                json!([{"condition": "head_turn > 0.5", "event": EVENT_ON_LOAD}]),
+            );
+        },
+    );
+
+    c.variant(
+        "rigged:duplicate-trigger-event",
+        Expect::Rejected,
+        "one animation naming one scene event twice",
+        |doc| {
+            set_triggers(
+                doc,
+                A_IDLE,
+                json!([
+                    puppet::trigger(EVENT_ON_LOAD),
+                    puppet::trigger(EVENT_ON_LOAD),
+                ]),
+            );
+        },
+    );
+
+    c.variant(
+        "rigged:bezier-without-control-points",
+        Expect::Rejected,
+        "a segment declaring Bézier and carrying no control points",
+        |doc| install_bezier(doc, Value::Null),
+    );
+
+    c.variant(
+        "rigged:bezier-control-time-outside-segment",
+        Expect::Rejected,
+        "a Bézier control time past the later keyframe of its segment",
+        |doc| {
+            install_bezier(
+                doc,
+                json!([puppet::keyframe(0.625, 0.5), puppet::keyframe(1.25, 0.0)]),
+            );
+        },
+    );
+
+    c.variant(
+        "rigged:bezier-control-value-nonfinite",
+        Expect::Rejected,
+        "a Bézier control value that overflows to infinity",
+        |doc| {
+            let placeholder = doc.raws.add("1e400");
+            install_bezier(
+                doc,
+                json!([
+                    puppet::keyframe(0.625, 0.5),
+                    {"time": 0.875, "value": [placeholder]},
+                ]),
+            );
+        },
+    );
+
+    // ------------------------------------------------------ just over a limit
+
+    c.variant(
+        "rigged:triggers-over-limit",
+        Expect::Rejected,
+        "an animation carrying one trigger more than the declared limit on `triggers`",
+        |doc| {
+            let triggers: Vec<Value> = (0..=PROVISIONAL_TRIGGERS_PER_ANIMATION)
+                .map(|index| puppet::trigger(&format!("event_{index:03}")))
+                .collect();
+            set_triggers(doc, A_IDLE, Value::Array(triggers));
+        },
+    );
+}
+
+/// The middle keyframe of the head-turn track is the earlier keyframe of the
+/// second of its two segments, so a mode set here sits in the middle of the
+/// track rather than at either end of it — which is what `UNF-1` asks for, so
+/// that a build treating the track as contributing nothing can be told apart
+/// from one that drops only the segment.
+fn unfamiliar_interpolation(doc: &mut Doc) {
+    doc.track(A_IDLE, TR_HEAD)
+        .get_mut("keyframes")
+        .and_then(Value::as_array_mut)
+        .unwrap()[1]
+        .as_object_mut()
+        .unwrap()
+        .insert("interpolation".into(), json!("ease_elastic"));
+}
+
+fn unfamiliar_end_behaviour(doc: &mut Doc) {
+    doc.entity("animations", A_IDLE)
+        .insert("end_behaviour".into(), json!("ping_pong"));
 }
 
 /// Shorten every keypoint's offset list by one vertex, so the deformation no
