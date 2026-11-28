@@ -177,7 +177,7 @@ the same rendered content Live would produce.
 
 ## The input boundary **[proposed]**
 
-A source may set channel values and trigger animations. The runtime exposes nothing else to it
+A source may set channel values and start animations. The runtime exposes nothing else to it
 — no load, no scene change, no filesystem, no output reconfiguration — and the port's bounds on
 message size, channel-name count and name length are enforced at the boundary rather than
 deeper in.

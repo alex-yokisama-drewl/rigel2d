@@ -34,7 +34,9 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   generator with no notion of polarity needs a way to say so honestly rather than pick. Studio's
   own paths do not produce it: a merge takes a puppet that already declares polarity, and
   importing artwork creates no parameters. **The value is therefore dormant in anything Studio
-  writes**, which is the expected state and not a sign it is unused;
+  writes**, which is the expected state and not a sign it is unused. A parameter also has a
+  place in an order the rigger sets and a `mappable` flag saying whether Live offers it
+  ([below](#parameters-are-ordered-and-declared-mappable-or-not-proposed));
 - **bindings**, each mapping a parameter to something that changes — a node transform, or
   per-vertex offsets on a mesh — with values stored at keypoints and interpolated between;
 - **physics**, a kind of node: simulated motion anchored in the tree, which reads its own
@@ -45,7 +47,8 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   **A chain lags by one frame however long it is**, because each node reads a previous frame that
   already carried its parent's displacement;
 - **animations**, which drive parameters over time, each composed of **tracks**. One track
-  drives exactly one parameter, and an animation carries at most one track per parameter;
+  drives exactly one parameter, and an animation carries at most one track per parameter. Each
+  declares how it ends and what starts it — [below](#an-animation-adds-to-its-parameter-proposed);
 - **chain deformers**, each a chain of **joints** deforming the geometry along it — see
   [below](#a-chain-deformer-is-a-permanent-structure-not-a-bulk-edit-tool-proposed);
 - **a gravity**, one magnitude for the whole puppet which every physics node scales by its own
@@ -98,7 +101,9 @@ There is no good universal rule for combining them, and this project does not pr
 What it commits to instead:
 
 - **Evaluation is deterministic and specified in the format.** The order in which deformations
-  apply is defined, not emergent. The claim is three distinct claims, because one unqualified
+  apply is defined, not emergent — and so is the order of every sum, because float addition is
+  not associative and three contributions give different results by grouping
+  ([evaluation.md](../evaluation.md#the-order-of-the-sum-is-fixed-by-data-proposed)). The claim is three distinct claims, because one unqualified
   sentence would promise more than can be kept:
   - **The same build on the same platform is bit-exact.** The same puppet and the same inputs
     produce the same geometry, every time, in the editor and in the player alike.
@@ -120,6 +125,134 @@ undefined evaluation order does not merely produce surprising output; it destroy
 loop the rigger is relying on, and it is how the editor's preview comes to disagree with the
 player's output — the failure the shared runtime exists to prevent. Determinism is the part
 that must be right first, and it is cheaper than a composition model.
+
+## An animation adds to its parameter **[proposed]**
+
+**Every track adds its contribution to the parameter it drives.** There is no replacing mode and
+no precedence between tracks, so no track is ever discarded: an idle animation plays underneath
+live tracking, and a lost source's fallback layers on rather than blocking. **A track's
+keyframes store absolute values, as keypoints do, and its contribution is that value less the
+parameter's neutral keypoint**, so a track at the neutral pose contributes nothing. An animation
+can therefore push a parameter and never force it to a value; that is accepted deliberately.
+The mechanics, the fixed order of the sum and the reasons are in
+[evaluation.md](../evaluation.md#a-track-adds-to-its-parameter-proposed), and the supersession of
+the earlier override rule is in [decisions.md](../decisions.md).
+
+**The one-driver rule binds parameters and not nodes.** Several bindings sum on one node and node
+transforms are not clamped; a parameter has at most one base driver and is clamped. A track is
+not a base driver.
+
+### A parameter clamps to its declared range **[proposed]**
+
+**The sum of every contribution to a parameter is clamped to the range its axes declare.** A
+track's keyframe values are required to sit inside that range; their sum with a base driver and
+with other tracks need not.
+
+- **A non-finite sum rests the parameter at its neutral keypoint**, never at a range edge and
+  never reaching geometry ([I2](../invariants.md)).
+- **The clamp is derived and never stored.** No file records that a parameter was clamped.
+- **Studio surfaces clamping while authoring**, so the rigger can see a layer being eaten rather
+  than discover it on stream. Clamping with no way to see it is the silent discard this project
+  refuses everywhere else.
+- **Reporting is edge-triggered and coalesced** — once when a parameter starts clamping, once when
+  it stops, never per frame — and a report names the parameter by identifier, never by name,
+  because a name is puppet content.
+- **Studio can predict only part of it.** It has no tracking input, so from the file alone it can
+  report where a parameter's animation extent plus its driver's declared range could exceed the
+  parameter's range. The live case belongs to Live.
+
+**How the runtime surfaces a clamp to a streamer mid-stream is `[open]`.** It is never on the
+render surface ([I2](../invariants.md)). Beyond that it belongs with how a streamer learns
+something broke in [performing.md](performing.md), which is `[open]` and now gates this. Nothing
+may assume an answer.
+
+### A track declares how it interpolates, and an animation how it ends **[proposed]**
+
+**A track declares its interpolation per segment**: linear, stepped, inverse stepped or Bézier.
+They are Cubism's own, because importing animation that already exists is a case this project
+serves. A single track may mix them. **A Bézier segment's control times lie inside the segment
+and every control value is finite**, and evaluating one yields a finite value inside the segment
+for every input, degenerate control points included. **Interpolation between a parameter's
+keypoints stays linear and only linear** — a different question, unchanged.
+
+**An animation declares what happens at its last keyframe**: it **loops**, **holds** — keeps
+contributing its final values until stopped — or **releases**, stopping its contribution and
+blending out over each track's own blend duration. It is not a type of animation but one of the answers to
+a single question.
+
+### An animation may be started by a scene event **[proposed]**
+
+**A trigger lives on the animation it starts and is only a start event.** It names the
+**scene event** it waits for, defined in [vocabulary.md](../vocabulary.md), and nothing else: no
+target, no command, no condition, no delay, nothing evaluated. **A puppet references an event by
+name**, as it does a channel, which is outside what [I3](../invariants.md) binds. **An event name
+nothing raises never fires and is not a validation failure**, because the scene or plugin that
+raises it may not be present, and a puppet carrying triggers for events nothing raises is a normal
+puppet. Matching a name against raised events is a lookup and not evaluation, so
+[I1](../invariants.md) is untouched. The stored shape, and why it makes sequencing inexpressible,
+is in [format.md](../format.md#a-trigger-proposed).
+
+### Losing a source rests its parameters at neutral **[proposed]**
+
+**A parameter whose base driver has no data rests at its neutral keypoint**, not at whatever a
+channel value of zero maps to: a response curve need not be centred on zero, so *all zeros* would
+leave a puppet subtly off-pose. **The scene decides what losing a source means and the puppet
+decides what to do about it** — the scene owns sources, so interpreting their absence is its job;
+the puppet owns its animations, so reacting is its. Resting at neutral is what *ease to neutral*
+means in [performing.md](performing.md), which owns the scene's drop behaviours, *hold the
+last pose* among them.
+
+**A scene event carries no payload.** It says a source is lost and nothing else — no source name, no
+port, no address, no scene identity — so a puppet file cannot learn which trackers or ports a
+person has.
+
+**With several sources, whether loss is per source or per puppet is `[open]`.** The puppet never
+learns which source, so the scene must decide what counts as lost. Nothing may assume an answer.
+
+### Long animations are ordinary **[proposed]**
+
+**A puppet may carry several animations of a minute or more, at a thousand keyframes and
+upwards**, and both extremes must load and play: a long loop holding two keyframes, and one
+holding a keyframe per frame. Per-frame cost is one curve evaluation per playing track, not per
+keyframe, which is why this is cheap to promise ([evaluation.md](../evaluation.md#a-tracks-value-at-a-time-proposed)).
+
+### A limit stops a hostile file; a budget describes what is tuned for **[decided]**
+
+A **limit** exists so a file traded between strangers cannot exhaust memory, and is set from
+memory safety. A **budget** describes the workload the frame targets are measured against, and is
+set from what a rig realistically contains. **A puppet may sit inside every limit and outside the
+budget: it loads, it plays, and it misses the frame budget on the reference machine, and that is
+the author's choice, not a refusal** — the same bargain as opening fifty browser tabs. The figures
+are in [format.md](../format.md#load-limits-proposed).
+
+### Parameters are ordered, and declared mappable or not **[proposed]**
+
+**A rigger arranges the puppet's parameters, that order is stored, and Live presents them in it.**
+Live's mapping list otherwise shows every parameter in an order nobody chose. **An order is not
+an identity**: every stored reference is still by identifier ([I3](../invariants.md)) and nothing
+resolves through the order.
+
+**A parameter carries a `mappable` flag, set in Studio and stored, saying whether Live offers it
+as a mapping target.** No rule can infer it from the puppet's shape, because under additive
+composition a parameter may be both mapped and animated, so *is it animated* does not answer
+*should it be offered*. Only the author knows.
+
+**It is called `mappable` rather than a mark** because the format already has *marked* extension
+data and a binding's *stale* mark, and a third sense of one word is the collision
+[vocabulary.md](../vocabulary.md) exists to prevent.
+
+**A parameter that carries a channel mapping is mappable whatever the flag says.** The effective
+value is the stored flag or the presence of a mapping, which makes the word honest: there is no
+state in which a file calls a parameter unmappable while something is in fact mapped to it. That
+state is the one every concern sweep found bugs around — a streamer facing a mapping they can
+neither locate nor remove, because the flag can only be changed in the other application.
+Deriving the value makes it unreachable instead of making it somebody's job to remember.
+
+**The derived value is never stored.** Only what the author set is written, so removing a
+mapping hides the parameter again rather than silently losing the rigger's intent.
+
+**It hides and does not forbid**: presentation, not validation. A file whose flag disagrees with
+its mappings is not malformed — that disagreement has a defined reading.
 
 ## A chain deformer is a permanent structure, not a bulk-edit tool **[proposed]**
 
@@ -347,13 +480,14 @@ code, and the same validator gates loading and saving.
 | Keypoints are ordered and within range | The range is the one the parameter declares |
 | An animation carries at most one track per parameter | More than one is a malformed file. Two tracks driving one parameter over one timeline is the same ambiguity the one-driver rule refuses, arriving by another route |
 | A track's keyframes are ordered in time, and its values within its parameter's range | The keypoint rule above, applied to the other thing that stores values against a parameter. Animation lookup seeks rather than scans, so unordered times give wrong answers rather than slow ones |
+| A Bézier segment's control times lie inside the segment, and every control value is finite | Outside, the curve stops being a function of time and the solve can leave the segment. Cubism guarantees it; a stranger's writer need not, so the reader checks. The range rule above does not reach control values |
 | Each of a parameter's axes declares an **axis polarity** | Bilateral, unipolar or unknown, per dimension. An unfamiliar value follows the enumerated-values row below. A **missing** polarity is invalid in a file whose declared version this build knows — *unknown* is how a file says nobody has decided, and it is a value that must be written rather than an absence that may be inferred. The distinction is what stops a guessed polarity from being indistinguishable from a declared one |
 | Every parameter has exactly one neutral keypoint | None and more than one are both invalid. *Easing to neutral* ([performing.md](performing.md)) has no meaning without it, and a rule stated and never checked is a hope |
 | Each node's children are of a kind its own kind may contain | Declared **per kind** ([What a puppet is](#what-a-puppet-is-proposed)): a part contains nothing, a mesh group or a composite contains any kind, a physics node contains only physics. A rule written as prose naming kinds is one a fifth kind escapes silently; a declaration is one it has to answer |
-| Every parameter has at most one **base driver** | A channel mapping, a physics output, or none ([decisions.md](../decisions.md)). Two is a malformed file rather than a precedence question, which is what [evaluation.md](../evaluation.md) relies on. **A track is not a base driver** — an animation overrides temporarily and blends out, which is why a parameter may carry one alongside its driver |
+| Every parameter has at most one **base driver** | A channel mapping, a physics output, or none ([decisions.md](../decisions.md)). Two is a malformed file rather than a precedence question, which is what [evaluation.md](../evaluation.md) relies on. **A track is not a base driver** — a track adds to whatever drives its parameter, which is why a parameter may carry any number alongside its driver |
 | A binding's stale mark agrees with its value counts: counts that match the mesh topology it applies to and no mark, or counts that mismatch and the mark | Staleness is the flagged outcome of [artwork changing under a rig](#adding-artwork-when-the-art-and-the-rig-disagree-proposed) — a state the rigger resolves, not a malformed file. **The derived state is authoritative and the mark must agree with it**, so a mismatch that is unmarked is invalid, and so is a match that is marked. A file from a stranger can lie; a derivation cannot. The mark stays useful as the cheap thing a loader reads first |
 | Every number is finite | NaN and infinity are rejected, not clamped silently. **Finiteness is judged at the precision the runtime evaluates in**, not only at the precision the file was parsed in: a literal that is finite as a 64-bit value and infinite once narrowed is rejected, or two tools reading one file disagree about whether it is valid. **This rule does not carry the version gate the row below does**, and the difference matters: it applies to every value this build interprets as a number, in a file of any declared version, so a later version's NaN in a node transform is still rejected rather than preserved into the frame loop. What it does not reach is material preserved opaquely — in data whose shape we do not know there is nowhere to look for a number, and almost any eight bytes read as one are a NaN |
-| Enumerated values are known, or explicitly marked as extensions | In a file whose declared version this build knows. A later version's unfamiliar value is preserved, under the [version gate](#unrecognised-data-is-marked-as-such-by-whoever-wrote-it-decided) |
+| Enumerated values are known, or explicitly marked as extensions | In a file whose declared version this build knows. A later version's unfamiliar value is preserved, under the [version gate](#unrecognised-data-is-marked-as-such-by-whoever-wrote-it-decided). **Inert is stated per field, because a build must not guess**: an unfamiliar interpolation mode makes its whole **track** contribute nothing — not the segment alone, which would pop at the boundary — and an unfamiliar end behaviour means the animation never starts. A trigger's event name is not an enumerated field, so an unrecognised one never fires at any version, as above |
 
 Every size and count the loader trusts has a **load limit**, declared in one place, checked
 **before allocating** — decompressed payload size, texture dimensions, the count of every kind
@@ -368,8 +502,10 @@ hostile file and are multiples of the stress puppet in
 [platform.md](platform.md#the-reference-puppet-and-the-stress-puppet-proposed); they are **not** authoring
 limits, and they must not reappear as a choice presented to the person rigging.
 
-**The multiple is 4× the stress workload on each dimension.** It is provisional, to be revised
-the first time a legitimate file is refused.
+**The multiple is 4× the stress workload on each dimension, except where a limit is set from
+memory rather than from the workload** — the animation keyframe limits, which
+[a limit stops a hostile file](#a-limit-stops-a-hostile-file-a-budget-describes-what-is-tuned-for-decided)
+explains. The multiple is provisional, to be revised the first time a legitimate file is refused.
 
 **The memory bound is assertable and the time bound is not.** Peak resident bytes during a
 failed load stay below the declared payload limit, which is exact. For time there is no

@@ -181,6 +181,19 @@ pub enum Basis {
     /// **No `stress` dimension exists for this kind.** A placeholder with a
     /// stated reason, to be replaced by a measurement.
     Provisional,
+    /// **Set from memory safety, not from what an author would write.**
+    ///
+    /// The distinction `docs/requirements/puppet.md` draws between a *limit*
+    /// and a *budget*: a budget describes the workload the frame targets are
+    /// measured against, a limit only stops a file from exhausting memory. A
+    /// figure on this basis is deliberately far above any authored puppet, and
+    /// raising it is a memory argument rather than a workload one.
+    ///
+    /// Not `Provisional`: nothing is missing and no measurement would replace
+    /// it. Not `Stress`: a multiple of the workload would be the wrong
+    /// quantity, and is how this kind came to carry a figure a one-minute
+    /// animation already exceeded.
+    Memory,
 }
 
 /// One kind's stated figure, or its absence.
@@ -328,19 +341,25 @@ pub const FIGURES: &[Figure] = &[
     },
     Figure {
         kind: LimitKind::TracksPerAnimation,
-        limit: stress(150),
-        basis: Basis::Provisional,
-        note: "no dimension: the corpus counted .motion3.json files rather than the \
-               curves inside them, and docs/wip/open-questions.md carries it. Set to \
-               the parameter limit, which bounds it anyway — an animation carries at \
-               most one track per parameter (VAL-27)",
+        limit: Some(600),
+        basis: Basis::Derived,
+        note: "an animation carries at most one track per parameter (VAL-27), so the \
+               parameter limit bounds this one and the derivation is exact. The \
+               dimension was measured on 2026-11-28 \
+               (docs/research/2026-11-28-animation-dimensions.md) at 200 for stress, \
+               and four times that is 800 — but a figure derived from a real bound \
+               beats a multiple of a workload, so the smaller one stands",
     },
     Figure {
         kind: LimitKind::KeyframesPerTrack,
-        limit: Some(4096),
-        basis: Basis::Provisional,
-        note: "no dimension, for the reason the row above gives. 4096 authored \
-               positions on one track is far past any hand-made animation",
+        limit: Some(65536),
+        basis: Basis::Memory,
+        note: "set from memory rather than from authoring, which is why it is far \
+               above the measured corpus. One keyframe per frame is ordinary for \
+               script-generated motion and reaches 65536 at about eighteen minutes \
+               at 60fps. The earlier figure of 4096 was justified as `far past any \
+               hand-made animation` and was wrong: a one-minute animation at 60fps \
+               passes it at 68 seconds. docs/format.md, *Load limits*",
     },
     Figure {
         kind: LimitKind::ChannelMappingCount,
@@ -454,6 +473,14 @@ mod tests {
                 assert!(
                     figure.note.contains("no dimension"),
                     "{:?} is provisional and must say which dimension is missing",
+                    figure.kind
+                );
+            }
+            if figure.basis == Basis::Memory {
+                assert!(
+                    figure.note.contains("memory"),
+                    "{:?} is set from memory and must say so, because the figure \
+                     looks arbitrary beside a workload-derived one",
                     figure.kind
                 );
             }

@@ -212,6 +212,61 @@ animation. Inochi Creator's fixed timeline scale is a named frustration, and it 
 order effect worth recording: it caps the length of animation that can be authored at all, which
 is what forced the workaround described under randomness below.
 
+**Authoring a long animation in Studio is a requirement, not a workaround.** A puppet may carry
+animations of a minute or more at a thousand keyframes and upwards, and the bar is a timeline
+that stays usable there. The owner reaches for external scripts today because Inochi's timeline
+becomes impractical somewhere around a hundred frames; Studio is expected to do better than the
+tool it replaces, and *better* is measured at that length rather than at a typical clip.
+
+**This is cheap to promise, and the reason should be kept because it will look expensive.**
+Playback cost is one curve evaluation per playing track, not per keyframe; keyframes are storage
+plus finding the active one, which is a cursor or a search and never a scan. What must stay
+usable is therefore the interface — drawing, selecting and scrubbing across that many keyframes
+at display rate — not the runtime. What a file may carry, against what the frame targets are
+tuned for, is in [platform.md](platform.md).
+
+## Parameters are ordered by the rigger, and declared mappable or not **[proposed]**
+
+**A rigger arranges the puppet's parameters, and the arrangement is stored.** Live presents them
+in that order. The reason is Live's mapping list: shown in an order nobody chose, finding the
+few parameters that want a channel means scrolling past the rest, which is a daily irritation in
+Inochi Session and a small thing to fix.
+
+**An order is not an identity.** Every stored reference is still by identifier
+([I3](../invariants.md)); the order is presentation and nothing resolves through it.
+
+**A parameter also carries a `mappable` flag saying whether Live offers it as a mapping
+target**, set in Studio and stored in the puppet. It cannot be inferred from the puppet's shape:
+under additive composition a parameter may be both mapped and animated, so *is it animated* does
+not answer *should it be offered*, and only the author knows.
+
+**It hides, it does not forbid.** Presentation, not validation — a file whose flag disagrees
+with its mappings is not malformed, and a mapping to an unmappable parameter still works.
+
+**Studio is where the flag is set, and that is the thing to be careful about.** Because it can
+be changed nowhere else, a parameter hidden here while something is mapped to it would strand
+the streamer. [puppet.md](puppet.md) resolves that by deriving the effective value — anything
+mapped is mappable — so hiding a parameter in Studio can never take a live mapping out of
+reach. Studio should show which parameters are hidden, and that a hidden one is being overridden
+because it is mapped.
+
+## Studio shows clamping while authoring **[proposed]**
+
+A parameter's summed contributions are clamped to the range it declares
+([puppet.md](puppet.md)), so a layer can be eaten without anything looking wrong. **The rigger
+must be able to see that while authoring** rather than discover it on stream; a clamp with no way
+to see it is the silent discard this project refuses everywhere else.
+
+**Studio can predict only part of it, and must say so rather than imply more.** It has no
+tracking input, so it cannot know what a base driver will contribute. From the file alone it can
+report where a parameter's animation extent plus its driver's declared range could exceed the
+parameter's range — a pure function over the puppet, and worth having. The case that depends on
+what a person actually does in front of a camera belongs to Live. At the playhead the check is
+cheap and in scope; a prediction across a whole timeline costs duration times tracks and is not.
+
+How a clamp reaches a streamer mid-stream is undecided and lives with *How a streamer learns
+something broke* in [performing.md](performing.md#how-a-streamer-learns-something-broke-open).
+
 ## Randomness **[open]**
 
 Real-time randomised motion — idle variation that does not repeat — is wanted and **not

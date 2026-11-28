@@ -71,6 +71,9 @@ every cycle. Each entry carries its provenance. See README.md.
 - **A failed import leaves the puppet unchanged and says why** — `judgment`
   → `test` over fixtures: truncated PSD, zero layers, corrupt layer, unsupported blend mode, oversized canvas, non-image file. Assert file, cause and next action, and an unchanged serialisation.
   Seeded at planning, 2026-11-26.
+- **A bulk operation on a stress-sized collection is one undo step and holds the display rate** — `test`
+  Fixture: the minute-long, keyframe-per-frame animation. Assert the undo-step count and per-frame work counters, not wall-clock time. *Catches:* a timeline nominally usable at length that needs a thousand clicks — which is the scripting the owner is trying to stop doing.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Telling the user what happened
 
@@ -86,6 +89,9 @@ every cycle. Each entry carries its provenance. See README.md.
 - **Opening a file carrying unrecognised data warns, names what is missing, and still allows editing** — `judgment`
   → `test`. The warning must not imply an install route while plugins do not exist. See `docs/requirements/puppet.md`.
   Seeded at planning, 2026-11-26.
+- **A silent reduction of a value the author supplied is reported at the thing reduced** — `test`
+  Covers clamping now and anything of the same shape later. Assert the report names the parameter and the contributors, and that a within-range sum reports nothing — a permanent warning is an ignored warning.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Live never stops rendering
 
@@ -101,6 +107,9 @@ every cycle. Each entry carries its provenance. See README.md.
 - **A source going silent and returning is handled without a restart** — `judgment`
   → `test`, covering each of the three scene-selected drop behaviours, the continuous transition into and out of each, and a scene naming an idle animation the puppet does not carry.
   Seeded at planning, 2026-11-26.
+- **Where two places can configure one outcome, one wins, it is stated, and the interface says which** — `test`
+  Covers the scene's drop behaviour against a puppet's trigger. *Catches:* a streamer who set one thing, sees another, and has nothing to read.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Saving, and what it changes
 
@@ -125,6 +134,12 @@ every cycle. Each entry carries its provenance. See README.md.
 - **The active mode and the current edit target are exposed as inspectable state** — `judgment`
   → `test`: switching mode, parameter or keypoint changes it. This is what makes the editing-between-keypoints trap testable rather than a matter of someone noticing.
   Seeded at planning, 2026-11-26.
+- **A parameter's order and `mappable` flag never change what the puppet evaluates to** — `test`
+  Shuffle every order, flip every flag, assert identical output. *Catches:* presentation state leaking into behaviour.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Anything hidden from a list is still shown when something depends on it, and stays reachable from where the person is** — `test`
+  Fixture: a parameter declaring `mappable: false` that carries a channel mapping. *Catches:* a streamer who can see neither the mapping nor a way to remove it, because the flag can only be changed in the other application.
+  Seeded at the animation planning sweep, 2026-11-28.
 - **A first-time user reaches a moving puppet from a PSD without outside help** — `judgment`
   Human gate on the first end-to-end build. Stays `judgment` permanently. Watch for every point where the tester stops, searches or asks; each becomes an entry.
   Seeded at planning, 2026-11-26.

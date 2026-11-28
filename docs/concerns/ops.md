@@ -239,6 +239,18 @@ application open a connection, so it does not touch the rule in
   how a loop starts.
   Seeded at planning, 2026-11-26.
 
+- **The load-in-progress marker is cleared only after start-up triggers have run and a frame has presented** — `test`
+  Tightens the relaunch entry above, which clears it at the first presented frame: start-up triggers run before that frame, so the two agree only if nothing clears the marker earlier. *Catches:* a crash loop that begins after the marker clears, so the existing relaunch protection never engages.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **Everything that can start without the person asking can be stopped by the person, from the surface they are already using** — `test`
+  Assert the playing set names what started each animation, and that stopping returns evaluation to the base drivers. *Catches:* a `hold` animation with no exit, and the restart-the-player outcome.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **Losing and regaining a source leaves no residue, and a flapping source cannot restart animations without bound** — `test`
+  *Catches:* an idle started on a drop still layered over live tracking after the tracker came back — the failure the release-on-clear rule exists to prevent, asserted rather than assumed.
+  Seeded at the animation planning sweep, 2026-11-28.
+
 - **A file that cannot be opened is reported as such, distinctly from a file that is refused** — `test`
   A missing path, a directory and an unreadable file each produce a different rule name from a malformed or hostile file. *Would have caught:* the validator reporting a mistyped path identically to a hostile puppet, leaving a script no way to tell them apart. Fixed; this entry keeps it fixed.
   Harvested at the S2 review, 2026-11-28.
@@ -274,6 +286,22 @@ application open a connection, so it does not touch the rule in
   freshness. The classes are source dropped, output lost, device lost, write failed, load failed
   and dormant item. Which of them also interrupt the streamer is `[open]`.
   Seeded at planning, 2026-11-26.
+
+- **An advisory is edge-triggered and coalesced; its cost never scales with frames or messages** — `test`
+  *Catches:* a clamp reported once per frame, and a flooding source evicting every useful line from a rotated log so the diagnostics report is one repeated message.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **A condition the runtime absorbs silently is visible somewhere a person can reach** — `test`
+  Covers clamping, resting at neutral on a lost source, and a trigger firing. Extends the failure-class entry above to conditions that are not failures. *Catches:* the stream looking wrong with nothing anywhere saying why.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **A trigger that cannot act is reported, never silent, and never reaches the render surface** — `test`
+  Fixtures: an animation whose end behaviour this build does not understand, and a scene naming an idle the puppet does not have. **An event nothing raises is not a fault** — the scene that raises it may not be loaded, or a plugin not installed — so it is reported nowhere and is not a defect. *Catches:* a puppet quietly not doing what its author wired, and [I2](../invariants.md) breached by a diagnostic drawn on the stream.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **A local log records the shape of what was loaded, and carries nothing the user did not intend to share** — `test` and `script`
+  Per animation: duration, track count, keyframe count, by identifier and never by name. Extends the no-personal-data entry above. *Catches:* workload assumptions that cannot be revisited because real inputs were never visible, and a log invited into a bug report leaking file paths or puppet names.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### CI machinery
 

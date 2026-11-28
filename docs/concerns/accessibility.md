@@ -107,14 +107,26 @@ unaffected by whether the element can be focused.
 - **Every gizmo, keypoint and timeline marker a canvas can hit-test appears in the tree with a role and a non-empty name** — `judgment`
   → `test`: compare the tree against the canvas's own hit-test list, which is an independent
   source, not against what registered. Comparing the tree with itself is the circularity recorded
-  as `[open]` in [testing.md](../testing.md). Individual mesh vertices are exempt.
+  as `[open]` in [testing.md](../testing.md). Individual mesh vertices are exempt. **Amended for
+  dense collections:** where a collection is too large to register element by element, such as
+  keyframes, the next entry replaces "appears in the tree" with a keyboard walk compared against
+  the same hit-test list.
   Seeded at planning, 2026-11-26.
+
+- **A dense ordered collection is reached by a keyboard walk, not by registering every element** — `test`
+  Amends the entry above for keyframes. Walk *next* from the first and compare against the canvas's own hit-test list, which is the independent second source [testing.md](../testing.md) requires. *Catches:* both failures at once — keyframes reachable only by mouse, and a tree node per keyframe at a thousand.
+  **Keyframes are not vertices.** A vertex is an unordered point meaning nothing to a person; a keyframe has a time and a value a rigger reasons about, and *next keyframe* is a natural operation. The existing vertex exemption does not extend to them.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 - **A canvas stays one Tab stop, and its tree size is bounded however large the puppet** — `judgment`
   → `test`: Tab presses from the first to the last chrome control are identical on the reference
   and stress puppets, and per-canvas tree-node counts have a committed ceiling beside the counter
   baseline. The ceiling is what stops vertex registration creeping back in.
   Seeded at planning, 2026-11-26.
+
+- **Tree size and tab-stop count do not grow with the size of the thing being edited** — `test`
+  Generalises the entry above beyond a canvas to any dense collection. *Catches:* registration creeping back at scale, asserted against a committed ceiling.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Keyboard
 
@@ -129,6 +141,10 @@ unaffected by whether the element can be focused.
   → `test`: specialises the Universal Escape entry to the canvas case. Applies although the drag
   itself is pointer-only.
   Seeded at planning, 2026-11-26.
+
+- **Every drag in chrome has a non-drag alternative, and the drags are enumerated in one list** — `test`
+  Parameter reorder, keyframe move, playhead scrub. Canvas drags are exempt by name in the same list. *Catches:* reordering that works only by mouse.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 - **Focus on a chrome control is drawn by the registration module** — `judgment`
   → `test`: focus the control and assert a focus-indicator shape in egui's output at its rect.
@@ -196,6 +212,26 @@ unaffected by whether the element can be focused.
   everything else. The events are mode change, edit-target change, load failure, per-item merge
   outcome, source drop and return, and dormant entry.
   Seeded at planning, 2026-11-26.
+
+- **A per-frame value is never a live region; a discrete event is announced once** — `test`
+  Extends the list above. Playhead time and clamp flips are not live; play, pause, stop, seek and end-reached are. *Catches:* a screen reader flooded for the duration of playback.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **An event that can arrive in a burst is coalesced into one announcement** — `test`
+  *Catches:* a flapping source flooding the live region.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **An element in a dense collection has an accessible name carrying its own values, not its kind** — `test`
+  A keyframe reads as track, time, value and interpolation to the next. *Catches:* a thousand elements all announcing "keyframe".
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **A virtualised list exposes position and set size on its visible rows** — `test`
+  *Catches:* rows that exist only once scrolled to, and a reorder announcement with nothing to say.
+  Seeded at the animation planning sweep, 2026-11-28.
+
+- **Displayed order, stored order and focus order are the same for an author-ordered list** — `test`
+  *Catches:* unordered-container iteration silently discarding the arrangement the author made.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 - **The two Live windows have distinct, non-empty OS titles, and the control surface offers a named, keyboard-focusable way to raise the render surface** — `judgment`
   → `test`: assert the title constants, and assert the activation by the command it emits rather

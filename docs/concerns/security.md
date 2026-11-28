@@ -93,7 +93,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
 - **The port binds to loopback, and loading a scene never changes that** — `judgment`
   → `test`. Off-machine listening is deferred, not rejected; when it arrives it is an explicit in-app opt-in and still never enabled from a file.
   Seeded at planning, 2026-11-26.
-- **A source can set channel values and trigger animations, and nothing else** — `judgment`
+- **A source can set channel values and start animations, and nothing else** — `judgment`
   → `test`: malformed, oversized and many-channel messages leave scene state, loaded puppets and output configuration unchanged, within the memory cap.
   Seeded at planning, 2026-11-26.
 - **Channel values are finite and clamped before binding** — `judgment`
@@ -112,6 +112,15 @@ Record the threat model, the roles, and anything exempt here on the first planni
   → `script`: `scripts/no-outbound.sh`, run as gate 5. Same caveat as above: the assertion covers our code, so its scope needs restating before plugins ship. **It also reads first-party source and cannot see the dependency graph.** A crate that pulls in an HTTP client transitively is invisible to it, and that is the likeliest way this decision actually breaks. A pass means "we did not write one", never "none can happen". See `docs/decisions.md`. **The other half now exists** — `scripts/locked-graph.sh`, below — so the pair covers both "we did not write one" and "nothing we build on brought one".
   Covered, S2 task 2, 2026-11-27.
   Seeded at planning, 2026-11-26.
+- **A trigger is data selecting from a set, and no field of it is evaluated** — `test`
+  Fixtures carrying an expression-like string, and an unmarked extra field on a trigger where a condition or a target would go. *Catches:* a trigger growing a condition, a delay expression or a runtime-looked-up hook, each of which turns a puppet into a program and breaks [I1](../invariants.md). This is the entry that keeps the line where the sweep found it.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **A scene event carries no payload** — `test`
+  *Catches:* a puppet file learning which trackers, ports or addresses a person has. Cheap now, a breaking change once files exist.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Executing a trigger cannot raise an event, and a flapping source cannot start work without bound** — `test`
+  *Catches:* a restart storm from a hostile or glitchy source on loopback, and trigger-to-trigger chaining, which is where the state machine we ruled out would arrive by the back door.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Supply chain
 
@@ -158,6 +167,12 @@ Record the threat model, the roles, and anything exempt here on the first planni
 - **Every stored collection and string has a declared limit, and the limit set and the schema agree** — `judgment`
   → `script`: walk the format definition and fail on any collection or string with no limit, and on any limit with no just-over fixture. Physics nodes, tree depth through a chain, animations, tracks and keyframes are all newly countable and none is currently bounded. A kind added later with no limit then fails the check rather than shipping unbounded.
   Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **An aggregate limit exists wherever per-item limits multiply** — `script`
+  Extend the limits completeness walk above to require it. *Catches:* animation × track × keyframe limits permitting hundreds of millions of keyframes, bounded only by the parse-tree cap.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Animation evaluation is finite for every finite file** — `test`
+  Property test over keyframe times, Bézier control points, durations, a stalled frame interval and the representable extremes. Extends the physics finiteness entry above to animation. *Catches:* `f32::clamp` propagating NaN to geometry, `inf − inf` in a sum of in-range contributions whose range reaches the float limit, a zero derivative in a Newton step, and a zero-duration loop that never exits.
+  Seeded at the animation planning sweep, 2026-11-28.
 - **The archive's directory is bounded and sanity-checked before any entry is read** — `judgment`
   → `test`: fixtures with an over-long entry name, duplicate entry names, overlapping local-header data, and an entry name the format does not define. Each is refused before anything is decompressed, with peak memory below the payload limit.
   Seeded at planning, 2026-11-27, on the physics-and-track revision.

@@ -151,6 +151,13 @@ the question of how a live failure — a source dropping, an output failing — 
 is not looking at the player is a requirement and not a detail. Candidates include a sound, an
 OS notification, and a tray state. Undecided.
 
+**Other things now wait on the answer.** A parameter whose summed contributions are being
+clamped, and a trigger that cannot fire, are mid-stream faults in the same class, and neither has
+anywhere to be reported until this is settled. Whatever the answer, a clamp report is
+edge-triggered — once when a parameter starts clamping and once when it stops, never per frame —
+and names the parameter by identifier, never by name, because a name is puppet content. Until
+this is decided nothing may assume how either reaches a person; it is never the render surface.
+
 ## What the puppet does when its source drops is a scene setting **[decided]**
 
 A scene chooses what happens when a source stops sending, from a fixed set: **hold the last
@@ -173,6 +180,107 @@ Constraints on every one of them:
 
 **A new scene defaults to easing to neutral.** It is unambiguous on stream, and it is the one
 behaviour every puppet can perform without carrying authored content for it.
+
+**How these three relate to a parameter resting at neutral** is stated in
+[Losing a source, and scene events](#losing-a-source-and-scene-events-proposed) below: resting
+is what *ease to neutral* means, and *hold the last pose* suppresses it. None of them is
+deleted or replaced there.
+
+## Losing a source, and scene events **[proposed]**
+
+**The scene decides what losing a source means; the puppet decides what to do about it.** The
+scene owns sources, so interpreting their absence is its job. The puppet owns its animations, so
+reacting is the puppet's.
+
+**A parameter whose base driver has no data rests at its neutral keypoint** — not at whatever a
+channel value of zero maps to. A response curve need not be centred on zero, so resting every
+channel at zero would leave a puppet subtly off-pose. This is what the scene's drop behaviours
+sit on:
+
+| Scene setting | Relationship to resting at neutral |
+|---|---|
+| **Ease to a neutral pose** | *Is* resting at neutral, reached continuously |
+| **Hold the last pose** | Suppresses it: the parameters keep their last values |
+| **Play an idle animation** | The puppet reacts to the loss with its own animation, over the resting parameters; additive composition is what lets the idle layer on top without blocking tracking when the source returns |
+
+**The scene event is raised on every loss, whatever the setting, and the setting governs only
+the base drivers.** A puppet's *source lost* trigger therefore fires under *ease* and under
+*hold* as well, and the animation it starts adds on top of whichever resting behaviour the
+scene chose. This is the only reading consistent with additive composition: a trigger does not
+compete with the setting, it composes with it. Without the rule stated, a reader of the decided
+section above builds a scene-level idle picker and a reader of this one builds a puppet-level
+trigger, and the two do not compose.
+
+**`[open]`: whether *play an idle* survives as a separate setting.** Once a trigger starts the
+idle, that row is no longer a third base-driver behaviour — it is *ease* or *hold* plus a puppet
+that happens to carry a trigger, and the scene has no animation to name. The two genuinely
+distinct settings are *ease* and *hold*. Collapsing the third is a change to a `[decided]`
+section and a product call, so it is recorded here rather than made. The sentence in
+[what a source may do](#a-source-can-drive-the-puppet-and-nothing-else-decided) about a source
+"triggering animations" waits on the same answer.
+
+**Losing a source is a scene event.** A scene event is a named occurrence the scene raises, which
+an animation may listen for ([vocabulary.md](../vocabulary.md)). **It carries no payload** — no
+source name, no port, no address, no scene identity — because a puppet file must not be able to
+learn which trackers or ports a person has, and that is far cheaper to settle before files exist.
+
+**Scene events are named outward, which carries the weight here.** A plugin may one day wire into
+a scene and raise events of its own, so the set of names is **open**. Two things follow:
+
+- **A puppet references a scene event by name**, as it does a channel. [I3](../invariants.md)
+  binds references to what the file contains; a channel and a scene event are both named outward,
+  which is the case that rule already sets aside.
+- **An unrecognised event name never fires, and is not a validation failure.** The scene that
+  raises it may not be loaded, or the plugin may not be installed. A puppet carrying triggers for
+  events nothing raises is an ordinary puppet.
+
+**This does not reopen [I1](../invariants.md).** Matching a name against the events that were
+raised is a lookup, not evaluation. What would cross the line is a condition, comparison or
+expression attached to the match, and none exists.
+
+**`[open]`: with several sources, whether loss is per source or per puppet.** The puppet never
+learns which source, so the scene must decide what counts as lost.
+
+## An animation is started by a trigger, and triggers are puppet data **[proposed]**
+
+**Animation configuration lives in the puppet**, beside channel mappings and for the same
+reason: it is how this puppet behaves, and it should not be redone per scene or per machine.
+These are kept separate, because conflating them is how a format grows a state machine:
+
+| | What it is | Where |
+|---|---|---|
+| **Commands** | Play, pause, stop, seek — the verbs | Runtime |
+| **End behaviour** | What an animation does on reaching its last keyframe ([puppet.md](puppet.md)) | Puppet |
+| **Triggers** | What issues a command, and when | Puppet |
+
+**A trigger lives on the animation it starts and is only a start event.** It carries no target,
+because the animation that owns it is the target, and no command, because the command is always
+*start*. It names the **scene event** it waits for; *on load* and *source lost* are the two with a
+use today, and the set is open. **Because the shape enforces the scope:** a trigger that cannot
+name another animation cannot sequence one, so a state machine is inexpressible rather than
+forbidden by a sentence someone later reads as advice.
+
+**Stopping is a rule, not a trigger.** An animation started by an event that can clear is
+released when it clears, blending out over each track's own blend duration. *Source regained* therefore
+needs no trigger of its own, and a tracker that recovers never leaves an idle layered over live
+tracking. *On load* does not clear, so what it starts runs to its end behaviour.
+
+**A person can always stop a playing animation**, and for an animation started *on load* and
+held, that is the only exit — one started by an event that can clear is released when it
+clears, so only *on load* leaves nothing to release it. The control surface lists what is playing and
+what started it, and can stop any of them or all of them, by keyboard, without reloading. This
+is a recovery path and not a state machine: it issues *stop* and never decides what plays next.
+**It is also what stops an animation held after an *on load* start**, which is the one case with nothing else to release it.
+
+**A trigger selects an event by name from an open set, and nothing it carries is evaluated.** No condition,
+no comparison, no delay expression, no free string looked up at run time. The first of those
+turns a puppet into a program, which [I1](../invariants.md) forbids.
+
+**`[open]`: whether a source may issue commands over its port, and how it would name an
+animation.** [A source can drive the puppet and nothing else](#a-source-can-drive-the-puppet-and-nothing-else-decided)
+says a source may start animations, which this section does not reconcile with triggers being
+puppet data started by scene events. Whatever the answer, a source addresses an animation by an
+outward name, as it does a channel, never by a stored identifier ([I3](../invariants.md)).
 
 ## The input protocol is ours, and the channel vocabulary with it **[decided]**
 
@@ -273,7 +381,7 @@ The input port is the application's only network surface and it is treated as un
   decided then and not now.
 - **A scene never enables off-machine listening.** Scenes are files that strangers share, and
   "open my port to the network" must not be able to arrive inside one.
-- **A source may set channel values and trigger animations. It may do nothing else** — not load
+- **A source may set channel values and start animations. It may do nothing else** — not load
   a puppet, not change the scene, not touch the filesystem, not reconfigure output.
 - **Channel values are finite and clamped to the parameter's range before any binding is
   evaluated.** A source cannot deform a puppet past its authored extremes, and a NaN never

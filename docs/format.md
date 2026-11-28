@@ -71,8 +71,8 @@ for, so *can I render this* and *can I save this* are one question here and not 
 
 The hard case, and the one that is not extension data. A later minor version may add a value to
 an enumerated field the core format already defines — a physics node's `output_source`, a
-parameter axis's polarity, a deformation's composition mode. The field is one this build
-interprets; the value is one it has never heard of.
+parameter axis's polarity, a deformation's composition mode, a segment's interpolation, an animation's end behaviour. The
+field is one this build interprets; the value is one it has never heard of.
 
 **Every enumerated field the format defines therefore has one more inhabitant than it lists: the
 unfamiliar value, carrying the token verbatim.** It is not a parse failure and not a repair.
@@ -87,6 +87,19 @@ asserts by removal: deleting the material from the file must change no evaluated
 draw order and no reported entity. So a physics node whose `output_source` is unfamiliar drives
 nothing on that axis — it does not fall back to a default, because guessing is the one thing a
 build with no code for a value must not do.
+
+**What inert means is stated per field**, because a build with no code for a value must not
+guess, and "inert wherever it would have been interpreted" does not say where that is for a
+field with a timeline:
+
+| Field | Inert means |
+|---|---|
+| Interpolation mode | The **track** contributes nothing — not the segment alone. A track that contributes across part of its timeline and vanishes across the rest pops at the boundary, which looks like a bug rather than a missing feature |
+| End behaviour | The animation **never starts**. Treating it as loop, hold or release is the guess the rule forbids |
+
+A trigger's event is not in this table because it is not an enumerated field: it names a scene
+event outward, the set of names is open at every version, and a name nothing raises is a normal
+puppet — see [a trigger](#an-animation-and-its-tracks-proposed).
 
 **Because** the alternative is a closed enum, and a closed enum forces a reader to choose between
 refusing a file a later build wrote and silently substituting a value nobody asked for. The first
@@ -178,7 +191,21 @@ whitespace, a fixed number format, UTF-8.
 
 **Ordering is part of the canonical form.** `nodes` is in depth-first preorder, and order among
 siblings is draw order — the one thing order is allowed to decide. Every other collection is
-ordered by identifier, and keypoints by position along their axis.
+ordered by identifier, keypoints by position along their axis and keyframes by time.
+
+**A parameter's presentation order is a stored field, not the order of the collection.** The
+rigger arranges the parameters and Live presents them that way
+([requirements/authoring.md](requirements/authoring.md)), but `parameters` stays in identifier
+order like every other collection — otherwise a canonical sort would erase the arrangement, and
+a position would start deciding something, which [I3](invariants.md) rules out. The field is an
+integer; equal and absent values are both legal, ties break by identifier, and a parameter
+without one sorts after those with one, so a third-party file presents in a defined order.
+
+**`mappable` is a boolean, absent when true.** Absent therefore means *offered*, which is the
+direction that fails safely: an older or third-party puppet hides nothing. A reader that finds
+it disagreeing with the puppet's channel mappings does not refuse the file — the effective value
+is the flag **or** the presence of a mapping, and
+[requirements/puppet.md](requirements/puppet.md) says why.
 
 **A defaulted field is absent when it holds its default.** Without the rule a writer that omits a
 default and one that spells it out produce different bytes for the same puppet. The one
@@ -329,7 +356,7 @@ Two outputs, and the first is what makes a chain work with no chain mechanism in
   chaining ([evaluation.md](evaluation.md)).
 - **One parameter may be driven.** Each axis of that parameter names the quantity that drives it
   and the gain onto it. inochi2d spends an enum on the four orderings of angle, length, x and y;
-  naming the source per axis covers all four, covers a one-dimensional parameter without a
+  naming the source per axis covers every ordering, covers a one-dimensional parameter without a
   special case, and does not grow when a fifth quantity is wanted.
 
 
@@ -357,11 +384,91 @@ A track carries a **`blend_duration`**. [security.md](concerns/security.md), by 
 requires a track's keyframe times, values and blend durations to be validated, and nothing
 defined one until here.
 
-**`composition_mode` is always written, even though it holds the only value the format
-defines.** It is the single exception to the absent-when-default rule, and deliberate: a mode
-added in a later version must not change how a puppet authored before it composes. Further modes
-are [what the format does not define yet](#what-the-format-does-not-define-yet-proposed), which
-owns that question.
+**A track composes additively and carries no field that says so.** Its contribution is a
+keyframe-curve value less the parameter's neutral keypoint, summed with the parameter's base
+driver and every other track in the order [evaluation.md](evaluation.md#the-order-of-the-sum-is-fixed-by-data-proposed)
+fixes. A replacing mode, if a case ever appears that addition cannot express, is a later
+addition where **absent means additive** — so no file written today has to change.
+
+**A keyframe stores an absolute value, the way a keypoint does, and never a contribution.**
+**Because** the alternative breaks four things at once: a track resting at the neutral pose would
+add the neutral value on top of its base driver and shove the puppet permanently off-pose; a
+rigger scrubbing to author a pose sees absolute values everywhere else in Studio; imported
+Cubism curves are absolute and would need converting; and the rule that a track's keyframe
+values sit inside its parameter's range would stop making sense, because a contribution's
+natural range is not the parameter's.
+
+### How a segment interpolates **[proposed]**
+
+**A track's keyframes are ordered by time, and each segment between adjacent keyframes carries its own
+interpolation mode**: linear, stepped (holds the earlier value until the later keyframe),
+inverse stepped (takes the later value immediately) or Bézier (a cubic through control points).
+The modes are Cubism's own, because importing animation that already exists is a case this
+project serves — stepped is how discrete state swaps are expressed, and Bézier is what lets a
+rigger author smooth motion without baking a keyframe per frame. **Per segment, not per track**,
+because the corpus mixes modes within one track and a format that cannot say so cannot import one.
+
+**The mode is stored on the earlier keyframe of its segment, and the last keyframe carries none.
+Linear is the absent form**, so a linear track stores no modes at all. Storing a mode by
+position is the trap this project already has an entry for: inserting or deleting a keyframe
+must carry each segment's mode — and any preserved material a build does not understand — with
+the right segment.
+
+**A Bézier segment's control times lie inside the segment, and every control value is finite.**
+Outside, the curve stops being a function of time: the solve has several roots and the iteration
+can leave the segment. Cubism guarantees this; a stranger's writer need not, so the validator
+checks it ([Validation](#validation-proposed)). How the curve is solved is in
+[evaluation.md](evaluation.md#a-tracks-value-at-a-time-proposed).
+
+### How an animation ends **[proposed]**
+
+**An animation declares what happens at its last keyframe**: it loops (restarts), holds (keeps
+contributing its final values until stopped), or releases (stops contributing, blending out over
+**each track's own `blend_duration`**, which is the only duration this format defines — so
+tracks within one animation may release at different rates, deliberately). It is written
+always, because no default is stated for it. **It is not a
+type field**: looping is not a different kind of animation, it is one of the answers to the
+question of what happens at the end, and that is the thing that actually differs between a
+breathing idle, a one-off emote and a state a puppet moves into and stays in.
+
+### A trigger **[proposed]**
+
+**An animation carries a list of triggers, and a trigger carries one thing: the name of the scene
+event it waits for.** It names no target, because the animation that owns it is the target, and
+no command, because the command is always *start*. *On load* and *source lost* are the
+events a use has been named for; the set of names is open, because a plugin may one day raise
+its own.
+
+**Because the shape enforces the scope.** A trigger that cannot name another animation cannot
+sequence one, so the state machine this project ruled out is structurally inexpressible rather
+than forbidden by a sentence somebody later reads as advice. It also leaves no enumerated field
+beyond the event name and no unfamiliar-value question beyond it.
+
+**The name is outward, like a channel's.** [I3](invariants.md) binds references to what the file
+contains; a scene event is raised by a scene the puppet has never met, so a shared name is the
+only thing the two ends can agree on. **An unrecognised name never fires and is never a
+validation failure**, at any version — the scene that raises it may not be loaded, or the plugin
+not installed — and the other triggers on that animation are unaffected. Matching a name
+against the events raised is a lookup, not evaluation, so [I1](invariants.md) is untouched. What
+would cross the line is a condition, a comparison, a delay expression or a free string looked up
+at run time, and a trigger has no field for any of them.
+
+**A trigger carries no identifier, and that is deliberate.** Nothing refers to a trigger —
+it is reached only through the animation that owns it, and deleting that animation takes its
+triggers with it — so an identifier would be a value nothing resolves and
+[I3](invariants.md) would have to bind for no purpose. Canonically, an animation's triggers are
+ordered by event name, and **one animation naming one event twice is invalid**: the second says
+nothing the first did not, and this format refuses meaningless duplication wherever a reader
+would have to decide what it meant.
+
+**A scene event carries no payload**, so a puppet file cannot learn which trackers or ports a person
+has. That is a property of the event the scene raises rather than of anything stored.
+
+**`composition_mode` is the puppet's field and is always written, even though it holds the only
+value the format defines.** It is the single exception to the absent-when-default rule, and
+deliberate: a mode added in a later version must not change how a puppet authored before it
+composes. It concerns deformations and transforms, not tracks. Further modes are [what the format
+does not define yet](#what-the-format-does-not-define-yet-proposed), which owns that question.
 
 ## Textures **[proposed]**
 
@@ -430,6 +537,9 @@ rules it cannot:
 - keypoints ordered and within their parameter's range;
 - **every parameter carrying at most one base driver** — a channel mapping, a physics output, or
   none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
+- a track's keyframes ordered in time, with values within the parameter's range;
+- **a Bézier segment's control times inside the segment, and every control value finite.** The
+  reader checks it because Cubism guarantees it and a stranger's writer need not;
 - binding value counts matching their mesh, or marked stale;
 - every number finite;
 - **the arity of a keypoint's coordinates and a keyframe's values against the parameter's axes —
@@ -438,6 +548,11 @@ rules it cannot:
   validated against nothing. Nothing may assume an answer;
 - enumerated values known, or under `x`, or unfamiliar in a file declaring a later minor version
   — see [an unfamiliar value in a field this build knows](#an-unfamiliar-value-in-a-field-this-build-knows-proposed).
+
+**Nothing has shipped, so a change to what a track means needs no migration.** The format is at
+1.1 and no file exists outside this repository's own fixtures, which are regenerated. That is
+the reason this round could change how tracks compose at all, and it expires at the first
+release.
 
 A generated puppet doubles as the conformance fixture proving a third party can write a valid
 one, which [platform.md](requirements/platform.md) already requires for its own reasons.
@@ -459,6 +574,25 @@ A second sharpening is that a size inside its own limit can still cost many time
 is held in memory, so what is bounded has to be the **held** quantity and not only the stored
 one. A payload's bytes and the structure parsed out of them are therefore limited separately.
 
+**Two limits on animation are set from memory and not from the workload**, because a limit
+stops a hostile file and a budget describes what is tuned for
+([requirements/puppet.md](requirements/puppet.md#a-limit-stops-a-hostile-file-a-budget-describes-what-is-tuned-for-decided)).
+`KeyframesPerTrack` is **65536**: one keyframe per frame is about eighteen minutes at 60 fps,
+where the earlier figure of 4096 is reached at 68 seconds, which the minute-plus animations
+this format must carry already exceed. **A total keyframe limit for the whole puppet is new**,
+at **16,777,216**. Per-track limits multiply — the animation, track and keyframe figures
+together permit billions of keyframes, bounded only by the parse-tree cap — so the
+aggregate is the one that decides whether a load can exhaust memory.
+
+The figure is set from memory rather than from authoring, and the arithmetic is stated so a
+reader can redo it: a keyframe costs on the order of **24 bytes** resident — a time, a value, a
+segment mode, and alignment — so the limit admits about 400 MB of keyframes. That is far beyond
+any authored puppet, survivable on the machine
+[platform.md](requirements/platform.md) names, and inside the whole-load memory limit alongside
+the payload and the textures. A puppet anywhere near it misses the frame budget long before it
+threatens the limit, which is the intended ordering: the budget is what a rig is tuned against,
+and the limit is only what stops a hostile file.
+
 **Whether a texture has a limit on its pixel *area* is `[open]`.** Each side is capped, and
 nothing caps the product, so a texture at the maximum on both sides is a gigabyte of pixels once
 uploaded. The format reads only a payload's header, so the allocation belongs to whatever
@@ -474,5 +608,6 @@ through untouched. None of them changes [evaluation order](evaluation.md).
 | | Today | If it is ever wanted |
 |---|---|---|
 | Interpolation between keypoints | Linear, and only linear | Another mode, as a format addition |
+| Composition of tracks | Additive, with no field saying so | A replacing mode, as a format addition where absent means additive |
 | Composition of deformations | Summation, the single mode | Deferred in [requirements/puppet.md](requirements/puppet.md#composition-is-deterministic-now-and-configurable-later-proposed), which owns that question |
 | Channel-mapping setups per puppet | One | Named profiles, per [requirements/performing.md](requirements/performing.md) |

@@ -43,6 +43,33 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-28 — A track adds to its parameter, and a keyframe holds a pose (supersedes part of "One parameter has one driver")
+
+**Decided:** every playing animation track adds its contribution to the parameter it drives, in
+an order fixed by data, and the sum is clamped to the parameter's range. A keyframe stores an
+absolute value, as a keypoint does, and the contribution is that value less the neutral
+keypoint. This supersedes only the animation half of *"One parameter has one driver, enforced by
+the validator"* — that animations override a parameter's driver temporarily and the
+later-started wins. **The base-driver rule itself is unchanged**: one channel mapping, one
+physics output or none, and two is a validation failure. A track was never a base driver.
+**Because:** override made the ordinary case unrepresentable. An idle or breathing animation
+layered under live tracking is bread-and-butter vtubing, and a permanently-playing idle under
+override blocks tracking entirely. *Later-started wins* was also the silent discard of the loser
+that the original entry refused for base drivers, disclosed rather than argued. Absolute
+keyframes keep a track at the neutral pose from shoving the puppet off-pose, match what Studio
+shows everywhere else, and match imported Cubism curves.
+**Rejected:** keeping override, which is what the earlier entry chose and what a newcomer will
+reintroduce to "let an animation take over". A replacing mode alongside addition, which is
+speculative and can be added later as a format addition where absent means additive. And a
+keyframe storing the contribution directly, which looks simpler and breaks four things — the
+neutral pose, authored values in Studio, Cubism import, and the rule that a track's keyframes
+sit in its parameter's range.
+**Consequences:** an animation can push a parameter and never force it to a value, so *head roll
+exactly centred regardless of tracking* is inexpressible. Float addition is not associative, so
+the order is data and never iteration order. The sum can overflow, so a non-finite result rests
+at neutral and not at a range edge. Nothing had shipped, so no puppet needed migrating; that
+reason expires at the first release.
+
 ## 2026-11-28 — The reader accepts a container the canonical writer would not have produced
 
 **Decided:** the canonical-serialisation rules bind the writer. The reader accepts any archive

@@ -139,8 +139,8 @@ things about them do not follow the pattern of the rows above.
 from each other.** Multiplying tracks by the median keyframes per track gives far less than the
 measured keyframes per animation, since most tracks sit at the floor while a few carry an order
 of magnitude more. A generator should draw from the distribution the research file records
-rather than emitting a flat figure, and a load limit should bind total keyframes per animation
-directly.
+rather than emitting a flat figure, and a load limit should bind total keyframes per **puppet**
+directly, and [format.md](../format.md) carries the figure.
 
 **The two keyframe rows do not bound what a puppet may contain.** They describe the workload the
 budgets are measured against, and the corpus they come from — hand-authored Cubism rigs — cannot
@@ -148,6 +148,21 @@ speak for script-generated animation, which is an ordinary way to make a puppet.
 motion baked at one keyframe per frame over a long loop reaches several times the stress figure
 here, and must load. What a file may actually carry is bounded by memory rather than by what a
 rigger typically does, and is settled in [puppet.md](puppet.md) rather than here.
+
+**A limit and a budget are different numbers, and conflating them is the error to avoid.** A
+**limit** exists so a file traded between strangers cannot exhaust memory, and is set from memory
+safety. A **budget** is the workload the frame targets are measured against, set from what a rig
+realistically contains. A puppet may sit inside every limit and outside the budget: it loads, it
+plays, and it misses the frame budget on the reference machine. **That is the author's choice and
+not a refusal** — the same bargain as opening more browser tabs, and consistent with *Budgets are
+per puppet* above.
+
+**The stress workload carries one animation at extreme density and the rest at corpus density.**
+Giving every animation one keyframe per frame would be several hundred megabytes of keyframe
+data, against a player budget that already spends a large share on textures. A budget measured
+against a workload nobody authors is not a budget, so the extreme is promised **per animation**
+and not simultaneously across all of them. Long animations are ordinary, and Studio must author
+them ([authoring.md](authoring.md#the-timeline-proposed)).
 
 **Tracks per animation is a property of the rig rather than of the animation**, in this corpus:
 a Cubism motion is exported against the model's whole parameter list, so most rigs ship clips
