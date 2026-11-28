@@ -24,7 +24,7 @@
 //!
 //! | Variable | Default | What it sets |
 //! |---|---|---|
-//! | `RIGEL_FUZZ_SECONDS` | `0.5` | The wall-clock budget. The loop stops at the deadline once it has run `MIN_INPUTS`, so a slow runner cannot fail the gate and a hang cannot outlive it |
+//! | `RIGEL_FUZZ_SECONDS` | `0.5` | The wall-clock budget for the **loop**, checked between inputs, so a slow runner cannot fail the gate. It does not bound the time spent inside one input; [`ONE_INPUT_TIMEOUT`] does that, and a hang is a failure rather than something the budget absorbs |
 //! | `RIGEL_FUZZ_INPUTS` | `512` | The number of inputs, if the budget does not run out first |
 //! | `RIGEL_FUZZ_SEED` | a fixed constant | The generator's seed |
 //!
@@ -489,20 +489,47 @@ struct Verdict {
     peak: u64,
 }
 
-fn drive(path: &Path) -> Verdict {
-    let mut accepted = false;
-    let mut panicked = false;
-    let peak = counting::peak_bytes(|| {
-        match catch_unwind(AssertUnwindSafe(|| load(path))) {
-            Ok(outcome) => accepted = outcome.is_ok(),
-            Err(_) => panicked = true,
-        };
+/// How long one input may take before the run is called a hang.
+///
+/// Generous against the slowest hosted runner — no legitimate input comes near
+/// it — and the point is only that an input which never returns is caught as
+/// the defect it is, rather than running until CI's own job timeout kills the
+/// whole workflow with no attribution.
+const ONE_INPUT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Runs one input **on a worker thread, with a timeout**.
+///
+/// The loop's deadline is checked *between* inputs, so it bounds the number of
+/// inputs and not the time spent inside one. Until this existed, the module
+/// table's claim that "a hang cannot outlive it" was false in exactly the case
+/// it was written for, and the comment in the loop — "every input is bounded
+/// by the loader's own limits, so reaching it cannot hang CI either" — was the
+/// assumption that made the claim look safe. Task 11 falsified it: a 4 KB
+/// input took 23 seconds, and a larger one of the same shape would have taken
+/// hours.
+///
+/// A thread that does not return cannot be killed, so a timeout here fails the
+/// run and leaves the thread to die with the process. The counting allocator's
+/// counters are per thread, which is what makes measuring on a worker sound.
+fn drive(path: &Path) -> Option<Verdict> {
+    let owned = path.to_path_buf();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut accepted = false;
+        let mut panicked = false;
+        let peak = counting::peak_bytes(|| {
+            match catch_unwind(AssertUnwindSafe(|| load(&owned))) {
+                Ok(outcome) => accepted = outcome.is_ok(),
+                Err(_) => panicked = true,
+            };
+        });
+        let _ = sender.send(Verdict {
+            accepted,
+            panicked,
+            peak,
+        });
     });
-    Verdict {
-        accepted,
-        panicked,
-        peak,
-    }
+    receiver.recv_timeout(ONE_INPUT_TIMEOUT).ok()
 }
 
 /// `EXEC-5` — every input ends in a refusal or a successful load. Never a panic,
@@ -546,8 +573,9 @@ fn exec_5_a_fuzz_run_over_the_puppet_parser() {
         // other way made this gate fail on a hosted runner that is slower than
         // the machine it was written on — 49 inputs in 0.5s, tripping the floor
         // below. A gate whose verdict depends on how loaded the runner is is not
-        // a gate. The floor is small and every input is bounded by the loader's
-        // own limits, so reaching it cannot hang CI either.
+        // a gate. The floor is small, and an input that never returns is caught
+        // by `ONE_INPUT_TIMEOUT` rather than by this deadline, which cannot see
+        // inside a call that has not come back.
         if ran >= MIN_INPUTS && Instant::now() >= deadline {
             break;
         }
@@ -560,7 +588,17 @@ fn exec_5_a_fuzz_run_over_the_puppet_parser() {
         };
         fs::write(&path, &mutated).expect("the input writes");
 
-        let verdict = drive(&path);
+        let Some(verdict) = drive(&path) else {
+            let kept = dir.join(format!("hanging-{index}.rigel2d"));
+            fs::write(&kept, &mutated).expect("the hanging input is kept");
+            panic!(
+                "seed {seed:#x}, input {index}, {name} mutated by {kind:?}: \
+                 one input did not return within {ONE_INPUT_TIMEOUT:?}, which is \
+                 a hang. The input is at {kept:?}; reach it again with \
+                 RIGEL_FUZZ_SEED={seed} RIGEL_FUZZ_INPUTS={}",
+                index + 1
+            );
+        };
         ran += 1;
         by_kind[Mutation::ALL
             .iter()

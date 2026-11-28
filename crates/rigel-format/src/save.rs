@@ -204,12 +204,22 @@ fn write_file(
     }
     if let Some(held) = upgrading {
         let sibling = backup_path(path, held);
-        backup_is_ours = !sibling.exists();
-        let previous = fs::read(path).map_err(|e| io(format!("{path:?} is not readable: {e}")))?;
-        // Through a temporary of its own, so that a half-written backup never
-        // stands in for the file it exists to preserve.
-        put(directory, &sibling, &previous, None)?;
-        backup = Some(sibling);
+        // **An existing backup is never replaced.** The backup exists because
+        // an upgrade is the one save that saving again cannot undo, so
+        // overwriting an older one takes away the thing it was kept for. The
+        // save continues: the puppet is still written, and the backup already
+        // on disk still holds a readable file at the version its name claims.
+        if sibling.exists() {
+            backup = Some(sibling);
+        } else {
+            backup_is_ours = true;
+            let previous =
+                fs::read(path).map_err(|e| io(format!("{path:?} is not readable: {e}")))?;
+            // Through a temporary of its own, so that a half-written backup
+            // never stands in for the file it exists to preserve.
+            put(directory, &sibling, &previous, None)?;
+            backup = Some(sibling);
+        }
     }
 
     // Steps 2 to 4: the file itself. Nothing touches `path` until the new bytes
@@ -253,7 +263,16 @@ fn put(
     if fail_at == Some(SaveStep::WriteTemporary) {
         return Err(clean(injected(SaveStep::WriteTemporary)));
     }
-    let mut file = File::create(&temporary)
+    // **Exclusive create, not `File::create`.** `create` truncates whatever is
+    // at the path and follows a symlink to wherever it points, so a name
+    // already taken — by a leftover from a killed save, or by something
+    // planted in a directory the user chose — would be written through.
+    // `create_new` refuses instead, which is also what keeps a save touching
+    // nothing outside the file's own directory.
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
         .map_err(|e| clean(io(format!("{temporary:?} is not writable: {e}"))))?;
     file.write_all(bytes)
         .map_err(|e| clean(io(format!("{temporary:?} is not written: {e}"))))?;

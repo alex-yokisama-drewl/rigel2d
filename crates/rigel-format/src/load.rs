@@ -155,6 +155,10 @@ impl Rejection {
                     .iter()
                     .map(|broken| broken.rule.as_str())
                     .collect();
+                // Sorted first: `dedup` removes only *consecutive* repeats,
+                // so an unsorted list renders a rule twice when two
+                // violations of it are separated by a third rule.
+                names.sort_unstable();
                 names.dedup();
                 names.join(", ")
             }
@@ -256,6 +260,15 @@ impl std::error::Error for Rejection {}
 /// What is wrong with the container, before any of it is trusted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ArchiveFault {
+    /// The file could not be opened at all — no such path, a directory, or no
+    /// permission to read it.
+    ///
+    /// Distinct from [`ArchiveFault::NotAnArchive`] because it says nothing
+    /// about the file's contents and is not a judgement on a puppet. Reporting
+    /// a mistyped path as a malformed archive sends a person looking for a
+    /// problem in a file they have not actually opened, and leaves a script no
+    /// way to tell the two apart.
+    Unreadable,
     /// Not a zip archive at all.
     NotAnArchive,
     /// An entry the format's table does not define.
@@ -274,6 +287,7 @@ impl ArchiveFault {
     /// The fault's name, for a rejection a person and a test can both read.
     pub fn as_str(self) -> &'static str {
         match self {
+            ArchiveFault::Unreadable => "unreadable",
             ArchiveFault::NotAnArchive => "not-an-archive",
             ArchiveFault::UndefinedEntryName => "undefined-entry-name",
             ArchiveFault::DuplicateEntryName => "duplicate-entry-name",
@@ -815,7 +829,7 @@ mod tests {
     /// A file that is not an archive at all, and one that is an archive and not
     /// a puppet, are both refused rather than read part-way.
     #[test]
-    fn something_that_is_not_an_archive_is_refused() {
+    fn something_that_is_not_an_archive_is_refused_apart_from_something_unreadable() {
         let directory = fixture("rigged.rigel2d")
             .parent()
             .expect("a directory")
@@ -827,12 +841,24 @@ mod tests {
             }) => {}
             other => panic!("a JSON file is not an archive: {other:?}"),
         }
+        // A file that was never opened is `Unreadable`, not `NotAnArchive`.
+        // The two were one fault until task 11: a mistyped path reported
+        // identically to a hostile puppet, which sends a person looking for a
+        // fault in a file nothing ever read, and leaves a script no way to
+        // tell a bad path from a bad puppet.
         match read_file(&directory.join("no-such-file.rigel2d")) {
             Err(Rejection::Archive {
-                fault: ArchiveFault::NotAnArchive,
+                fault: ArchiveFault::Unreadable,
                 ..
             }) => {}
-            other => panic!("a missing file is refused: {other:?}"),
+            other => panic!("a missing file is unreadable, not malformed: {other:?}"),
+        }
+        match read_file(&directory) {
+            Err(Rejection::Archive {
+                fault: ArchiveFault::Unreadable,
+                ..
+            }) => {}
+            other => panic!("a directory is unreadable, not malformed: {other:?}"),
         }
     }
 

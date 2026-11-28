@@ -106,8 +106,30 @@ fn fault(fault: ArchiveFault, detail: impl Into<String>) -> Rejection {
 
 /// Opens an archive and refuses every container fault, decompressing nothing.
 pub(crate) fn open(path: &Path) -> Result<Container, Rejection> {
-    let file = File::open(path)
-        .map_err(|e| fault(ArchiveFault::NotAnArchive, format!("not opened: {e}")))?;
+    let file = File::open(path).map_err(|e| {
+        fault(
+            ArchiveFault::Unreadable,
+            format!("{path:?} is not readable: {e}"),
+        )
+    })?;
+    // A path that opens but is not a file — a directory, most often — is
+    // unreadable rather than malformed, for the same reason: nothing has been
+    // said about any puppet's contents.
+    match file.metadata() {
+        Ok(data) if !data.is_file() => {
+            return Err(fault(
+                ArchiveFault::Unreadable,
+                format!("{path:?} is not a file"),
+            ));
+        }
+        Ok(_) => {}
+        Err(e) => {
+            return Err(fault(
+                ArchiveFault::Unreadable,
+                format!("{path:?} is not readable: {e}"),
+            ));
+        }
+    }
     let archive = zip::ZipArchive::new(file).map_err(|e| {
         fault(
             ArchiveFault::NotAnArchive,

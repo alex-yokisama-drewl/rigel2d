@@ -584,7 +584,7 @@ fixed. Re-run after the fix, the owner's own repacked file is accepted.
 **Approved.** The owner accepted the fix and the reader's tolerance of directory markers, with
 no further issues against any of the four steps.
 
-### 11. The reader's work and memory are bounded — `in progress`
+### 11. The reader's work and memory are bounded — `done`
 
 **Added at task 10, from review.** Three independent sweeps and the code review found the same
 family of defect, and the measurements confirmed it: the reader's cost is not bounded by
@@ -630,9 +630,28 @@ the fuzz deadline can actually interrupt a hang. No user gate.
   the counting allocator. Confirmed non-vacuous: with the budget disabled the assertion fails on
   the peak, not on the verdict.
 
-**Still to do:** the fuzz deadline, which is checked *between* inputs so a hang inside one is
-not bounded by it — the thing the module table claims it bounds; and the smaller review
-findings listed under *Caught at review*.
+- **The fuzz deadline can now interrupt a hang.** It is checked *between* inputs, so it bounded
+  the number of inputs and not the time inside one — the module table claimed "a hang cannot
+  outlive it" and the loop's own comment assumed "every input is bounded by the loader's own
+  limits", which task 11 falsified. `drive` now runs on a worker thread with a 30-second
+  per-input timeout, and a timeout is a failure that keeps the input, not something the budget
+  absorbs. The counting allocator's counters are per thread, which is what makes measuring on a
+  worker sound.
+- **The smaller review findings**, each verified before fixing:
+  - A save **no longer replaces an existing backup**. `backup_is_ours` decided only whether to
+    *undo* the backup, so a `.bak-<v>` already on disk was overwritten regardless. The backup
+    exists because an upgrade is the one save that saving again cannot undo, which is exactly
+    the case where losing it costs.
+  - The save temporary is created with **`create_new`**, not `File::create`, which truncates and
+    follows a symlink. This is also what makes the symlink decision below hold at every step:
+    a save touches nothing outside the file's own directory.
+  - **`archive.unreadable` is now distinct from `archive.not-an-archive`.** A missing path and a
+    directory reported identically to a hostile puppet, sending a person to look for a fault in
+    a file nothing had opened and leaving a script no way to tell a bad path from a bad puppet.
+  - `Rejection::rule_name` **sorts before `dedup`**, which removes only consecutive repeats, so
+    a rule broken twice with another rule between them printed twice.
+
+**Still to do:** nothing in this task. Task 10 follows.
 
 ### 10. Finish — `todo`
 
@@ -881,6 +900,15 @@ are untouched: a marker read in is dropped on save, which is correct, because it
 puppet data. **Because** `TOOL-3` is the requirement that a third party can inspect, change and
 regenerate a puppet with ordinary tooling, and `zip -r` is that tooling; a reader that refuses
 its output refuses the whole claim the archive container was chosen to deliver.
+
+Task 11. **Save replaces a symlink at the puppet's path rather than writing through it.**
+The owner's rule decides it: a saved file must stay workable if it is moved, and save and load
+must touch nothing outside the file itself. Writing through a link reaches a file in another
+directory, which that rule forbids; replacing the link writes only where the user pointed.
+Recorded because the behaviour was previously `fs::rename`'s default rather than a decision,
+and because it has a visible cost — a synced or shared rig becomes a plain file and the old
+target goes stale. The same rule is why the temporary uses `create_new`. **Flag:** this is a
+product-shaped choice the owner delegated, and `format.md` says nothing about symlinks.
 
 Task 10. **The marker predicate ignores the compressed size and the compression method.** The
 entry is never read, so neither is the loader's business; the method is nonetheless checked for
