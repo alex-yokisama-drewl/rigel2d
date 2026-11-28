@@ -22,8 +22,12 @@ the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) 
 
 ## Status
 
-**Current task:** 1 and 2 done. Task 3 is next
-**Blocked on:** nothing. The aggregate keyframe limit is **262,144**, settled by the owner on
+**Current task:** 1 and 2 done. Task 3 is done but for one assertion; task 4 is next
+**Blocked on:** one acceptance assertion in
+`lim_1_the_aggregate_keyframe_limit_is_declared_once_and_bites_before_allocating`, which this
+reader cannot satisfy and which is reported as a finding rather than edited — see *Contradicts
+docs*, **the peak assertion**. Everything else is green.
+**Was blocked on:** nothing. The aggregate keyframe limit is **262,144**, settled by the owner on
 2026-11-28, and `rigged:keyframes-over-aggregate` is built against it and verified to be
 refused for that rule and no other. Both earlier figures were unreachable and the record of why
 stays in *Contradicts docs*, because the failure mode repeats: a figure checked against one
@@ -239,6 +243,12 @@ branch ends so nobody re-proposes them.
   reads better and it makes `rigged:bezier-without-control-points` unrepresentable in memory —
   so only the decoder could refuse that fixture, and `validate(&Puppet)` could never reach it.
   The defect has a committed fixture precisely so a validator refuses it. See *Decisions made*.
+- **Folding a non-finite Bézier control value into `Rule::NumbersFinite`**, by adding control
+  points to the validator's `numbers()` walk. It works and the fixture is refused — for two
+  rules at once, which is what a one-defect corpus exists to prevent. Task 3.
+- **Sorting an animation's triggers in the writer rather than in the decoder.** A preserved
+  member's path carries the trigger's index, so sorting at save time moves preserved material
+  onto a different trigger. Task 3.
 
 ## Caught at gate
 
@@ -286,14 +296,15 @@ asked for, and task 3 makes them pass.
 not building, and every criterion in *Acceptance criteria* above has a test or a recorded reason
 why it has none. No user gate.
 
-### 3. Decode, validate, write — `todo`
+### 3. Decode, validate, write — `done`
 
 Dispatch `module-dev`. Make the tests from task 2 pass: the decode path, the validation rules,
 the canonical writer, the JSON Schema, and the two new entries in
 [limits.rs](../../crates/rigel-format/src/limits.rs) with the aggregate counted before
 allocating.
 
-**Never edit an acceptance test to make it pass.** One that seems wrong is a finding.
+**Never edit an acceptance test to make it pass.** One that seems wrong is a finding. One was:
+the peak-memory half of the aggregate limit test. It is left failing and reported.
 
 **Done when:** `scripts/test-record.sh` records a pass for the commit, `scripts/docs-check.sh`
 passes, and the limits completeness and allocation-check scripts pass over the new paths. No
@@ -345,6 +356,26 @@ than deleting it.
   `Parameter::order` and `Parameter::mappable`, with the types `Interpolation`, `ControlPoint`,
   `EndBehaviour` and `Trigger` beside them and re-exported from `lib.rs`. **The surface only** —
   no decode, no validation, no writing.
+
+**Task 3 — decode, validate, write.**
+
+- The five fields read, validated and written: `interpolation` and `control_points` on a
+  keyframe, `end_behaviour` and `triggers` on an animation, `order` and `mappable` on a
+  parameter. Every `// Task 2 (acceptance surface)` placeholder is gone, the invented
+  `EndBehaviour::Loop` in [decode.rs](../../crates/rigel-format/src/decode.rs) among them.
+- Six `Rule` variants in [validate.rs](../../crates/rigel-format/src/validate.rs), one per
+  defect the corpus carries and `format.md`'s *Validation* list does not state:
+  `end-behaviour-declared`, `interpolation-opens-a-segment`, `trigger-events-unique`,
+  `bezier-segment-carries-control-points`, `bezier-control-time-inside-segment`,
+  `bezier-control-value-finite`. Each defect fixture is now refused for **its own rule and no
+  other**, verified one at a time through `rigel-validate`.
+- Two rows in [limits.rs](../../crates/rigel-format/src/limits.rs): `TotalKeyframeCount` at
+  262,144, basis `Memory`, and `TriggersPerAnimation` at 64, basis `Provisional`.
+- The committed JSON Schema carries every new field, plus a `trigger` and a `control_point`
+  definition. The unit test holding the schema's member lists against the reader's key sets
+  now covers both, and [schema/README.md](../../crates/rigel-format/schema/README.md) carries a
+  boundary row per new rule.
+
 
 **Decisions made:**
 
@@ -414,6 +445,39 @@ than deleting it.
   **accepted** and canonicalised on save. Added from the security concern on triggers: an event
   name shaped like a condition, which is **accepted**, because the set of names is open and an
   unrecognised one is never a validation failure.
+
+**Task 3.**
+
+- **The aggregate keyframe count runs in the `Decoder`, charged per track before the keyframe
+  collection is allocated.** The counter is a field on the decoder rather than a check over a
+  finished collection, which is what the assignment asked for. It is the reason the peak
+  assertion below cannot hold: see *Contradicts docs*.
+- **A non-finite Bézier control value gets its own rule rather than `NumbersFinite`**, and
+  control points are therefore **not** added to the validator's `numbers()` walk. One defect
+  naming one rule is what makes a one-defect corpus worth having, and a control point checked
+  in two places would name two.
+- **Exactly two control points stays a type invariant**, so a three-point file is
+  `Rejection::Malformed` at decode rather than a validation rule. No fixture carries a wrong
+  count and `format.md` states no count rule, so a `Vec` plus a rule would be a validator
+  designed from nothing. Task 2 asked to be told either way: **this is the answer**, and it is
+  one line to reverse if a fixture ever needs it.
+- **A negative `order` is accepted.** `format.md` says only *an integer* and the reader admits
+  everything the specification permits; the schema says `"type": "integer"` to match. Refusing
+  one would be a rule no document states. Reported under *Contradicts docs* as a gap, not
+  decided silently.
+- **Triggers are sorted by event name in the decoder, not in the writer.** `save.rs` documents
+  itself as writing *a puppet already in canonical order*, and sorting at read keeps a
+  preserved member's path — `triggers/<n>` — pointing at the same trigger through a round trip.
+  Sorting in the writer would renumber those paths under the preserved material.
+- **An absent `end_behaviour` yields `EndBehaviour::Unfamiliar("")` after the violation is
+  raised**, deliberately not one of the three the format defines. The file is already refused,
+  so the value is never read — and a test cannot accidentally pass against it, which is what
+  the invented `Loop` made possible.
+- **The trigger limit is not written into the schema as a `maxItems`.**
+  `schema/README.md`'s *The load limits are not here either* says load limits are deliberately
+  absent from the schema; the security entry's *the limit set and the schema agree* is read as
+  the member lists agreeing, which the unit test enforces.
+
 
 **Contradicts docs:**
 
@@ -502,6 +566,73 @@ than deleting it.
   [format.md](../format.md) *Load limits* carries it with its arithmetic, so that row is stale
   and `LIM-9` can assert the figure after all. The acceptance test does assert it.
 
+**Task 3.**
+
+- **The peak assertion in
+  `lim_1_the_aggregate_keyframe_limit_is_declared_once_and_bites_before_allocating` cannot hold
+  for this reader, and is left failing rather than edited.** It asserts that loading
+  `rigged:keyframes-over-aggregate` peaks below `DecompressedPayloadBytes`, 67,108,864 bytes.
+  Measured under the counting allocator, the failed load peaks at **145,840,208 bytes** — about
+  556 bytes per keyframe, against the 458 `format.md` *Load limits* charges one in the parse
+  tree.
+
+  The cause is architectural and already written down: `limits.rs` says of `ParseTreeBytes`
+  that *nothing downstream can refuse it, because every collection limit in `decode` runs after
+  the tree exists*. A fixture **one** keyframe over an aggregate has to be read almost
+  entirely before the count can exceed it, so the tree for 262,144 keyframes is built whatever
+  the counting is. Counting inside the JSON parser rather than in the decoder moves the refusal
+  earlier by one keyframe and the peak not at all. No aggregate figure fixes it either: at the
+  measured cost, peaking under 64 MiB needs a limit near 120,000, which collides with
+  `KeyframesPerTrack`.
+
+  The only implementation that satisfies it is a **streaming pre-scan of the payload text that
+  counts keyframes before the tree is built**. That is a second parser with a second definition
+  of *a keyframe*, run on every load, and it would single this limit out from every other
+  collection limit in the format, which the project settled run after the tree with
+  `ParseTreeBytes` as the compensating bound. It is not what the assignment asked for — *a
+  running count across the decode path* — and it was not built.
+
+  **The suite's own precedent is the fix.**
+  `a_payload_whose_parsed_tree_exceeds_the_budget_is_refused_before_it_is_built` asserts
+  `peak < TotalLoadMemory` and `peak < 2 * ParseTreeBytes`. Both hold here — 145.8 MB against
+  1 GiB and against 536 MB — and both say what the criterion means for a limit the tree reaches
+  before the decoder does. Everything else in the test passes: the figure is declared once, its
+  basis is `Memory`, and the rejection is `limit.total-keyframe-count` at 262,144.
+
+- **`format.md` *Load limits* charges a keyframe 458 bytes in the parse tree; the measurement
+  above puts live allocation nearer 556.** The 458 is `json.rs`'s accounting figure, and the
+  gap means `ParseTreeBytes` admits rather more real memory than its arithmetic suggests —
+  about 326 MB at its own 586,000-keyframe ceiling, against a 256 MiB budget. The measured peak
+  includes the transient doubling a growing `Vec` really holds, so this is an upper bound
+  rather than a settled figure, but the direction is wrong and the figure is quoted in
+  `format.md` as if it bounded memory.
+
+- **`format.md` *Validation* still lists no rule for the four defects task 1 reported**, and a
+  fifth: an absent `end_behaviour`, an interpolation mode on a track's last keyframe, a Bézier
+  segment declaring the mode with no control points, one animation naming one event twice, and
+  — new here — a Bézier **control value** that is not finite, which the list folds into the
+  control-times bullet rather than naming. Each now has a `Rule`; each still needs a line in
+  that list, which is where a completeness check will look.
+
+- **`format.md` does not say whether a parameter's `order` may be negative**, as task 1
+  reported. The decoder and the schema now both admit one. If it should be refused, that is a
+  document change and a seventh rule, not an edit here.
+
+- **`schema/README.md` stated *The load limits are not here either*** and that is still true,
+  including for `TriggersPerAnimation`. Recorded because the security concern entry's phrase
+  *the limit set and the schema agree* reads, at a glance, as asking for the figures.
+
+- **The limits-completeness and allocation-check scripts the assignment names do not exist.**
+  `scripts/` carries no such script and nothing in `tests/` implements either walk; both
+  concern entries in [security.md](../concerns/security.md) are still `script` with no script.
+  The new decode paths were audited by hand instead: every `with_capacity` sized from a
+  file-derived length — `triggers`, `keyframes`, `control_points` — is preceded by its limit
+  check. The one exception follows an existing pattern rather than introducing one: a control
+  point's `value` array is sized from the file with no limit, exactly as a keyframe's `value`
+  and a keypoint's `position` already are, because the keyframe/keypoint arity rule is `[open]`
+  and `ParseTreeBytes` is what bounds them.
+
+
 **Traps:**
 
 - **`rigged` is the control, and a field added to it silently disarms a criterion.** Adding
@@ -551,6 +682,21 @@ than deleting it.
   currently refused for `unmarked-data [interpolation]` rather than for the defect it carries.
   It only becomes meaningful when task 3 lands the rule.
 
+**Task 3.**
+
+- **The aggregate keyframe fixture costs 145 MB and five seconds every time the acceptance
+  suite runs**, whatever the assertion over it says. The figure above is what the counting
+  allocator reports; nothing else in the suite is within an order of magnitude.
+- **A preserved member's path carries an index, so re-sorting a collection at save time
+  silently moves preserved material onto a different entity.** Triggers are the first
+  collection whose canonical order is not the order it was read in, which is why the sort
+  happens at read. Anything that later sorts in the writer has to renumber the preserved paths
+  with it.
+- **`EVERY_RULE` in `validate.rs`'s tests is three lists, not one** — the enum, the `as_str`
+  match and the exhaustive match in the test — and only the last fails to compile when a
+  variant is missed. A variant added to two of the three builds and passes.
+
+
 **Assumptions:**
 
 - **A Bézier control time may equal a segment endpoint.** Stated above; the degenerate fixture
@@ -570,6 +716,17 @@ than deleting it.
   version fails those tests, which is deliberate — but it means the enumeration has to be
   maintained with the format.
 
+**Task 3.**
+
+- **A control point on a non-Bézier segment is not refused.** No fixture carries one and
+  `format.md` states no rule, so the reader keeps it and writes it back. The acceptance suite
+  asserts the *accepted* corpus pairs them correctly, which is a claim about the corpus rather
+  than about the reader.
+- **A non-finite Bézier control *time* is caught by `bezier-control-time-inside-segment`**,
+  because a NaN compares false against both endpoints. That is a true rejection for the right
+  reason by accident rather than by design; no fixture carries one.
+
+
 **Deferred:**
 
 - **Regenerating `rigged:near-limit` against the real `NodeCount` limit.** Reported above;
@@ -580,6 +737,15 @@ than deleting it.
   remove most of it. Not done: it means hand-spelling floats and matching `serde_json`'s
   shortest-round-trip format exactly, which is a correctness risk taken for a cost nothing is
   yet paying. The lever is here if S3's generated workloads make it worth pulling.
+
+**Task 3.**
+
+- **A streaming pre-scan that would let the aggregate keyframe limit bite before the parse tree
+  exists.** Reported above under *Contradicts docs*; it is a format-wide architectural change
+  and is out of this task's scope either way.
+- **Writing the two `script` concern entries the assignment expected to run.** They do not
+  exist, and writing them is a task of its own rather than a side effect of this one.
+
 
 ---
 

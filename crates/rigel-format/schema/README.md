@@ -47,6 +47,12 @@ Each rule the validator names, and which side of the line it falls on. The rule 
 | `at-most-one-base-driver` | no | counts channel mappings and physics outputs that name one parameter |
 | `binding-value-count-agrees-with-stale-mark` | no | compares a count against a mesh reached through a reference, in both directions |
 | `at-most-one-track-per-parameter` | no | a uniqueness rule over a referenced value |
+| `end-behaviour-declared` | yes | the member is required, which is the whole rule: `docs/format.md` states no default for it, so an animation meeting it absent has nothing to fall back on |
+| `bezier-segment-carries-control-points` | no | a member required by the *value* of a sibling member, which this schema expresses nowhere else and which the validator already walks the segment to reach |
+| `bezier-control-value-finite` | yes | a control point's values are bounded at the single-precision limits like every other interpreted number |
+| `interpolation-opens-a-segment` | no | names a position in an array — the **last** keyframe — which is not a constraint on an element |
+| `bezier-control-time-inside-segment` | no | compares a control time against the keyframe after the one carrying it |
+| `trigger-events-unique` | no | a uniqueness rule over array elements |
 
 **A file this schema accepts is not yet a valid puppet.** It is a file whose *shapes* are right.
 

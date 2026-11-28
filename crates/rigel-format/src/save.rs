@@ -650,6 +650,12 @@ impl Object {
         self.put(key, Json::Number(value.to_string()));
     }
 
+    /// A whole number that may be negative — a parameter's order is the one
+    /// the format defines.
+    fn signed(&mut self, key: &str, value: i64) {
+        self.put(key, Json::Number(value.to_string()));
+    }
+
     fn text(&mut self, key: &str, value: &str) {
         self.put(key, Json::String(value.to_owned()));
     }
@@ -734,6 +740,30 @@ fn output_source(source: &OutputSource) -> &str {
         OutputSource::X => "x",
         OutputSource::Y => "y",
         OutputSource::Unfamiliar(token) => token,
+    }
+}
+
+fn end_behaviour(behaviour: &crate::puppet::EndBehaviour) -> &str {
+    use crate::puppet::EndBehaviour;
+    match behaviour {
+        EndBehaviour::Loop => "loop",
+        EndBehaviour::Hold => "hold",
+        EndBehaviour::Release => "release",
+        EndBehaviour::Unfamiliar(token) => token,
+    }
+}
+
+/// The mode of the segment a keyframe opens, or `None` where the writer stores
+/// nothing: **linear is the absent form**, so an all-linear track stores no
+/// mode anywhere.
+fn interpolation(mode: &crate::puppet::Interpolation) -> Option<&str> {
+    use crate::puppet::Interpolation;
+    match mode {
+        Interpolation::Linear => None,
+        Interpolation::Stepped => Some("stepped"),
+        Interpolation::InverseStepped => Some("inverse_stepped"),
+        Interpolation::Bezier => Some("bezier"),
+        Interpolation::Unfamiliar(token) => Some(token),
     }
 }
 
@@ -1134,6 +1164,17 @@ impl Writer<'_> {
                     .collect(),
             ),
         );
+        // The rigger's arrangement, which is a stored field rather than the
+        // order of the collection. Absent is legal and sorts last.
+        if let Some(order) = parameter.order {
+            out.signed("order", order);
+        }
+        // Absent when true, so absent means *offered* — the direction that
+        // fails safely. The derived `true` a channel mapping implies is never
+        // written back (`MAP-3`).
+        if !parameter.mappable {
+            out.put("mappable", Json::Bool(false));
+        }
         self.preserve(&mut out, parameter.id, &[]);
         out.into_json()
     }
@@ -1194,6 +1235,29 @@ impl Writer<'_> {
                     .collect(),
             ),
         );
+        // Always written: `docs/format.md` states no default for it, and a
+        // field with no stated default is written whatever it holds.
+        out.text("end_behaviour", end_behaviour(&animation.end_behaviour));
+        // Canonically ordered by event name, and absent when empty.
+        if !animation.triggers.is_empty() {
+            out.put(
+                "triggers",
+                Json::Array(
+                    animation
+                        .triggers
+                        .iter()
+                        .enumerate()
+                        .map(|(at, trigger)| {
+                            let mut held = Object::new();
+                            held.text("event", &trigger.event);
+                            let step = at.to_string();
+                            self.preserve(&mut held, animation.id, &["triggers", step.as_str()]);
+                            held.into_json()
+                        })
+                        .collect(),
+                ),
+            );
+        }
         self.preserve(&mut out, animation.id, &[]);
         out.into_json()
     }
@@ -1224,6 +1288,49 @@ impl Writer<'_> {
                             ),
                         );
                         let step = at.to_string();
+                        // The mode of the segment this keyframe opens. Linear
+                        // is the absent form and the last keyframe opens no
+                        // segment, so neither stores anything.
+                        if let Some(mode) = interpolation(&keyframe.interpolation) {
+                            held.text("interpolation", mode);
+                        }
+                        if let Some(controls) = &keyframe.control_points {
+                            held.put(
+                                "control_points",
+                                Json::Array(
+                                    controls
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(which, control)| {
+                                            let mut point = Object::new();
+                                            point.number("time", control.time);
+                                            point.put(
+                                                "value",
+                                                Json::Array(
+                                                    control
+                                                        .value
+                                                        .iter()
+                                                        .map(|coordinate| number(*coordinate))
+                                                        .collect(),
+                                                ),
+                                            );
+                                            let slot = which.to_string();
+                                            self.preserve(
+                                                &mut point,
+                                                track.id,
+                                                &[
+                                                    "keyframes",
+                                                    step.as_str(),
+                                                    "control_points",
+                                                    slot.as_str(),
+                                                ],
+                                            );
+                                            point.into_json()
+                                        })
+                                        .collect(),
+                                ),
+                            );
+                        }
                         self.preserve(&mut held, track.id, &["keyframes", step.as_str()]);
                         held.into_json()
                     })
@@ -1505,7 +1612,6 @@ mod tests {
     fn keypoints_sort_and_take_their_binding_values_with_them() {
         let mut puppet = subject();
         puppet.parameters.push(Parameter {
-            // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
             order: None,
             mappable: true,
             id: Id(20),
@@ -1591,6 +1697,100 @@ mod tests {
     }
 
     /// Empty is absent, because the corpus's smallest valid puppet writes no
+    /// The absent forms the new fields take, and the one that is always
+    /// written.
+    ///
+    /// Linear is the absent interpolation, `mappable` is absent when true, an
+    /// absent `order` is legal, and an empty `triggers` is not written — while
+    /// `end_behaviour` is written whatever it holds, because `docs/format.md`
+    /// states no default for it.
+    #[test]
+    fn the_new_fields_are_absent_in_their_default_form_except_the_ending() {
+        let text = |puppet: &Puppet| {
+            String::from_utf8(Writer { puppet }.document().to_canonical_bytes()).expect("UTF-8")
+        };
+
+        // `subject()` carries no parameters and no animations, so the fields
+        // need something to sit on before their absence says anything.
+        let mut animated = subject();
+        animated.parameters.push(Parameter {
+            order: None,
+            mappable: true,
+            id: Id(20),
+            name: String::from("head_turn"),
+            axes: vec![Axis {
+                range: [-1.0, 1.0],
+                polarity: AxisPolarity::Bilateral,
+            }],
+            keypoints: vec![Keypoint {
+                id: Id(21),
+                position: vec![0.0],
+                neutral: true,
+            }],
+        });
+        animated.animations.push(crate::puppet::Animation {
+            id: Id(40),
+            name: String::from("idle"),
+            end_behaviour: crate::puppet::EndBehaviour::Loop,
+            triggers: Vec::new(),
+            tracks: vec![Track {
+                id: Id(41),
+                parameter: Id(20),
+                blend_duration: 0.0,
+                keyframes: vec![
+                    crate::puppet::Keyframe {
+                        interpolation: crate::puppet::Interpolation::Linear,
+                        control_points: None,
+                        time: 0.0,
+                        value: vec![0.0],
+                    },
+                    crate::puppet::Keyframe {
+                        interpolation: crate::puppet::Interpolation::Linear,
+                        control_points: None,
+                        time: 1.0,
+                        value: vec![1.0],
+                    },
+                ],
+            }],
+        });
+
+        let plain = text(&animated);
+        for absent in [
+            "interpolation",
+            "control_points",
+            "triggers",
+            "mappable",
+            "order",
+        ] {
+            assert!(!plain.contains(absent), "{absent} was written: {plain}");
+        }
+        assert!(
+            plain.contains(r#""end_behaviour":"loop""#),
+            "a field with no stated default is always written: {plain}"
+        );
+
+        // And each one appears the moment it holds anything else.
+        let mut set = animated.clone();
+        set.parameters[0].order = Some(-3);
+        set.parameters[0].mappable = false;
+        set.animations[0].end_behaviour = crate::puppet::EndBehaviour::Release;
+        set.animations[0].triggers = vec![crate::puppet::Trigger {
+            event: String::from("source_lost"),
+        }];
+        set.animations[0].tracks[0].keyframes[0].interpolation =
+            crate::puppet::Interpolation::Stepped;
+        let written = text(&set);
+        for present in [
+            r#""order":-3"#,
+            r#""mappable":false"#,
+            r#""end_behaviour":"release""#,
+            r#""event":"source_lost""#,
+            r#""interpolation":"stepped""#,
+        ] {
+            assert!(written.contains(present), "{present} is missing: {written}");
+        }
+    }
+
     /// `parameters`, `bindings`, `animations` or `channel_mappings` key at all
     /// and a save of it has to reproduce the file it came from.
     #[test]

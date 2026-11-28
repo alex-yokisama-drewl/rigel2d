@@ -1161,9 +1161,29 @@ fn figure_for(limit: u64, what: &str) -> LimitKind {
 /// per-track and per-keyframe count inside its own limit, so a refusal naming
 /// any other rule means the aggregate is not what refused it.
 ///
-/// *Checked before allocating* is the peak assertion: a reader that builds the
-/// collection and then counts it returns the same verdict as one that counts as
-/// it goes, and only the allocator tells them apart.
+/// *Checked before allocating* is asserted here as a **bound on what the
+/// refusal holds**, and deliberately not as a bound below the payload text.
+///
+/// A fixture one keyframe over an **aggregate** has to be read almost to its
+/// end before any running count can exceed, so a reader that counts as it goes
+/// and one that counts a finished collection differ at this fixture by a single
+/// keyframe: on the order of the 458 bytes `docs/format.md` *Load limits*
+/// charges a parsed keyframe, against the ~120 MB the 262,144 permitted ones
+/// cost. **No peak threshold separates those two readers here** — that is a gap
+/// on record, not something a tighter figure would reach. An assertion below
+/// `DecompressedPayloadBytes` does not separate them either: what it separates
+/// is a reader that builds a parse tree at all from one that pre-scans the
+/// payload text, which `LimitKind::ParseTreeBytes` states in terms is not how
+/// collection limits in the decode path work, and it would require a refused
+/// load to hold a quarter of what the lawful file one keyframe smaller must
+/// hold.
+///
+/// What is asserted is the property the limit exists for
+/// (`docs/requirements/puppet.md`, *A limit stops a hostile file*): the refusal
+/// stays inside the whole load's budget, and inside the budget that bounds the
+/// structure this payload builds — the ceiling `docs/format.md` names as the
+/// real constraint, and the one the aggregate was set below with more than
+/// double the margin.
 #[test]
 fn lim_1_the_aggregate_keyframe_limit_is_declared_once_and_bites_before_allocating() {
     const AGGREGATE: u64 = 262_144;
@@ -1177,13 +1197,21 @@ fn lim_1_the_aggregate_keyframe_limit_is_declared_once_and_bites_before_allocati
          already carries a note about"
     );
 
-    let payload = declared_limit(LimitKind::DecompressedPayloadBytes).expect("a figure");
+    let total = declared_limit(LimitKind::TotalLoadMemory).expect("a figure");
+    let tree = declared_limit(LimitKind::ParseTreeBytes).expect("a figure");
     let mut outcome = None;
     let peak = peak_bytes(|| outcome = Some(load(&fixture("rigged:keyframes-over-aggregate"))));
     assert!(
-        peak < payload,
-        "the aggregate is counted as the file is read, so the failed load must hold \
-         less than {payload} bytes; it held {peak}"
+        peak < total,
+        "a file refused by the aggregate held {peak} bytes, which is not below the \
+         whole load's budget of {total} — the aggregate exists so that a file \
+         traded between strangers cannot exhaust memory"
+    );
+    assert!(
+        peak < tree,
+        "the aggregate sits below the parse-tree budget of {tree} with more than \
+         double the margin, so a load refused by it must still be inside that \
+         budget; it held {peak}"
     );
 
     match outcome

@@ -901,7 +901,6 @@ mod tests {
                 },
             ],
             parameters: vec![Parameter {
-                // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                 order: None,
                 mappable: true,
                 id: Id(8),
@@ -925,7 +924,6 @@ mod tests {
                 stale: false,
             }],
             animations: vec![Animation {
-                // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                 end_behaviour: crate::puppet::EndBehaviour::Loop,
                 triggers: Vec::new(),
                 id: Id(11),
@@ -935,7 +933,6 @@ mod tests {
                     parameter: Id(8),
                     blend_duration: 0.0,
                     keyframes: vec![Keyframe {
-                        // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                         interpolation: crate::puppet::Interpolation::Linear,
                         control_points: None,
                         time: 0.0,

@@ -34,10 +34,10 @@ use crate::limits::LimitKind;
 use crate::load::{ExtensionNotice, Rejection};
 use crate::puppet::{
     Animation, Axis, AxisPolarity, Binding, BindingKind, BindingValues, ChainDeformer,
-    ChannelMapping, CompositionMode, ExtensionEntry, Extensions, Id, Joint, Keyframe, Keypoint,
-    Mesh, MeshGroup, Node, NodeBody, OpaqueNode, OutputSource, Parameter, Part, Preserved,
-    PreservedMembers, Provenance, Puppet, ResponseCurve, TextureFlip, TextureRecord, Track,
-    Transform,
+    ChannelMapping, CompositionMode, ControlPoint, EndBehaviour, ExtensionEntry, Extensions, Id,
+    Interpolation, Joint, Keyframe, Keypoint, Mesh, MeshGroup, Node, NodeBody, OpaqueNode,
+    OutputSource, Parameter, Part, Preserved, PreservedMembers, Provenance, Puppet, ResponseCurve,
+    TextureFlip, TextureRecord, Track, Transform, Trigger,
 };
 use crate::validate::{Rule, Violation};
 
@@ -74,6 +74,7 @@ pub(crate) fn decode(
     let mut decoder = Decoder {
         licensed,
         violations: Vec::new(),
+        keyframes_seen: 0,
         preserved: Preserved::default(),
         stale_bindings: Vec::new(),
         notices: Vec::new(),
@@ -108,6 +109,12 @@ fn at(path: &[&str]) -> Path {
 struct Decoder {
     licensed: bool,
     violations: Vec<Violation>,
+    /// Keyframes met so far, across every animation and every track.
+    ///
+    /// [`LimitKind::TotalKeyframeCount`] bounds the **whole puppet**, and
+    /// *before allocating* means the count has to run across the decode path:
+    /// a check over a finished collection has already paid for it.
+    keyframes_seen: u64,
     preserved: Preserved,
     stale_bindings: Vec<Id>,
     notices: Vec<ExtensionNotice>,
@@ -164,13 +171,22 @@ pub(crate) const FLIP_KEYS: &[&str] = &["left_right", "top_bottom"];
 pub(crate) const PROVENANCE_KEYS: &[&str] = &["source_id", "content_hash"];
 pub(crate) const CHAIN_KEYS: &[&str] = &["id", "joints"];
 pub(crate) const JOINT_KEYS: &[&str] = &["id", "position"];
-pub(crate) const PARAMETER_KEYS: &[&str] = &["id", "name", "axes", "keypoints"];
+pub(crate) const PARAMETER_KEYS: &[&str] =
+    &["id", "name", "axes", "keypoints", "order", "mappable"];
 pub(crate) const AXIS_KEYS: &[&str] = &["range", "polarity"];
 pub(crate) const KEYPOINT_KEYS: &[&str] = &["id", "position", "neutral"];
 pub(crate) const BINDING_KEYS: &[&str] = &["id", "kind", "parameter", "target", "values", "stale"];
-pub(crate) const ANIMATION_KEYS: &[&str] = &["id", "name", "tracks"];
+pub(crate) const ANIMATION_KEYS: &[&str] = &["id", "name", "tracks", "end_behaviour", "triggers"];
+/// A trigger carries **one thing**: the name of the scene event it waits for.
+/// Anything beside it is unmarked data, which is what keeps a trigger from
+/// growing a condition or a target ([I1](../../../docs/invariants.md),
+/// `LOST-4`).
+pub(crate) const TRIGGER_KEYS: &[&str] = &["event"];
 pub(crate) const TRACK_KEYS: &[&str] = &["id", "parameter", "blend_duration", "keyframes"];
-pub(crate) const KEYFRAME_KEYS: &[&str] = &["time", "value"];
+pub(crate) const KEYFRAME_KEYS: &[&str] = &["time", "value", "interpolation", "control_points"];
+/// A control point is shaped like a keyframe — a time and a value per axis — so
+/// a reader meets one shape rather than two.
+pub(crate) const CONTROL_POINT_KEYS: &[&str] = &["time", "value"];
 pub(crate) const MAPPING_KEYS: &[&str] =
     &["id", "channel", "parameter", "source", "response_curve"];
 pub(crate) const CURVE_KEYS: &[&str] = &["points"];
@@ -223,6 +239,23 @@ impl Decoder {
         value
             .as_bool()
             .ok_or_else(|| malformed(format!("{what} is {}, not a boolean", value.kind())))
+    }
+
+    /// A whole number that may be negative.
+    ///
+    /// `docs/format.md` says a parameter's `order` is *an integer* and does not
+    /// forbid a negative one, so the reader admits everything the
+    /// specification permits.
+    fn signed(&self, value: &Json, what: &str) -> Result<i64, Rejection> {
+        match value {
+            Json::Number(text) => text
+                .parse::<i64>()
+                .map_err(|_| malformed(format!("{what} is not a whole number"))),
+            _ => Err(malformed(format!(
+                "{what} is {}, not a number",
+                value.kind()
+            ))),
+        }
     }
 
     fn identifier(&self, value: &Json, what: &str) -> Result<Id, Rejection> {
@@ -979,10 +1012,18 @@ impl Decoder {
                 keypoints.push(self.keypoint(keypoint)?);
             }
 
+            // Presentation, both of them: an absent order is legal and sorts
+            // last, and `mappable` is absent when true, so absent means
+            // *offered* — the direction that fails safely.
+            let order = match self.optional(fields, "order") {
+                Some(value) => Some(self.signed(value, "a parameter's order")?),
+                None => None,
+            };
+            let mappable = self.flag_or(fields, "mappable", true)?;
+
             out.push(Parameter {
-                // Task 2 (acceptance surface): placeholders, as above.
-                order: None,
-                mappable: true,
+                order,
+                mappable,
                 id,
                 name,
                 axes,
@@ -1213,6 +1254,9 @@ impl Decoder {
                 track_items.len() as u64,
                 "tracks",
             )?;
+            let end_behaviour = self.end_behaviour(id, fields)?;
+            let triggers = self.triggers(id, fields)?;
+
             let mut tracks = Vec::with_capacity(track_items.len());
             for track in track_items {
                 tracks.push(self.track(track)?);
@@ -1221,10 +1265,96 @@ impl Decoder {
                 id,
                 name,
                 tracks,
-                // Task 2 (acceptance surface): placeholders, as above.
-                end_behaviour: crate::puppet::EndBehaviour::Loop,
-                triggers: Vec::new(),
+                end_behaviour,
+                triggers,
             });
+        }
+        Ok(out)
+    }
+
+    /// What an animation does at its last keyframe.
+    ///
+    /// **Always written**, because `docs/format.md` states no default for it.
+    /// An absence is therefore a rule the reader raises, like every rule about
+    /// a member that is simply absent: once parsed there is no inhabitant left
+    /// to find.
+    fn end_behaviour(
+        &mut self,
+        owner: Id,
+        fields: &[(String, Json)],
+    ) -> Result<EndBehaviour, Rejection> {
+        let Some(value) = self.optional(fields, "end_behaviour") else {
+            self.violate(
+                Rule::EndBehaviourDeclared,
+                vec![owner],
+                Some("end_behaviour"),
+                String::from(
+                    "an animation declares no end behaviour, for which no default is stated",
+                ),
+            );
+            // The file is already refused. This stands in for a value the file
+            // never gave, and is deliberately **not** one of the three the
+            // format defines: a test passing against an invented `loop` would
+            // be testing nothing.
+            return Ok(EndBehaviour::Unfamiliar(String::new()));
+        };
+        let token = self.text(value, "an end behaviour")?;
+        Ok(self.enumerated(
+            owner,
+            "end_behaviour",
+            &token,
+            &[
+                ("loop", EndBehaviour::Loop),
+                ("hold", EndBehaviour::Hold),
+                ("release", EndBehaviour::Release),
+            ],
+            EndBehaviour::Unfamiliar,
+        ))
+    }
+
+    /// The scene events one animation waits for.
+    ///
+    /// Each entry carries the event name and nothing else; anything beside it
+    /// is unmarked data like any other member, which is the shape that keeps a
+    /// trigger from growing a condition or a target
+    /// ([I1](../../../docs/invariants.md)).
+    ///
+    /// Sorted by event name here, because that is the canonical order and the
+    /// writer writes a puppet already in it.
+    fn triggers(
+        &mut self,
+        owner: Id,
+        fields: &[(String, Json)],
+    ) -> Result<Vec<Trigger>, Rejection> {
+        let Some(value) = self.optional(fields, "triggers") else {
+            return Ok(Vec::new());
+        };
+        let items = self.array(value, "an animation's triggers")?;
+        crate::archive::within(
+            LimitKind::TriggersPerAnimation,
+            items.len() as u64,
+            "triggers",
+        )?;
+
+        let mut found: Vec<(Trigger, &[(String, Json)])> = Vec::with_capacity(items.len());
+        for item in items {
+            let entry = self.object(item, "a trigger")?;
+            let event = self.text(
+                self.required(entry, "event", "a trigger")?,
+                "a trigger's event",
+            )?;
+            found.push((Trigger { event }, entry));
+        }
+        // Sorted before the sweep, so a preserved member's path names the
+        // trigger's canonical position and survives a round trip.
+        found.sort_by(|a, b| a.0.event.cmp(&b.0.event));
+        let mut out = Vec::with_capacity(found.len());
+        for (at, (trigger, entry)) in found.into_iter().enumerate() {
+            let step = at.to_string();
+            let path = ["triggers", step.as_str()];
+            self.extensions_preserved(owner, &path, entry)?;
+            self.sweep(owner, &path, entry, TRIGGER_KEYS);
+            out.push(trigger);
         }
         Ok(out)
     }
@@ -1244,6 +1374,18 @@ impl Decoder {
             keyframe_items.len() as u64,
             "keyframes",
         )?;
+        // The aggregate, over the whole puppet rather than over this track:
+        // charged **before** the collection is allocated, which is what
+        // `LIM-2`'s *before allocating* means for a count that only a running
+        // total can reach.
+        self.keyframes_seen = self
+            .keyframes_seen
+            .saturating_add(keyframe_items.len() as u64);
+        crate::archive::within(
+            LimitKind::TotalKeyframeCount,
+            self.keyframes_seen,
+            "keyframes over the whole puppet",
+        )?;
         let mut keyframes = Vec::with_capacity(keyframe_items.len());
         for (n, keyframe) in keyframe_items.iter().enumerate() {
             let frame = self.object(keyframe, "a keyframe")?;
@@ -1260,13 +1402,32 @@ impl Decoder {
             for coordinate in coordinates {
                 coordinate_values.push(self.number(coordinate, "a keyframe coordinate")?);
             }
+            // The mode of the segment this keyframe **opens**. Linear is the
+            // absent form, and is also accepted spelled out — the reader
+            // accepts more than the writer emits.
+            let interpolation = match self.optional(frame, "interpolation") {
+                Some(value) => {
+                    let token = self.text(value, "an interpolation mode")?;
+                    self.enumerated(
+                        id,
+                        "interpolation",
+                        &token,
+                        &[
+                            ("linear", Interpolation::Linear),
+                            ("stepped", Interpolation::Stepped),
+                            ("inverse_stepped", Interpolation::InverseStepped),
+                            ("bezier", Interpolation::Bezier),
+                        ],
+                        Interpolation::Unfamiliar,
+                    )
+                }
+                None => Interpolation::Linear,
+            };
+            let control_points = self.control_points(id, &path, frame)?;
+
             keyframes.push(Keyframe {
-                // Task 2 (acceptance surface): the stored shape these carry is
-                // task 3's. Placeholders only, chosen to keep the crate
-                // compiling, and they are what makes the new acceptance tests
-                // fail rather than not build.
-                interpolation: crate::puppet::Interpolation::Linear,
-                control_points: None,
+                interpolation,
+                control_points,
                 time: self.number(
                     self.required(frame, "time", "a keyframe")?,
                     "a keyframe's time",
@@ -1284,6 +1445,62 @@ impl Decoder {
             blend_duration: self.number_or(fields, "blend_duration", 0.0)?,
             keyframes,
         })
+    }
+
+    /// The two control points a Bézier segment's cubic passes through.
+    ///
+    /// **Exactly two is a type invariant** — the field is
+    /// `Option<[ControlPoint; 2]>` — so a file carrying any other count is
+    /// malformed rather than invalid: there is no inhabitant for the validator
+    /// to be given. Whether a mode that needs them arrived without them is a
+    /// rule and is [`crate::validate`]'s
+    /// ([`Rule::BezierSegmentCarriesControlPoints`]).
+    fn control_points(
+        &mut self,
+        owner: Id,
+        keyframe: &[&str],
+        frame: &[(String, Json)],
+    ) -> Result<Option<[ControlPoint; 2]>, Rejection> {
+        let Some(value) = self.optional(frame, "control_points") else {
+            return Ok(None);
+        };
+        let items = self.array(value, "a segment's control points")?;
+        if items.len() != 2 {
+            return Err(malformed(format!(
+                "a Bézier segment carries {} control points, not two",
+                items.len()
+            )));
+        }
+        let mut out: Vec<ControlPoint> = Vec::with_capacity(2);
+        for (at, item) in items.iter().enumerate() {
+            let fields = self.object(item, "a control point")?;
+            let step = at.to_string();
+            let mut path = keyframe.to_vec();
+            path.push("control_points");
+            path.push(step.as_str());
+            self.extensions_preserved(owner, &path, fields)?;
+            self.sweep(owner, &path, fields, CONTROL_POINT_KEYS);
+
+            let coordinates = self.array(
+                self.required(fields, "value", "a control point")?,
+                "a control point's value",
+            )?;
+            let mut held = Vec::with_capacity(coordinates.len());
+            for coordinate in coordinates {
+                held.push(self.number(coordinate, "a control point coordinate")?);
+            }
+            out.push(ControlPoint {
+                time: self.number(
+                    self.required(fields, "time", "a control point")?,
+                    "a control point's time",
+                )?,
+                value: held,
+            });
+        }
+        let mut drain = out.into_iter();
+        let first = drain.next().expect("two control points");
+        let second = drain.next().expect("two control points");
+        Ok(Some([first, second]))
     }
 
     // ---------------------------------------------- the channel mappings

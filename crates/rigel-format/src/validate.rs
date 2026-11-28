@@ -108,6 +108,41 @@ pub enum Rule {
     BlendDurationNonNegative,
     /// An animation carries at most one track for any one parameter (`VAL-27`).
     AtMostOneTrackPerParameter,
+    /// An animation **declares** what happens at its last keyframe.
+    ///
+    /// `docs/format.md` states no default for `end_behaviour`, so the
+    /// absent-when-default rule does not reach it and a reader meeting it
+    /// absent has nothing to fall back on. Raised by the reader, like every
+    /// rule about a member that is simply absent.
+    EndBehaviourDeclared,
+    /// An interpolation mode sits on the keyframe that **opens** its segment,
+    /// so a track's last keyframe carries none.
+    ///
+    /// A mode there names a segment that does not exist
+    /// (`docs/format.md`, *How a segment interpolates*).
+    InterpolationOpensASegment,
+    /// One animation names one scene event **once**.
+    ///
+    /// The second says nothing the first did not, and this format refuses
+    /// meaningless duplication wherever a reader would have to decide what it
+    /// meant (`docs/format.md`, *A trigger*).
+    TriggerEventsUnique,
+    /// A segment declaring Bézier carries the control points the cubic passes
+    /// through. Declaring the mode without them leaves no curve to solve.
+    BezierSegmentCarriesControlPoints,
+    /// A Bézier segment's control times lie inside its own segment.
+    ///
+    /// The interval is **closed**: a control point coincident with a keyframe
+    /// is the only way to express the degenerate curve, and `docs/format.md`
+    /// settles neither endpoint. Outside the segment the curve stops being a
+    /// function of time, which is what this refuses.
+    BezierControlTimeInsideSegment,
+    /// Every Bézier control value is finite.
+    ///
+    /// Named apart from [`Rule::NumbersFinite`] because a control point is not
+    /// a number the evaluator reads off the puppet — it is checked where the
+    /// rest of the segment is checked, so one defect names one rule.
+    BezierControlValueFinite,
     /// A physics node's simulation constants are within their declared ranges
     /// (`VAL-25`, [`declared_range`]).
     PhysicsConstantWithinRange,
@@ -146,6 +181,12 @@ impl Rule {
             Rule::KeyframeWithinDeclaredRange => "keyframe-within-declared-range",
             Rule::BlendDurationNonNegative => "blend-duration-non-negative",
             Rule::AtMostOneTrackPerParameter => "at-most-one-track-per-parameter",
+            Rule::EndBehaviourDeclared => "end-behaviour-declared",
+            Rule::InterpolationOpensASegment => "interpolation-opens-a-segment",
+            Rule::TriggerEventsUnique => "trigger-events-unique",
+            Rule::BezierSegmentCarriesControlPoints => "bezier-segment-carries-control-points",
+            Rule::BezierControlTimeInsideSegment => "bezier-control-time-inside-segment",
+            Rule::BezierControlValueFinite => "bezier-control-value-finite",
             Rule::PhysicsConstantWithinRange => "physics-constant-within-range",
         }
     }
@@ -856,9 +897,11 @@ impl<'a> Checks<'a> {
     /// track is only reachable through the animation that holds it.
     fn animations(&mut self) {
         for animation in &self.puppet.animations {
+            self.triggers(animation);
             let mut driven: BTreeMap<Id, Vec<Id>> = BTreeMap::new();
             for track in &animation.tracks {
                 driven.entry(track.parameter).or_default().push(track.id);
+                self.segments(animation.id, track);
 
                 if track.blend_duration < 0.0 {
                     let found = track.blend_duration;
@@ -914,6 +957,94 @@ impl<'a> Checks<'a> {
                     Some("parameter"),
                     format!("{count} tracks drive one parameter, and at most one may"),
                 );
+            }
+        }
+    }
+
+    /// One animation names one scene event once (`docs/format.md`, *A
+    /// trigger*).
+    ///
+    /// An **unrecognised** name is never a failure, at any version: the scene
+    /// that raises it may not be loaded. What is refused is the same name
+    /// twice, which says nothing the first did not.
+    fn triggers(&mut self, animation: &crate::puppet::Animation) {
+        let mut seen: BTreeSet<&str> = BTreeSet::new();
+        for trigger in &animation.triggers {
+            if !seen.insert(trigger.event.as_str()) {
+                let event = trigger.event.clone();
+                self.violate(
+                    Rule::TriggerEventsUnique,
+                    vec![animation.id],
+                    Some("triggers"),
+                    format!("{event:?} is named twice, and one animation names one event once"),
+                );
+            }
+        }
+    }
+
+    /// The rules over a track's **segments**: where a mode may sit, and what a
+    /// Bézier segment's control points must satisfy.
+    ///
+    /// A mode is stored on the keyframe that **opens** its segment, so the last
+    /// keyframe carries none. Each Bézier segment's control times lie in the
+    /// **closed** interval between its two keyframes — the endpoints count,
+    /// because a control point coincident with a keyframe is the only way to
+    /// express a degenerate curve — and every control value is finite.
+    fn segments(&mut self, animation: Id, track: &crate::puppet::Track) {
+        use crate::puppet::Interpolation;
+
+        let last = track.keyframes.len().saturating_sub(1);
+        for (at, keyframe) in track.keyframes.iter().enumerate() {
+            if at == last {
+                if keyframe.interpolation != Interpolation::Linear {
+                    self.violate(
+                        Rule::InterpolationOpensASegment,
+                        vec![animation, track.id],
+                        Some("interpolation"),
+                        String::from(
+                            "the last keyframe of a track opens no segment and carries no mode",
+                        ),
+                    );
+                }
+                continue;
+            }
+            if keyframe.interpolation != Interpolation::Bezier {
+                continue;
+            }
+            let Some(controls) = keyframe.control_points.as_ref() else {
+                self.violate(
+                    Rule::BezierSegmentCarriesControlPoints,
+                    vec![animation, track.id],
+                    Some("control_points"),
+                    String::from("a Bézier segment carries no control points to pass through"),
+                );
+                continue;
+            };
+            let opens = keyframe.time;
+            let closes = track.keyframes[at + 1].time;
+            for control in controls {
+                if !(control.time >= opens && control.time <= closes) {
+                    let found = control.time;
+                    self.violate(
+                        Rule::BezierControlTimeInsideSegment,
+                        vec![animation, track.id],
+                        Some("control_points"),
+                        format!("{found} is outside the segment {opens}..{closes}"),
+                    );
+                }
+                for coordinate in &control.value {
+                    if !finite(*coordinate) {
+                        let found = *coordinate;
+                        self.violate(
+                            Rule::BezierControlValueFinite,
+                            vec![animation, track.id],
+                            Some("control_points"),
+                            format!(
+                                "{found} is not a finite number at the precision evaluation uses"
+                            ),
+                        );
+                    }
+                }
             }
         }
     }
@@ -1323,7 +1454,6 @@ mod tests {
                 node(4, 2, NodeBody::Physics(physics())),
             ],
             parameters: vec![Parameter {
-                // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                 order: None,
                 mappable: true,
                 id: Id(20),
@@ -1359,7 +1489,6 @@ mod tests {
                 stale: false,
             }],
             animations: vec![Animation {
-                // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                 end_behaviour: crate::puppet::EndBehaviour::Loop,
                 triggers: Vec::new(),
                 id: Id(40),
@@ -1370,14 +1499,12 @@ mod tests {
                     blend_duration: 0.25,
                     keyframes: vec![
                         Keyframe {
-                            // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                             interpolation: crate::puppet::Interpolation::Linear,
                             control_points: None,
                             time: 0.0,
                             value: vec![0.0],
                         },
                         Keyframe {
-                            // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
                             interpolation: crate::puppet::Interpolation::Linear,
                             control_points: None,
                             time: 1.0,
@@ -1726,6 +1853,127 @@ mod tests {
         assert_eq!(named.field.as_deref(), Some("blend_duration"));
     }
 
+    // --------------------------------- segments, triggers and the ending
+
+    /// The mode belongs to the keyframe that **opens** its segment, so the last
+    /// keyframe of a track carries none: a mode there names a segment that does
+    /// not exist.
+    #[test]
+    fn a_mode_on_a_tracks_last_keyframe_is_rejected() {
+        use crate::puppet::Interpolation;
+
+        let mut opening = subject();
+        opening.animations[0].tracks[0].keyframes[0].interpolation = Interpolation::Stepped;
+        assert_eq!(
+            rules(&opening),
+            Vec::new(),
+            "a mode on a keyframe that opens a segment is ordinary"
+        );
+
+        for mode in [
+            Interpolation::Stepped,
+            Interpolation::InverseStepped,
+            Interpolation::Unfamiliar(String::from("ease_elastic")),
+        ] {
+            let mut last = subject();
+            let track = &mut last.animations[0].tracks[0];
+            let at = track.keyframes.len() - 1;
+            track.keyframes[at].interpolation = mode;
+            assert_names(&last, Rule::InterpolationOpensASegment);
+        }
+    }
+
+    /// A Bézier segment's control points: present, inside the **closed**
+    /// interval of their own segment, and finite.
+    #[test]
+    fn a_bezier_segments_control_points_are_checked_over_the_closed_interval() {
+        use crate::puppet::{ControlPoint, Interpolation};
+
+        let control = |time: f64, value: f64| ControlPoint {
+            time,
+            value: vec![value],
+        };
+        let bezier = |controls: Option<[ControlPoint; 2]>| {
+            let mut puppet = subject();
+            let opening = &mut puppet.animations[0].tracks[0].keyframes[0];
+            opening.interpolation = Interpolation::Bezier;
+            opening.control_points = controls;
+            puppet
+        };
+
+        assert_names(&bezier(None), Rule::BezierSegmentCarriesControlPoints);
+
+        // The segment runs from 0.0 to 1.0. Both endpoints are admitted, which
+        // is the only way to express the degenerate curve.
+        for controls in [
+            [control(0.25, 0.0), control(0.75, 1.0)],
+            [control(0.0, 0.0), control(0.0, 0.0)],
+            [control(1.0, 1.0), control(1.0, 1.0)],
+        ] {
+            assert_eq!(
+                rules(&bezier(Some(controls))),
+                Vec::new(),
+                "a control time in the closed interval is admitted"
+            );
+        }
+
+        for controls in [
+            [control(-0.5, 0.0), control(0.75, 1.0)],
+            [control(0.25, 0.0), control(1.5, 1.0)],
+        ] {
+            assert_names(
+                &bezier(Some(controls)),
+                Rule::BezierControlTimeInsideSegment,
+            );
+        }
+
+        assert_names(
+            &bezier(Some([control(0.25, f64::INFINITY), control(0.75, 1.0)])),
+            Rule::BezierControlValueFinite,
+        );
+        // Named apart from NumbersFinite deliberately: one defect, one rule.
+        assert!(
+            !rules(&bezier(Some([
+                control(0.25, f64::INFINITY),
+                control(0.75, 1.0)
+            ])))
+            .contains(&Rule::NumbersFinite),
+            "a control value is checked where the rest of the segment is"
+        );
+    }
+
+    /// One animation names one scene event once. An **unrecognised** name is
+    /// never a failure, at any version.
+    #[test]
+    fn one_animation_names_one_scene_event_once() {
+        use crate::puppet::Trigger;
+
+        let triggered = |events: &[&str]| {
+            let mut puppet = subject();
+            puppet.animations[0].triggers = events
+                .iter()
+                .map(|event| Trigger {
+                    event: (*event).to_owned(),
+                })
+                .collect();
+            puppet
+        };
+
+        assert_eq!(
+            rules(&triggered(&[
+                "on_load",
+                "plugin_ribbon_snapped",
+                "source_lost"
+            ])),
+            Vec::new(),
+            "a name nothing raises is an ordinary puppet"
+        );
+        assert_names(
+            &triggered(&["on_load", "on_load"]),
+            Rule::TriggerEventsUnique,
+        );
+    }
+
     #[test]
     fn two_tracks_for_one_parameter_are_rejected() {
         let mut broken = subject();
@@ -2033,10 +2281,10 @@ mod tests {
     #[test]
     fn the_schema_lists_the_members_the_reader_knows() {
         use crate::decode::{
-            ANIMATION_KEYS, AXIS_KEYS, BINDING_KEYS, CHAIN_KEYS, CURVE_KEYS, EXTENSION_KEYS,
-            FLIP_KEYS, JOINT_KEYS, KEYFRAME_KEYS, KEYPOINT_KEYS, MAPPING_KEYS, MESH_KEYS,
-            NODE_KEYS, PARAMETER_KEYS, PROVENANCE_KEYS, PUPPET_KEYS, TEXTURE_KEYS, TRACK_KEYS,
-            TRANSFORM_KEYS,
+            ANIMATION_KEYS, AXIS_KEYS, BINDING_KEYS, CHAIN_KEYS, CONTROL_POINT_KEYS, CURVE_KEYS,
+            EXTENSION_KEYS, FLIP_KEYS, JOINT_KEYS, KEYFRAME_KEYS, KEYPOINT_KEYS, MAPPING_KEYS,
+            MESH_KEYS, NODE_KEYS, PARAMETER_KEYS, PROVENANCE_KEYS, PUPPET_KEYS, TEXTURE_KEYS,
+            TRACK_KEYS, TRANSFORM_KEYS, TRIGGER_KEYS,
         };
 
         let schema = schema();
@@ -2056,6 +2304,8 @@ mod tests {
             ("animation", ANIMATION_KEYS),
             ("track", TRACK_KEYS),
             ("keyframe", KEYFRAME_KEYS),
+            ("control_point", CONTROL_POINT_KEYS),
+            ("trigger", TRIGGER_KEYS),
             ("channel_mapping", MAPPING_KEYS),
             ("response_curve", CURVE_KEYS),
             ("texture", TEXTURE_KEYS),
@@ -2195,6 +2445,12 @@ mod tests {
         Rule::KeyframeWithinDeclaredRange,
         Rule::BlendDurationNonNegative,
         Rule::AtMostOneTrackPerParameter,
+        Rule::EndBehaviourDeclared,
+        Rule::InterpolationOpensASegment,
+        Rule::TriggerEventsUnique,
+        Rule::BezierSegmentCarriesControlPoints,
+        Rule::BezierControlTimeInsideSegment,
+        Rule::BezierControlValueFinite,
         Rule::PhysicsConstantWithinRange,
     ];
 
@@ -2228,6 +2484,12 @@ mod tests {
                 Rule::KeyframeWithinDeclaredRange => "",
                 Rule::BlendDurationNonNegative => "",
                 Rule::AtMostOneTrackPerParameter => "",
+                Rule::EndBehaviourDeclared => "",
+                Rule::InterpolationOpensASegment => "",
+                Rule::TriggerEventsUnique => "",
+                Rule::BezierSegmentCarriesControlPoints => "",
+                Rule::BezierControlTimeInsideSegment => "",
+                Rule::BezierControlValueFinite => "",
                 Rule::PhysicsConstantWithinRange => "",
             };
         }

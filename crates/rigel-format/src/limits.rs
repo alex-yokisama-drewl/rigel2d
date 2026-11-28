@@ -94,6 +94,28 @@ pub enum LimitKind {
     TracksPerAnimation,
     /// Keyframes in one track.
     KeyframesPerTrack,
+    /// Keyframes over the **whole puppet**, across every animation and every
+    /// track.
+    ///
+    /// The per-item figures multiply — animations times tracks times keyframes
+    /// permits hundreds of millions — so an aggregate is what actually bounds a
+    /// load. Charged as a running total across the decode path rather than
+    /// over a finished collection, so it bites before the decoded keyframes
+    /// are allocated — which is what *before allocating* means for a count
+    /// only a running total can reach (`LIM-2`).
+    ///
+    /// **It does not precede the parsed tree**, and nothing here could: the
+    /// note on [`LimitKind::ParseTreeBytes`] states that every collection
+    /// limit in `decode` runs after the tree exists, and that is why that
+    /// budget exists at all. A file one keyframe over this limit therefore
+    /// has to be read almost entirely before the count can exceed it, so the
+    /// tree for the admitted keyframes is built either way. The figure is
+    /// derived from what a keyframe costs *once parsed* — see `docs/format.md`
+    /// *Load limits* — so this limit is bounded by the tree budget rather than
+    /// being an escape from it.
+    TotalKeyframeCount,
+    /// Triggers on one animation.
+    TriggersPerAnimation,
     /// Channel mappings in one puppet.
     ChannelMappingCount,
     /// Points in one response curve.
@@ -129,6 +151,8 @@ impl LimitKind {
         LimitKind::AnimationCount,
         LimitKind::TracksPerAnimation,
         LimitKind::KeyframesPerTrack,
+        LimitKind::TotalKeyframeCount,
+        LimitKind::TriggersPerAnimation,
         LimitKind::ChannelMappingCount,
         LimitKind::ResponseCurvePoints,
         LimitKind::ChainJointCount,
@@ -157,6 +181,8 @@ impl LimitKind {
             LimitKind::AnimationCount => "animation-count",
             LimitKind::TracksPerAnimation => "tracks-per-animation",
             LimitKind::KeyframesPerTrack => "keyframes-per-track",
+            LimitKind::TotalKeyframeCount => "total-keyframe-count",
+            LimitKind::TriggersPerAnimation => "triggers-per-animation",
             LimitKind::ChannelMappingCount => "channel-mapping-count",
             LimitKind::ResponseCurvePoints => "response-curve-points",
             LimitKind::ChainJointCount => "chain-joint-count",
@@ -360,6 +386,30 @@ pub const FIGURES: &[Figure] = &[
                at 60fps. The earlier figure of 4096 was justified as `far past any \
                hand-made animation` and was wrong: a one-minute animation at 60fps \
                passes it at 68 seconds. docs/format.md, *Load limits*",
+    },
+    Figure {
+        kind: LimitKind::TotalKeyframeCount,
+        limit: Some(262_144),
+        basis: Basis::Memory,
+        note: "the aggregate keyframe figure, over the whole puppet. Set from \
+               memory and not from the workload: the per-item limits multiply to \
+               hundreds of millions, and this is what decides whether a load can \
+               exhaust memory. A keyframe costs some 458 bytes in the parse tree \
+               against 24 resident, so ParseTreeBytes admits about 586,000 and is \
+               the real ceiling; this sits below it with more than double the \
+               margin, because the per-keyframe charge is an estimate that may be \
+               retuned. docs/format.md, *Load limits*",
+    },
+    Figure {
+        kind: LimitKind::TriggersPerAnimation,
+        limit: Some(64),
+        basis: Basis::Provisional,
+        note: "no dimension: the table counts animations, never the scene events \
+               one waits for. An animation waits on a handful of triggers and no \
+               stress dimension will ever count them, so 64 is far past any \
+               authored rig. It must match PROVISIONAL_TRIGGERS_PER_ANIMATION in \
+               crates/rigel-fixtures, or rigged:triggers-over-limit is just over \
+               nothing",
     },
     Figure {
         kind: LimitKind::ChannelMappingCount,
