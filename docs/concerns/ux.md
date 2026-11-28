@@ -134,8 +134,8 @@ every cycle. Each entry carries its provenance. See README.md.
 - **The active mode and the current edit target are exposed as inspectable state** — `judgment`
   → `test`: switching mode, parameter or keypoint changes it. This is what makes the editing-between-keypoints trap testable rather than a matter of someone noticing.
   Seeded at planning, 2026-11-26.
-- **A parameter's order and mark never change what the puppet evaluates to** — `test`
-  Shuffle every order, flip every mark, assert identical output. *Catches:* presentation state leaking into behaviour.
+- **A parameter's order and `mappable` flag never change what the puppet evaluates to** — `test`
+  Shuffle every order, flip every flag, assert identical output. *Catches:* presentation state leaking into behaviour.
   Seeded at the animation planning sweep, 2026-11-28.
 - **Anything hidden from a list is still shown when something depends on it, and stays reachable from where the person is** — `test`
   Fixture: a parameter declaring `mappable: false` that carries a channel mapping. *Catches:* a streamer who can see neither the mapping nor a way to remove it, because the flag can only be changed in the other application.

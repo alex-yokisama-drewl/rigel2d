@@ -296,7 +296,7 @@ application open a connection, so it does not touch the rule in
   Seeded at the animation planning sweep, 2026-11-28.
 
 - **A trigger that cannot act is reported, never silent, and never reaches the render surface** — `test`
-  Fixtures: a dangling target, an event nothing raises, a scene naming an idle the puppet does not have. *Catches:* a puppet quietly not doing what its author wired, and [I2](../invariants.md) breached by a diagnostic drawn on the stream.
+  Fixtures: an animation whose end behaviour this build does not understand, and a scene naming an idle the puppet does not have. **An event nothing raises is not a fault** — the scene that raises it may not be loaded, or a plugin not installed — so it is reported nowhere and is not a defect. *Catches:* a puppet quietly not doing what its author wired, and [I2](../invariants.md) breached by a diagnostic drawn on the stream.
   Seeded at the animation planning sweep, 2026-11-28.
 
 - **A local log records the shape of what was loaded, and carries nothing the user did not intend to share** — `test` and `script`

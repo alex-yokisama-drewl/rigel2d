@@ -193,6 +193,20 @@ whitespace, a fixed number format, UTF-8.
 siblings is draw order — the one thing order is allowed to decide. Every other collection is
 ordered by identifier, keypoints by position along their axis and keyframes by time.
 
+**A parameter's presentation order is a stored field, not the order of the collection.** The
+rigger arranges the parameters and Live presents them that way
+([requirements/authoring.md](requirements/authoring.md)), but `parameters` stays in identifier
+order like every other collection — otherwise a canonical sort would erase the arrangement, and
+a position would start deciding something, which [I3](invariants.md) rules out. The field is an
+integer; equal and absent values are both legal, ties break by identifier, and a parameter
+without one sorts after those with one, so a third-party file presents in a defined order.
+
+**`mappable` is a boolean, absent when true.** Absent therefore means *offered*, which is the
+direction that fails safely: an older or third-party puppet hides nothing. A reader that finds
+it disagreeing with the puppet's channel mappings does not refuse the file — the effective value
+is the flag **or** the presence of a mapping, and
+[requirements/puppet.md](requirements/puppet.md) says why.
+
 **A defaulted field is absent when it holds its default.** Without the rule a writer that omits a
 default and one that spells it out produce different bytes for the same puppet. The one
 deliberate exception is `composition_mode`, under
@@ -410,7 +424,9 @@ checks it ([Validation](#validation-proposed)). How the curve is solved is in
 
 **An animation declares what happens at its last keyframe**: it loops (restarts), holds (keeps
 contributing its final values until stopped), or releases (stops contributing, blending out over
-the declared duration). It is written always, because no default is stated for it. **It is not a
+**each track's own `blend_duration`**, which is the only duration this format defines — so
+tracks within one animation may release at different rates, deliberately). It is written
+always, because no default is stated for it. **It is not a
 type field**: looping is not a different kind of animation, it is one of the answers to the
 question of what happens at the end, and that is the thing that actually differs between a
 breathing idle, a one-off emote and a state a puppet moves into and stays in.
@@ -445,7 +461,7 @@ ordered by event name, and **one animation naming one event twice is invalid**: 
 nothing the first did not, and this format refuses meaningless duplication wherever a reader
 would have to decide what it meant.
 
-**The signal carries no payload**, so a puppet file cannot learn which trackers or ports a person
+**A scene event carries no payload**, so a puppet file cannot learn which trackers or ports a person
 has. That is a property of the event the scene raises rather than of anything stored.
 
 **`composition_mode` is the puppet's field and is always written, even though it holds the only
@@ -565,7 +581,7 @@ stops a hostile file and a budget describes what is tuned for
 where the earlier figure of 4096 is reached at 68 seconds, which the minute-plus animations
 this format must carry already exceed. **A total keyframe limit for the whole puppet is new**,
 at **16,777,216**. Per-track limits multiply — the animation, track and keyframe figures
-together permit hundreds of millions of keyframes, bounded only by the parse-tree cap — so the
+together permit billions of keyframes, bounded only by the parse-tree cap — so the
 aggregate is the one that decides whether a load can exhaust memory.
 
 The figure is set from memory rather than from authoring, and the arithmetic is stated so a

@@ -341,12 +341,14 @@ pub const FIGURES: &[Figure] = &[
     },
     Figure {
         kind: LimitKind::TracksPerAnimation,
-        limit: stress(150),
-        basis: Basis::Provisional,
-        note: "no dimension: the corpus counted .motion3.json files rather than the \
-               curves inside them, and docs/wip/open-questions.md carries it. Set to \
-               the parameter limit, which bounds it anyway — an animation carries at \
-               most one track per parameter (VAL-27)",
+        limit: Some(600),
+        basis: Basis::Derived,
+        note: "an animation carries at most one track per parameter (VAL-27), so the \
+               parameter limit bounds this one and the derivation is exact. The \
+               dimension was measured on 2026-11-28 \
+               (docs/research/2026-11-28-animation-dimensions.md) at 200 for stress, \
+               and four times that is 800 — but a figure derived from a real bound \
+               beats a multiple of a workload, so the smaller one stands",
     },
     Figure {
         kind: LimitKind::KeyframesPerTrack,

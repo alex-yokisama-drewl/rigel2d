@@ -35,8 +35,8 @@ Its pieces, named in [vocabulary.md](../vocabulary.md):
   own paths do not produce it: a merge takes a puppet that already declares polarity, and
   importing artwork creates no parameters. **The value is therefore dormant in anything Studio
   writes**, which is the expected state and not a sign it is unused. A parameter also has a
-  place in an order the rigger sets and a mark saying whether Live offers it for mapping
-  ([below](#parameters-are-ordered-and-marked-for-mapping-proposed));
+  place in an order the rigger sets and a `mappable` flag saying whether Live offers it
+  ([below](#parameters-are-ordered-and-declared-mappable-or-not-proposed));
 - **bindings**, each mapping a parameter to something that changes — a node transform, or
   per-vertex offsets on a mesh — with values stored at keypoints and interpolated between;
 - **physics**, a kind of node: simulated motion anchored in the tree, which reads its own
@@ -177,7 +177,7 @@ keypoints stays linear and only linear** — a different question, unchanged.
 
 **An animation declares what happens at its last keyframe**: it **loops**, **holds** — keeps
 contributing its final values until stopped — or **releases**, stopping its contribution and
-blending out over its declared duration. It is not a type of animation but one of the answers to
+blending out over each track's own blend duration. It is not a type of animation but one of the answers to
 a single question.
 
 ### An animation may be started by a scene event **[proposed]**
@@ -202,7 +202,7 @@ the puppet owns its animations, so reacting is its. Resting at neutral is what *
 means in [performing.md](performing.md), which owns the scene's drop behaviours, *hold the
 last pose* among them.
 
-**The signal carries no payload.** It says a source is lost and nothing else — no source name, no
+**A scene event carries no payload.** It says a source is lost and nothing else — no source name, no
 port, no address, no scene identity — so a puppet file cannot learn which trackers or ports a
 person has.
 
@@ -225,7 +225,7 @@ budget: it loads, it plays, and it misses the frame budget on the reference mach
 the author's choice, not a refusal** — the same bargain as opening fifty browser tabs. The figures
 are in [format.md](../format.md#load-limits-proposed).
 
-### Parameters are ordered and marked for mapping **[proposed]**
+### Parameters are ordered, and declared mappable or not **[proposed]**
 
 **A rigger arranges the puppet's parameters, that order is stored, and Live presents them in it.**
 Live's mapping list otherwise shows every parameter in an order nobody chose. **An order is not

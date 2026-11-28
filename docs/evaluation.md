@@ -81,8 +81,17 @@ tracks across the animations playing.
 
 **A keyframe holds a pose, and a track's contribution is the curve's value less the parameter's
 neutral keypoint.** Keyframes are stored absolute, as keypoints are, so a track resting at the
-neutral pose contributes nothing, and a lone track on a parameter with no base driver evaluates
-to the authored value exactly. A track blends in and out over its declared
+neutral pose contributes a true zero and changes nothing, and a lone track on a parameter with
+no base driver evaluates to the authored value **to within one rounding**.
+
+It is deliberately *not* required to be bit-identical to the authored value. The contribution
+is `value − neutral` and the base rests at `neutral`, so the result is
+`neutral + (value − neutral)` — and in floating point those two roundings do not generally
+cancel. Demanding exactness would mean special-casing a lone track, which is machinery for a
+guarantee nothing needs. A track at neutral contributing exactly zero is the claim that does
+have to hold, and it does, because the subtraction is exact when the operands are equal.
+
+A track blends in and out over its declared
 blend duration, which keeps every transition into and out of a fallback behaviour continuous
 ([performing.md](requirements/performing.md#what-the-puppet-does-when-its-source-drops-is-a-scene-setting-decided)).
 

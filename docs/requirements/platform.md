@@ -139,8 +139,8 @@ things about them do not follow the pattern of the rows above.
 from each other.** Multiplying tracks by the median keyframes per track gives far less than the
 measured keyframes per animation, since most tracks sit at the floor while a few carry an order
 of magnitude more. A generator should draw from the distribution the research file records
-rather than emitting a flat figure, and a load limit should bind total keyframes per animation
-directly.
+rather than emitting a flat figure, and a load limit should bind total keyframes per **puppet**
+directly, and [format.md](../format.md) carries the figure.
 
 **The two keyframe rows do not bound what a puppet may contain.** They describe the workload the
 budgets are measured against, and the corpus they come from — hand-authored Cubism rigs — cannot

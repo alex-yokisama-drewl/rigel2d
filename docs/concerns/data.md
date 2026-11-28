@@ -167,7 +167,7 @@ sweep.
   → `script` over the format definition. This is what keeps *a physics node contains only physics* a row in a table rather than a special case, and what makes the next kind arrive with a stated answer.
   Seeded at planning, 2026-11-27, on the physics-and-track revision.
 - **A new reference kind declares whether it is constitutive or incidental, and the deletion report names every record a cascade removes** — `script` over the format definition
-  Extends the declaration check above from node kinds to every reference kind. *Catches:* an animation deleted leaving a trigger that names nothing.
+  Extends the declaration check above from node kinds to every reference kind. *Catches:* a reference kind added with no cascade rule. Note a trigger is **not** an instance of this: it lives on the animation it starts, carries no target, and goes with that animation.
   Seeded at the animation planning sweep, 2026-11-28.
 - **The derived mirror axes are computed from drawn geometry alone** — `judgment`
   → `test`: change a physics node's local offset and assert both derived axes are unchanged. Physics has an offset and draws nothing, so it is the first kind that could wrongly move them.

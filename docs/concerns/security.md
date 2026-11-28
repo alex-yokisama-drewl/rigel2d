@@ -93,7 +93,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
 - **The port binds to loopback, and loading a scene never changes that** — `judgment`
   → `test`. Off-machine listening is deferred, not rejected; when it arrives it is an explicit in-app opt-in and still never enabled from a file.
   Seeded at planning, 2026-11-26.
-- **A source can set channel values and trigger animations, and nothing else** — `judgment`
+- **A source can set channel values and start animations, and nothing else** — `judgment`
   → `test`: malformed, oversized and many-channel messages leave scene state, loaded puppets and output configuration unchanged, within the memory cap.
   Seeded at planning, 2026-11-26.
 - **Channel values are finite and clamped before binding** — `judgment`
@@ -113,7 +113,7 @@ Record the threat model, the roles, and anything exempt here on the first planni
   Covered, S2 task 2, 2026-11-27.
   Seeded at planning, 2026-11-26.
 - **A trigger is data selecting from a set, and no field of it is evaluated** — `test`
-  Fixtures carrying an expression-like string, an unknown event, and a target named rather than identified. *Catches:* a trigger growing a condition, a delay expression or a runtime-looked-up hook, each of which turns a puppet into a program and breaks [I1](../invariants.md). This is the entry that keeps the line where the sweep found it.
+  Fixtures carrying an expression-like string, and an unmarked extra field on a trigger where a condition or a target would go. *Catches:* a trigger growing a condition, a delay expression or a runtime-looked-up hook, each of which turns a puppet into a program and breaks [I1](../invariants.md). This is the entry that keeps the line where the sweep found it.
   Seeded at the animation planning sweep, 2026-11-28.
 - **A scene event carries no payload** — `test`
   *Catches:* a puppet file learning which trackers, ports or addresses a person has. Cheap now, a breaking change once files exist.

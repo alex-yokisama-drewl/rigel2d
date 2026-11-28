@@ -203,6 +203,22 @@ sit on:
 | **Hold the last pose** | Suppresses it: the parameters keep their last values |
 | **Play an idle animation** | The puppet reacts to the loss with its own animation, over the resting parameters; additive composition is what lets the idle layer on top without blocking tracking when the source returns |
 
+**The scene event is raised on every loss, whatever the setting, and the setting governs only
+the base drivers.** A puppet's *source lost* trigger therefore fires under *ease* and under
+*hold* as well, and the animation it starts adds on top of whichever resting behaviour the
+scene chose. This is the only reading consistent with additive composition: a trigger does not
+compete with the setting, it composes with it. Without the rule stated, a reader of the decided
+section above builds a scene-level idle picker and a reader of this one builds a puppet-level
+trigger, and the two do not compose.
+
+**`[open]`: whether *play an idle* survives as a separate setting.** Once a trigger starts the
+idle, that row is no longer a third base-driver behaviour — it is *ease* or *hold* plus a puppet
+that happens to carry a trigger, and the scene has no animation to name. The two genuinely
+distinct settings are *ease* and *hold*. Collapsing the third is a change to a `[decided]`
+section and a product call, so it is recorded here rather than made. The sentence in
+[what a source may do](#a-source-can-drive-the-puppet-and-nothing-else-decided) about a source
+"triggering animations" waits on the same answer.
+
 **Losing a source is a scene event.** A scene event is a named occurrence the scene raises, which
 an animation may listen for ([vocabulary.md](../vocabulary.md)). **It carries no payload** — no
 source name, no port, no address, no scene identity — because a puppet file must not be able to
@@ -245,22 +261,24 @@ name another animation cannot sequence one, so a state machine is inexpressible 
 forbidden by a sentence someone later reads as advice.
 
 **Stopping is a rule, not a trigger.** An animation started by an event that can clear is
-released when it clears, blending out over its declared duration. *Source regained* therefore
+released when it clears, blending out over each track's own blend duration. *Source regained* therefore
 needs no trigger of its own, and a tracker that recovers never leaves an idle layered over live
 tracking. *On load* does not clear, so what it starts runs to its end behaviour.
 
-**A person can always stop a playing animation.** The control surface lists what is playing and
+**A person can always stop a playing animation**, and for an animation started *on load* and
+held, that is the only exit — one started by an event that can clear is released when it
+clears, so only *on load* leaves nothing to release it. The control surface lists what is playing and
 what started it, and can stop any of them or all of them, by keyboard, without reloading. This
 is a recovery path and not a state machine: it issues *stop* and never decides what plays next.
-**It is also what stops a hold animation**, which otherwise has no exit.
+**It is also what stops an animation held after an *on load* start**, which is the one case with nothing else to release it.
 
-**A trigger is a selection from a closed set and nothing it carries is evaluated.** No condition,
+**A trigger selects an event by name from an open set, and nothing it carries is evaluated.** No condition,
 no comparison, no delay expression, no free string looked up at run time. The first of those
 turns a puppet into a program, which [I1](../invariants.md) forbids.
 
 **`[open]`: whether a source may issue commands over its port, and how it would name an
 animation.** [A source can drive the puppet and nothing else](#a-source-can-drive-the-puppet-and-nothing-else-decided)
-says a source may trigger animations, which this section does not reconcile with triggers being
+says a source may start animations, which this section does not reconcile with triggers being
 puppet data started by scene events. Whatever the answer, a source addresses an animation by an
 outward name, as it does a channel, never by a stored identifier ([I3](../invariants.md)).
 
@@ -363,7 +381,7 @@ The input port is the application's only network surface and it is treated as un
   decided then and not now.
 - **A scene never enables off-machine listening.** Scenes are files that strangers share, and
   "open my port to the network" must not be able to arrive inside one.
-- **A source may set channel values and trigger animations. It may do nothing else** — not load
+- **A source may set channel values and start animations. It may do nothing else** — not load
   a puppet, not change the scene, not touch the filesystem, not reconfigure output.
 - **Channel values are finite and clamped to the parameter's range before any binding is
   evaluated.** A source cannot deform a puppet past its authored extremes, and a NaN never
