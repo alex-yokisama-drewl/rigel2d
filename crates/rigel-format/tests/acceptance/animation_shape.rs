@@ -47,8 +47,8 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use rigel_format::{
     Animation, Basis, EndBehaviour, Id, Interpolation, Keyframe, LimitKind, NodeBody, Parameter,
-    Puppet, Rejection, Rule, Track, Trigger, declared_limit, limits::FIGURES, load, save, validate,
-    validate_file,
+    PreservedMembers, Puppet, Rejection, Rule, Track, Trigger, declared_limit, limits::FIGURES,
+    load, save, validate, validate_file,
 };
 
 use crate::counting::peak_bytes;
@@ -1163,15 +1163,19 @@ fn carrier(subject: &Puppet, owner: Id, path: &[String]) -> Option<&'static str>
 /// parameter is collected, and each is required to survive a save and a reload
 /// byte for byte. A fixture added later is picked up without an edit here.
 ///
-/// **What the corpus holds today is one of those five**, an animation's own
-/// object, which is why this test can assert no more than it does. The gap is
-/// on record rather than closed, because fixtures belong to a different pass:
-/// nothing in the corpus carries marked extension data on a **trigger**, on a
-/// **keyframe carrying an interpolation mode**, on a **control point** or on a
-/// **parameter carrying `order`**, and the code path for each of those exists
-/// and is held by nothing. Three of them are addressed **by position** — a
-/// trigger's index moves when the writer orders the list, a keyframe's and a
-/// control point's do not — so a trigger's is the one worth building first.
+/// **The corpus carries all five**, so the final assertion names all five: a
+/// fixture deleted, or a code path that stops preserving one of them, fails
+/// here rather than passing while claiming the coverage it no longer has.
+///
+/// **This test's scope is round-trip by path** — the material found at
+/// `(owner, path)` on the first load is required at the same `(owner, path)`
+/// after a save. That is the whole property only while the writer's ordering
+/// leaves the path alone, which is true of every carrier here: the fixtures'
+/// triggers arrive in canonical order, so the sort moves nothing. The property
+/// that the material follows its **entity** rather than its seat when the
+/// writer does reorder lives in
+/// [`a_triggers_preserved_material_follows_its_event_through_the_writers_sort`],
+/// which builds the out-of-order state in memory and re-resolves by event name.
 #[test]
 fn marked_extension_data_round_trips_on_the_entities_of_the_animation_shape() {
     let mut covered: BTreeSet<&'static str> = BTreeSet::new();
@@ -1233,10 +1237,207 @@ fn marked_extension_data_round_trips_on_the_entities_of_the_animation_shape() {
         );
     }
 
+    let wanted: BTreeSet<&'static str> = [
+        "an animation",
+        "a trigger",
+        "a keyframe",
+        "a control point",
+        "a parameter",
+    ]
+    .into_iter()
+    .collect();
+    let missing: Vec<&&str> = wanted.difference(&covered).collect();
     assert!(
-        seen_fixtures > 0 && covered.contains("an animation"),
-        "the corpus carries marked extension data on an animation, or this test \
-         asserts nothing at all: found {covered:?} over {seen_fixtures} fixtures"
+        missing.is_empty(),
+        "every entity of the animation shape that can carry marked extension data has a \
+         fixture that does, and this test reaches it: nothing found on {missing:?}, over \
+         {seen_fixtures} fixtures carrying material on {covered:?}"
+    );
+}
+
+// --------------------- a preserved path into a collection the writer reorders
+
+/// The `data` concern entry *a preserved member's path may name a position in a
+/// collection, and any operation that reorders that collection must repath its
+/// preserved members in the same step*, on the first collection the format has
+/// one for: an animation's triggers, which the writer orders by event name and
+/// a preserved member addresses as `triggers/<n>`.
+///
+/// **The material is re-resolved by event name, never by the seat it arrived
+/// in.** The sibling test above collects each preserved member's path on the
+/// first load and asks for the same `(owner, path)` after a save, which is the
+/// property wanted only when the writer's sort is the identity permutation.
+/// `rigged:ext-on-trigger`'s triggers arrive in canonical order, so the sort
+/// moves nothing and a writer that sorted without repathing would pass it. Here
+/// the trigger carrying the material is moved to the front of a list it does
+/// not sort to the front of, and the material is moved with it — the repath
+/// this entry requires of *any* operation that reorders the collection, the
+/// test's own edit included. The writer's sort then has to put the two back
+/// together itself.
+///
+/// Built in memory rather than read from a fixture, for the reason
+/// `the_writer_canonicalises_what_the_reader_accepts` gives and the `data`
+/// entry *a canonical-writer rule is tested against a puppet built in memory*
+/// states: a non-canonical order that reaches the writer through the reader
+/// proves nothing, because whatever establishes the order may already have run.
+///
+/// Three claims, each failing against a different wrong writer: the saved list
+/// is in canonical order — a writer that does not sort at all; the material
+/// sits on the trigger carrying the event name it arrived on and on no other —
+/// a writer that sorts and does not repath; and the moved and unmoved puppets
+/// save to the same bytes — either.
+#[test]
+fn a_triggers_preserved_material_follows_its_event_through_the_writers_sort() {
+    let arrived = puppet("rigged:ext-on-trigger");
+    let animation = triggered_animation(&arrived).id;
+
+    let on_a_trigger = |subject: &Puppet| -> Vec<PreservedMembers> {
+        subject
+            .preserved
+            .members
+            .iter()
+            .filter(|held| {
+                held.owner == animation && held.path.first().map(String::as_str) == Some("triggers")
+            })
+            .cloned()
+            .collect()
+    };
+    let held = match on_a_trigger(&arrived).as_slice() {
+        [one] => one.clone(),
+        other => panic!(
+            "the fixture carries marked extension data on exactly one trigger, or this \
+             test is not about what it says it is: found {}",
+            other.len()
+        ),
+    };
+    assert_eq!(
+        held.path.len(),
+        2,
+        "a trigger's preserved material is addressed as triggers/<n>, and nothing \
+         deeper: {:?}",
+        held.path
+    );
+    let seat: usize = held.path[1]
+        .parse()
+        .expect("a trigger's path names a position, spelled in decimal");
+
+    let events = |subject: &Puppet| -> Vec<String> {
+        subject
+            .animations
+            .iter()
+            .find(|a| a.id == animation)
+            .expect("the triggered animation")
+            .triggers
+            .iter()
+            .map(|t| t.event.clone())
+            .collect()
+    };
+    let as_arrived = events(&arrived);
+    let event = as_arrived
+        .get(seat)
+        .unwrap_or_else(|| panic!("seat {seat} names a trigger of {as_arrived:?}"))
+        .clone();
+    assert!(
+        seat > 0,
+        "the material arrives on a trigger the move below actually moves, or the \
+         permutation under test is the identity and this asserts nothing: {event} sits \
+         first in {as_arrived:?}"
+    );
+
+    // The edit: the carrying trigger to the front of the list, and its
+    // preserved material to the front with it. Everything after the seat it
+    // vacated stays where it is; everything before it shifts one along.
+    let mut moved = arrived.clone();
+    {
+        let target = moved
+            .animations
+            .iter_mut()
+            .find(|a| a.id == animation)
+            .expect("the triggered animation");
+        let carried = target.triggers.remove(seat);
+        target.triggers.insert(0, carried);
+    }
+    for entry in &mut moved.preserved.members {
+        if entry.owner != animation || entry.path.first().map(String::as_str) != Some("triggers") {
+            continue;
+        }
+        let was: usize = entry.path[1].parse().expect("a position");
+        let now = if was == seat {
+            0
+        } else if was < seat {
+            was + 1
+        } else {
+            was
+        };
+        entry.path[1] = now.to_string();
+    }
+
+    let as_moved = events(&moved);
+    assert!(
+        as_moved.windows(2).any(|pair| pair[0] > pair[1]),
+        "the moved list is out of canonical order, or the writer is handed nothing to \
+         sort: {as_moved:?}"
+    );
+    assert_eq!(
+        on_a_trigger(&moved)
+            .first()
+            .map(|held| held.path.clone())
+            .expect("the material is still on a trigger"),
+        vec!["triggers".to_owned(), "0".to_owned()],
+        "the test's own edit repathed the material with the trigger it moved"
+    );
+
+    let written = save_to(&moved, "ext-on-trigger-moved");
+    let reloaded = load(&written)
+        .unwrap_or_else(|e| panic!("what we wrote loads: {e}"))
+        .puppet;
+
+    // A writer that does not sort at all fails here, which is what makes the
+    // assertion below mean anything: on an unsorted file the material would
+    // still be found beside its own event, having never been asked to move.
+    let as_written = events(&reloaded);
+    let mut canonical = as_written.clone();
+    canonical.sort();
+    assert_eq!(
+        as_written, canonical,
+        "the writer orders an animation's triggers by event name"
+    );
+
+    // A writer that sorts and does not repath fails here: the material would
+    // stay at triggers/0, which after the sort is a different trigger.
+    let now_at = as_written
+        .iter()
+        .position(|name| *name == event)
+        .unwrap_or_else(|| panic!("{event} is still a trigger of the animation: {as_written:?}"));
+    assert_eq!(
+        reloaded
+            .preserved
+            .at(animation, &["triggers", &now_at.to_string()]),
+        held.members.as_slice(),
+        "the material is attached to the trigger carrying {event}, the event name it \
+         arrived on, wherever the writer's order put it"
+    );
+    for (index, name) in as_written.iter().enumerate() {
+        if index == now_at {
+            continue;
+        }
+        assert!(
+            reloaded
+                .preserved
+                .at(animation, &["triggers", &index.to_string()])
+                .is_empty(),
+            "and to no other trigger: material also sits on {name} at triggers/{index}"
+        );
+    }
+
+    // The same claim in the form that needs no knowledge of where anything
+    // landed: the puppet as it arrived and the puppet with that one trigger
+    // moved are the same puppet, so they are the same file.
+    assert_eq!(
+        bytes(&save_to(&arrived, "ext-on-trigger-arrived")),
+        bytes(&written),
+        "moving a trigger and its material together changes nothing about the puppet, \
+         so it changes nothing about the bytes"
     );
 }
 
