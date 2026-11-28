@@ -154,10 +154,12 @@ evaluation pass needs, the unparseable-extension texture case is disclosed rathe
 and the unknown-polarity import path decides whether a criterion is live or dormant on a path
 Studio owns.
 
-**Raised by that round and not blocking S2.** The workload table has no dimension for tracks per
-animation or keyframes per track, because the corpus counted `.motion3.json` files rather than
-the curves inside them. Until that research is done, animation cost is unbounded by the table and
-no load limit covers it. It is in [open-questions.md](open-questions.md) and is due before S4.
+**Raised by that round and settled 2026-11-28, before S3.** The workload table had no dimension
+for tracks per animation or keyframes per track, because the corpus counted `.motion3.json`
+files rather than the curves inside them. Measured in
+[2026-11-28-animation-dimensions.md](../research/2026-11-28-animation-dimensions.md); the table
+now carries three rows rather than two, because the per-track and per-animation keyframe figures
+do not derive from each other.
 
 ## Due before the subsystem that needs them
 
@@ -166,7 +168,6 @@ discovered late.
 
 | Question | Due before | Lives in |
 |---|---|---|
-| Tracks per animation and keyframes per track, which no workload dimension covers | S4 | [open-questions.md](open-questions.md) |
 | Whether a texture has a pixel-area limit, and what figure | Not a subsystem — **deferred by the owner on 2026-11-28**, on the principle that the tool works first and is hardened second | [open-questions.md](open-questions.md) |
 
 The rows that stood here on the soak length, on a puppet changed on disk, and on configuration
