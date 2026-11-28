@@ -115,6 +115,9 @@ the corpus median; the stress sits above the largest rig measured on every dimen
 | Shaded pixels per frame | 3 M | 9 M | Not derivable from a file; belongs to the runtime counters |
 | Physics nodes | 12 | 40 | Tree entries too, and **additional to the Nodes row rather than part of it**. Load limits derived from a node count must use the sum |
 | Animations | 8 | 32 | The one row comfortably above the corpus at both ends |
+| Tracks per animation | 54 | 200 | Measured 2026-11-28 — [2026-11-28-animation-dimensions.md](../research/2026-11-28-animation-dimensions.md). **Per-frame animation cost is this row**, one curve evaluation per playing track |
+| Keyframes per track | 3 | 100 | **Heavily skewed; the median is not the shape.** Most tracks sit at the floor and a thin tail carries the rest, so a generator using a flat 3 emits about half the keyframe data a real animation holds |
+| Keyframes per animation | 284 | 1000 | **Not the product of the two rows above**, which understates it by about 40%. This is the row a load limit binds |
 | Source artwork | 25 Mpx | 75 Mpx | |
 | GPU-resident texture bytes | 100 MB | 300 MB | |
 
@@ -127,13 +130,25 @@ and *nodes* is a figure for our own tree.
 order together where inochi2d counts three bindings, so the corpus measurement undercounts the
 Cubism half and the true spread is wider than the row shows.
 
-**The table has no track or keyframe dimension, and needs one.** Per-frame animation cost is
-driven by playing **tracks** and by keyframes per track, not by the `Animations` row, which
-counts whole animations. The corpus cannot supply the figures as measured: it counted
-`.motion3.json` files rather than the curves inside them
-([2026-11-26-puppet-corpus.md](../research/2026-11-26-puppet-corpus.md)). Reading curve counts
-out of the same files is a research task, not a decision, and until it is done the animation
-cost of the stress workload is unbounded by this table and no load limit covers it.
+**The three animation rows were measured later than the rest**, on 2026-11-28, by opening the
+`.motion3.json` files the original pass had only counted
+([2026-11-28-animation-dimensions.md](../research/2026-11-28-animation-dimensions.md)). Two
+things about them do not follow the pattern of the rows above.
+
+**The per-track and per-animation keyframe rows are both needed, because they do not derive
+from each other.** Multiplying tracks by the median keyframes per track gives far less than the
+measured keyframes per animation, since most tracks sit at the floor while a few carry an order
+of magnitude more. A generator should draw from the distribution the research file records
+rather than emitting a flat figure, and a load limit should bind total keyframes per animation
+directly.
+
+**Tracks per animation is a property of the rig rather than of the animation**, in this corpus:
+a Cubism motion is exported against the model's whole parameter list, so most rigs ship clips
+that all drive an identical curve set. Whether that carries over to a format where a rigger
+writes tracks deliberately is unknown, and if it does not, this row is measuring the wrong
+thing. The figure is also the softest in the table after the texture rows — it rests on nine
+rigs, and the research file records the two neighbouring values that defensible alternative
+groupings produce.
 
 **The texture rows are the weakest in the table.** The Cubism samples cannot bound them — each
 ships one or two 2048² packed atlases, which is an export setting, and the layered source never
