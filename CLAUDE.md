@@ -47,6 +47,12 @@ Still the owner's, inside technical work:
   technical choice approved, and a gate the owner can only answer by re-running what the agent
   already ran is a defect in the gate. See `.claude/rules/testing.md`.
 
+- **A requirement that is both expensive and doubtful.** If satisfying one is taking
+  unreasonably long *and* the requirement itself looks questionable, stop and raise it rather
+  than grinding. Both halves must hold: expensive-but-sound is work, and doubtful-but-cheap is
+  not worth a round trip. No figure is attached to *unreasonable* deliberately — a number here
+  would be gamed in one direction or the other, and the judgement is the point.
+
 **Do not open a question the code, the documents or a measurement can answer.** Go and find out.
 
 ## Running it
