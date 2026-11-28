@@ -1,0 +1,29 @@
+# The hand-authored puppet fixture corpus, and the builder that produces it.
+#
+# This crate deliberately depends on NO other crate in this workspace. A fixture
+# produced by our writer and then read back by our reader asserts only that we
+# agree with ourselves; these files are authored from docs/format.md with
+# third-party libraries so that rigel-format is tested against the specification
+# instead. See README.md beside this file.
+[package]
+name = "rigel-fixtures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# Archive container. default-features off keeps bzip2, lzma, zstd, aes-crypto and
+# the `time` crate out of the locked graph.
+zip = { version = "9.8.2", default-features = false, features = ["deflate-flate2"] }
+# The deflate backend zip and png both reach for. rust_backend is the pure-Rust
+# one, so no C toolchain and no system zlib.
+flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
+# Texture payloads.
+png = "0.18.1"
+# JSON. serde_json's map is a BTreeMap unless `preserve_order` is enabled, which
+# is what gives docs/format.md's sorted keys for free.
+serde_json = "1.0.154"
+# CRC-32 for the hand-assembled archives behind the malformed-container fixtures.
+crc32fast = "1.5.0"

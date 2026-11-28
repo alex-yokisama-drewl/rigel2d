@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rigel2d-puppet 1.1 — puppet.json",
+  "description": "The structure entry of a .rigel2d archive, at format version 1.1. This schema is half of what docs/format.md's Validation section asks for: the rules a schema can express. The other half — the relations between values — is in README.md beside this file, and in crates/rigel-format/src/validate.rs. A file this schema accepts is not yet a valid puppet.",
+  "$ref": "#/$defs/puppet",
+
+  "$defs": {
+    "finite": {
+      "description": "A number this build interprets. Bounded at the single-precision limits because finiteness is judged at the precision the runtime evaluates in, not at the precision the file was parsed in (VAL-18) — a value finite as a double and infinite as a single is the case that rule exists for. A JSON number out of range for a double, such as 1e400, fails here for the same reason.",
+      "type": "number",
+      "minimum": -3.4028234663852886e38,
+      "maximum": 3.4028234663852886e38
+    },
+    "non_negative": {
+      "allOf": [{ "$ref": "#/$defs/finite" }, { "minimum": 0 }]
+    },
+    "above_zero": {
+      "allOf": [{ "$ref": "#/$defs/finite" }, { "exclusiveMinimum": 0 }]
+    },
+    "point": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finite" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "pixels": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "identifier": {
+      "description": "A stored reference. Zero is the reserved value and means no reference.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "entity_identifier": {
+      "description": "An identifier an entity carries as its own. Never zero, which is reserved (Rule::IdentifierZeroReserved).",
+      "type": "integer",
+      "minimum": 1
+    },
+
+    "extensions": {
+      "description": "The reserved `x` key: namespaced values the core format does not define, keyed by the extension's own identifier. `data` is carried untouched and is never executed, resolved or interpreted as a path or URL (I1) — which is a rule about what this build does with it, not a constraint on its shape, so it is left unconstrained here.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["version", "name", "data"],
+        "properties": {
+          "version": { "type": "string" },
+          "name": { "type": "string" },
+          "data": true
+        }
+      }
+    },
+
+    "transform": {
+      "type": "object",
+      "properties": {
+        "translation": { "$ref": "#/$defs/point" },
+        "rotation": { "$ref": "#/$defs/finite" },
+        "scale": { "$ref": "#/$defs/point" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "mesh": {
+      "type": "object",
+      "required": ["vertices", "uvs", "triangles"],
+      "properties": {
+        "vertices": { "type": "array", "items": { "$ref": "#/$defs/point" } },
+        "uvs": {
+          "description": "In the texture's authored pixel space, not the cropped bitmap's.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/point" }
+        },
+        "triangles": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "texture_flip": {
+      "type": "object",
+      "properties": {
+        "left_right": { "type": "boolean" },
+        "top_bottom": { "type": "boolean" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "provenance": {
+      "type": "object",
+      "required": ["source_id", "content_hash"],
+      "properties": {
+        "source_id": { "type": "string" },
+        "content_hash": { "type": "string" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "joint": {
+      "type": "object",
+      "required": ["id", "position"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "position": { "$ref": "#/$defs/point" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "chain_deformer": {
+      "type": "object",
+      "required": ["id", "joints"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "joints": { "type": "array", "items": { "$ref": "#/$defs/joint" } },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "node": {
+      "description": "One entry in the flat `nodes` array. The members a node carries beyond the common ones are decided by `kind`, which is why this is a conditional rather than four unrelated shapes.",
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "parent": { "$ref": "#/$defs/identifier" },
+        "name": { "type": "string" },
+        "transform": { "$ref": "#/$defs/transform" },
+        "kind": {
+          "description": "At this version these four are the whole list. A file declaring a later minor version may carry a kind this build has never heard of, which it preserves opaquely — see README.md.",
+          "enum": ["part", "mesh_group", "composite", "physics"]
+        },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "part" } }, "required": ["kind"] },
+          "then": {
+            "required": ["texture"],
+            "properties": {
+              "mesh": { "$ref": "#/$defs/mesh" },
+              "texture": { "$ref": "#/$defs/identifier" },
+              "texture_flip": { "$ref": "#/$defs/texture_flip" },
+              "mask": { "$ref": "#/$defs/identifier" },
+              "provenance": { "$ref": "#/$defs/provenance" },
+              "chain_deformer": { "$ref": "#/$defs/chain_deformer" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "mesh_group" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "mesh": { "$ref": "#/$defs/mesh" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "composite" } }, "required": ["kind"] },
+          "then": { "properties": {} }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "physics" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "length": { "$ref": "#/$defs/above_zero" },
+              "gravity": { "$ref": "#/$defs/non_negative" },
+              "frequency": { "$ref": "#/$defs/above_zero" },
+              "angle_damping": { "$ref": "#/$defs/non_negative" },
+              "length_damping": { "$ref": "#/$defs/non_negative" },
+              "output": { "$ref": "#/$defs/identifier" },
+              "output_source": {
+                "type": "array",
+                "items": { "enum": ["angle", "length", "x", "y"] }
+              },
+              "output_scale": { "type": "array", "items": { "$ref": "#/$defs/finite" } }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+
+    "axis": {
+      "type": "object",
+      "required": ["range", "polarity"],
+      "properties": {
+        "range": { "$ref": "#/$defs/point" },
+        "polarity": {
+          "description": "Declared per axis. An absence is not the value `unknown`, which is a decision the rigger declined to make and must be written (VAL-17, VAL-21) — which is why this member is required.",
+          "enum": ["bilateral", "unipolar", "unknown"]
+        },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "keypoint": {
+      "type": "object",
+      "required": ["id", "position"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "position": {
+          "description": "One coordinate per axis of the parameter.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/finite" }
+        },
+        "neutral": { "type": "boolean" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "parameter": {
+      "type": "object",
+      "required": ["id", "name", "axes", "keypoints"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "name": { "type": "string" },
+        "axes": { "type": "array", "items": { "$ref": "#/$defs/axis" }, "minItems": 1 },
+        "keypoints": { "type": "array", "items": { "$ref": "#/$defs/keypoint" } },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "binding": {
+      "description": "A binding's `kind` selects the shape of its `values`, so the two are one conditional rather than two members.",
+      "type": "object",
+      "required": ["id", "kind", "parameter", "target", "values"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "kind": { "enum": ["transform", "deformation"] },
+        "parameter": { "$ref": "#/$defs/identifier" },
+        "target": { "$ref": "#/$defs/identifier" },
+        "stale": {
+          "description": "Written only when set. A binding kept although the mesh it applies to no longer matches it — a state, never a failure.",
+          "type": "boolean"
+        },
+        "values": { "type": "array" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "transform" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "values": { "type": "array", "items": { "$ref": "#/$defs/transform" } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "deformation" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "values": {
+                "type": "array",
+                "items": { "type": "array", "items": { "$ref": "#/$defs/point" } }
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+
+    "keyframe": {
+      "type": "object",
+      "required": ["time", "value"],
+      "properties": {
+        "time": { "$ref": "#/$defs/finite" },
+        "value": {
+          "description": "One coordinate per axis of the parameter the track drives.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/finite" }
+        },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "track": {
+      "type": "object",
+      "required": ["id", "parameter", "keyframes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "parameter": { "$ref": "#/$defs/identifier" },
+        "blend_duration": { "$ref": "#/$defs/non_negative" },
+        "keyframes": { "type": "array", "items": { "$ref": "#/$defs/keyframe" } },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "animation": {
+      "type": "object",
+      "required": ["id", "name", "tracks"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "name": { "type": "string" },
+        "tracks": { "type": "array", "items": { "$ref": "#/$defs/track" } },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "response_curve": {
+      "type": "object",
+      "required": ["points"],
+      "properties": {
+        "points": { "type": "array", "items": { "$ref": "#/$defs/point" } },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "channel_mapping": {
+      "type": "object",
+      "required": ["id", "channel", "parameter", "response_curve"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "channel": {
+          "description": "A channel is named rather than identified: it is supplied by a source the puppet has never met, so a shared name is the only thing the two ends can agree on in advance. Outside what I3 binds.",
+          "type": "string"
+        },
+        "parameter": { "$ref": "#/$defs/identifier" },
+        "source": { "type": "string" },
+        "response_curve": { "$ref": "#/$defs/response_curve" },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "texture": {
+      "type": "object",
+      "required": ["id", "name", "authored_size", "crop"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "name": { "type": "string" },
+        "authored_size": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pixels" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "crop": {
+          "description": "[x, y, width, height] of the content within the authored space.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/pixels" },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+
+    "puppet": {
+      "type": "object",
+      "required": ["id", "name", "high_water_mark", "root", "composition_mode"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entity_identifier" },
+        "name": { "type": "string" },
+        "high_water_mark": { "type": "integer", "minimum": 0 },
+        "root": { "$ref": "#/$defs/identifier" },
+        "gravity": {
+          "description": "Absent when it holds its default of 1.0, by the stored-form rule.",
+          "$ref": "#/$defs/finite"
+        },
+        "composition_mode": {
+          "description": "Always written, even holding the only value the format defines: a mode added in a later version must not change how a puppet authored before it composes. The single exception to the absent-when-default rule.",
+          "enum": ["sum"]
+        },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+        "bindings": { "type": "array", "items": { "$ref": "#/$defs/binding" } },
+        "animations": { "type": "array", "items": { "$ref": "#/$defs/animation" } },
+        "channel_mappings": { "type": "array", "items": { "$ref": "#/$defs/channel_mapping" } },
+        "textures": { "type": "array", "items": { "$ref": "#/$defs/texture" } },
+        "x": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -43,6 +43,45 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-28 — The reader accepts a container the canonical writer would not have produced
+
+**Decided:** the canonical-serialisation rules bind the writer. The reader accepts any archive
+whose data-carrying entries are defined names, and ignores an empty `textures/` directory marker.
+**Because:** a third party must be able to repack a puppet with ordinary tooling, which is the
+whole case for the format being an archive, and every ordinary archiver emits that marker.
+**Rejected:** enforcing the writer's rules on load, which was the original behaviour and was found
+by a human gate — a puppet repacked with `zip -r` was refused. And keying the tolerance on the
+marker's *compressed* size: the first fix did this, and it accepted Info-ZIP's stored marker while
+still refusing Python `zipfile`'s deflated one.
+**Consequences:** the reader's accepted set is wider than the writer's output, so the two must be
+tested separately, and the tolerance will attract pressure to widen further.
+
+## 2026-11-28 — The parse tree has its own memory limit, separate from the payload's byte limit
+
+**Decided:** `ParseTreeBytes` (256 MiB) bounds the heap the parsed JSON of one entry may occupy,
+and is charged as the tree is built so it bites during the parse.
+**Because:** a tree costs several times its text — every value is a 32-byte enum and every number
+a separately allocated string — so a payload inside the 64 MiB byte limit could still exceed the
+whole load's budget, and every collection limit in decoding runs only once the tree already
+exists. Measured before the limit existed: a 63 KB archive of tiny array elements reached 1.94 GiB
+resident against a 1 GiB total-load budget.
+**Rejected:** raising or reusing the byte limit, which bounds the wrong quantity. And checking
+after the parse, which is checking after the allocation.
+**Consequences:** two memory figures that a newcomer may try to consolidate, and an estimate of
+per-value cost that must be revisited if the value representation changes.
+
+## 2026-11-28 — A save replaces a symlink at the puppet's path rather than writing through it
+
+**Decided:** the new bytes are renamed over the path, so a symlink there becomes a regular file
+and its old target is left untouched.
+**Because:** the project owner's rule is that a saved file stays workable if it is moved, and that
+save and load touch nothing outside the file itself — writing through a link reaches a file in
+another directory. The same rule is why the save temporary is created with `create_new`.
+**Rejected:** writing through to the link's target, which reaches outside the chosen directory.
+And refusing a symlinked destination, which turns a working setup into an error.
+**Consequences:** a synced or shared rig saved this way silently becomes a plain file, and the
+original target goes stale.
+
 ## 2026-11-27 — One physics model, and no rigid-pendulum switch
 
 **Decided:** a physics node stores one spring pendulum's constants — a rest length, a gravity

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rigel2d-puppet 1.1 — rigel2d.json",
+  "description": "The manifest entry of a .rigel2d archive: the format name and version, and nothing a reader needs to interpret. It exists so that deciding whether to refuse a file costs one small bounded read, before any load limit is at risk and before the structure is parsed.",
+  "type": "object",
+  "required": ["format", "version"],
+  "properties": {
+    "format": { "const": "rigel2d-puppet" },
+    "version": {
+      "type": "object",
+      "required": ["major", "minor"],
+      "properties": {
+        "major": {
+          "description": "A major that differs from the reading build's is a declared break: the file is refused whole and never opened partially.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "minor": {
+          "description": "A minor higher than the reading build's opens, warns and stays editable, with everything unrecognised preserved. This schema describes 1.1; a file declaring a higher minor is outside what it can judge.",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

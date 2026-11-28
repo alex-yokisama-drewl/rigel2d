@@ -2,16 +2,11 @@
 
 The current phase: which subsystems get built, in what order where order matters.
 
-**Status:** agreed 2026-11-26. **S0 and S1 are done** (2026-11-27); S2 onward are not started.
-The workspace builds, the push gates run and block a merge, and no production code is
-implemented yet — the crates are shells.
+**Status:** agreed 2026-11-26. **S0, S1 and S2 are done** — S0 and S1 on 2026-11-27, S2 on
+2026-11-28. `rigel-format` is the first subsystem with production code: a puppet file can be
+read, validated and written, and the rest of the phase builds on it.
 
-**The requirements round that gated S2 is done, and so is the design pass it handed on** — both
-2026-11-27. What the requirements round settled is below under *What blocked S2*; the design pass
-added the per-kind containment declaration and the physics node's stored shape to
-[format.md](../format.md), against
-[research/2026-11-27-physics-parameterisation.md](../research/2026-11-27-physics-parameterisation.md).
-**S2 is clear to start.**
+**S3 and S4 are both clear to start**, and are independent of each other.
 
 ## Where this phase ends, and why there
 
@@ -35,7 +30,7 @@ Ordered. `Blocks on` names what genuinely must come first; everything else may m
 |---|---|---|---|
 | S0 | **Transparency and alpha-output spike** | **Done 2026-11-27** — measured on Linux and Windows, recorded in [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md). The `[open]` in [performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-decided) is resolved and the Game Capture capability tension answered. **macOS was not attempted** — no Mac was reachable — so Syphon alpha stays unobserved, which [platform.md](../requirements/platform.md) permits at its tier | Nothing |
 | S1 | **Workspace and the push gates** | **Done 2026-11-27** — the workspace builds from a clean clone with `--locked`, the gates that have a subject run and are required on `master`, `scripts/test-record.sh` records a result, and *Running locally* and *Running it* were corrected from a verbatim container walk. Gate 3 waits for a counter baseline; [stack.md](../stack.md#on-push-proposed) says which gates are live and why | S0 |
-| S2 | **`rigel-format`: read, validate, write** | A puppet archive round-trips byte-identically; the validator rejects a hand-written malformed corpus and accepts stale bindings as a state; load limits are enforced before allocating; extension data survives untouched; every write goes through the one atomic path | S1, **and the requirements gaps below** |
+| S2 | **`rigel-format`: read, validate, write** | **Done 2026-11-28** — a puppet archive round-trips byte-identically, the hand-authored malformed corpus is rejected with stale bindings accepted as a state, load limits bite before allocating, extension data survives untouched, and every write goes through the one atomic path. The third-party gate was run by the owner and found one defect, now fixed. A review sweep found the reader's work and memory unbounded in four shapes and a late task closed them; *What S3 and S4 inherit* carries what that leaves | S1 |
 | S3 | **The workload generator and the fixture corpus** | The reference and stress puppets are generated from the committed dimension table in [platform.md](../requirements/platform.md), both validate, and the generated puppet doubles as the conformance fixture [puppet.md](../requirements/puppet.md) requires | S2 |
 | S4 | **The evaluation pass** | A generated puppet evaluates to a posed tree for given channel input, in the order [evaluation.md](../evaluation.md) sets; one parameter has one driver, enforced by the validator; stale bindings behave as specified; the name-resolution counter is zero | S2 |
 | S5 | **The render stage: command stream and backend** | Evaluation output produces an explicit command stream countable with no GPU present; the wgpu backend submits it; the warm-up pass begins every configuration the loaded puppet can reach, enumerated from puppet data; GPU resource creations after the first presented frame are zero on both workloads | S3, S4 |
@@ -63,13 +58,23 @@ measurements are in
 
 | | |
 |---|---|
-| **Gate 2 is green over an empty suite** | Intended at S1 and wrong from S2. The recorded result carries `tests_run`, and the approved `ops` entry *Gate 2 fails when the workspace runs zero tests* is the check that makes it bind. **S2 writes that check**, because S2 is the first subsystem with tests to lose |
+| **Gate 2 is green over an empty suite** | **Closed by S2.** `scripts/tests-ran.sh` fails on a zero, null or missing count, carries its own self-test, and runs in CI after the recording step. What it does *not* yet catch is a count that merely falls, which is now an `ops` entry |
 | **Gate 5 cannot see the dependency graph** | It reads first-party source. The first registry dependency is the point at which "gate 5 green" and the claim in [decisions.md](../decisions.md) start to diverge, and the approved `security` entries — the SHA-pinning check and the locked-graph check — are what close it. **Due with the first dependency, not later** |
 | **The Linux package list is a floor** | Established against crates with no dependencies. Whichever subsystem first pulls in windowing or the GPU establishes its packages the same way and extends [stack.md](../stack.md#running-locally-proposed) — verbatim in a bare environment, which is the standard the `ops` entry now sets |
 | **A bare nested test directory is silently skipped** | [testing.md](../testing.md#harness-proposed) prescribes `tests/acceptance/` and `tests/counters/`; cargo discovers `tests/*.rs` and `tests/<dir>/main.rs` only. The first subsystem to add one needs a `main.rs` or an explicit `[[test]]` |
 | **The backend is pinned on Windows** | Never left to wgpu's default selection, which chose the one backend that crashed on the machine measured. [stack.md](../stack.md#what-the-transparency-spike-settled-decided) carries the reason, alongside the surface-format and colour-space condition from the same spike |
 | **Read the vendored wgpu source before porting** | Due in S5, where the render stage meets wgpu. The spike's port found the API differs across majors enough to make guesses worthless; [stack.md](../stack.md#moving-to-a-new-wgpu-major-decided) carries what it cost |
 | **The S0 instrument is in git, not the tree** | S1 discarded `spike/alpha-sender/` as planned. [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md) carries the commit and the commands to recover it, which matters because macOS and a second Windows machine are both still unmeasured |
+
+### What S3 and S4 inherit
+
+| | |
+|---|---|
+| **The reader's cost is bounded by figures that are mostly provisional** | S2 found and closed four shapes where the reader's work or memory was unbounded — a quadratic string scan, a quadratic duplicate-member scan, an uncounted parse tree and three unbounded collections. The figures that now bound them are in `crates/rigel-format/src/limits.rs`, and all but `AxisCount` are `Provisional`. **S3 is where several stop being guesses**, because it commits the workload dimensions the limits table is supposed to be derived from |
+| **Every `ValidRange::max` is still `[open]`** | Pending the integrator-stability sweep due with the evaluation pass. The validator reads the table, so a figure landing there is the whole change — no code moves. **S4 owns this** |
+| **The fuzz target bounds one input, not the campaign** | `drive` runs on a worker thread with a per-input timeout, which is what catches a hang. A hung thread cannot be killed, so the run fails and the thread dies with the process. A subsystem adding a slower loader path should check the figure still has margin |
+| **The corpus is written by our own canonical writer** | So every fixture satisfies every writer rule, and no fixture can show that the *reader* accepts a container ordinary tooling wrote. This is what let a defect reach a human gate. The `data` entry that closes it is table-driven over the canonical-serialisation list and is not yet written |
+| **A texture's pixel area is unbounded** | Each side is capped; the product is not, so a legal texture is a gigabyte of pixels at upload. The format crate only reads the header. **Deferred by the owner rather than owed to a subsystem** — it is a hardening item, and nothing should block on it |
 
 ### Raised by the S1 review and not settled
 
@@ -161,7 +166,8 @@ discovered late.
 
 | Question | Due before | Lives in |
 |---|---|---|
-| What blocks S2 | S2 | *What blocks S2* above, and the table it points at |
+| Tracks per animation and keyframes per track, which no workload dimension covers | S4 | [open-questions.md](open-questions.md) |
+| Whether a texture has a pixel-area limit, and what figure | Not a subsystem — **deferred by the owner on 2026-11-28**, on the principle that the tool works first and is hardened second | [open-questions.md](open-questions.md) |
 
 The rows that stood here on the soak length, on a puppet changed on disk, and on configuration
 in the write path have all been answered in the documents that own them, and were struck when
