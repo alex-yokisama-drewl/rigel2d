@@ -197,8 +197,8 @@ ordered by identifier, keypoints by position along their axis and keyframes by t
 rigger arranges the parameters and Live presents them that way
 ([requirements/authoring.md](requirements/authoring.md)), but `parameters` stays in identifier
 order like every other collection — otherwise a canonical sort would erase the arrangement, and
-a position would start deciding something, which [I3](invariants.md) rules out. The field is an
-integer; equal and absent values are both legal, ties break by identifier, and a parameter
+a position would start deciding something, which [I3](invariants.md) rules out. The field is a signed
+integer, and a negative value is legal; equal and absent values are both legal, ties break by identifier, and a parameter
 without one sorts after those with one, so a third-party file presents in a defined order.
 
 **`mappable` is a boolean, absent when true.** Absent therefore means *offered*, which is the
@@ -414,10 +414,12 @@ position is the trap this project already has an entry for: inserting or deletin
 must carry each segment's mode — and any preserved material a build does not understand — with
 the right segment.
 
-**A Bézier segment's control times lie inside the segment, and every control value is finite.**
-Outside, the curve stops being a function of time: the solve has several roots and the iteration
-can leave the segment. Cubism guarantees this; a stranger's writer need not, so the validator
-checks it ([Validation](#validation-proposed)). How the curve is solved is in
+**A Bézier segment stores its control points on the segment's earlier keyframe, as
+`control_points`: two entries, each shaped like a keyframe (a time and a `value`).** Their times
+lie inside the segment. Outside, the curve stops being a function of time: the solve has several
+roots and the iteration can leave the segment. Cubism guarantees this; a stranger's writer need
+not, so the validator checks it, along with every control value being finite
+([Validation](#validation-proposed)). How the curve is solved is in
 [evaluation.md](evaluation.md#a-tracks-value-at-a-time-proposed).
 
 ### How an animation ends **[proposed]**
@@ -434,7 +436,7 @@ breathing idle, a one-off emote and a state a puppet moves into and stays in.
 ### A trigger **[proposed]**
 
 **An animation carries a list of triggers, and a trigger carries one thing: the name of the scene
-event it waits for.** It names no target, because the animation that owns it is the target, and
+event it waits for, stored as `{"event": "<name>"}`.** It names no target, because the animation that owns it is the target, and
 no command, because the command is always *start*. *On load* and *source lost* are the
 events a use has been named for; the set of names is open, because a plugin may one day raise
 its own.
@@ -457,7 +459,8 @@ at run time, and a trigger has no field for any of them.
 it is reached only through the animation that owns it, and deleting that animation takes its
 triggers with it — so an identifier would be a value nothing resolves and
 [I3](invariants.md) would have to bind for no purpose. Canonically, an animation's triggers are
-ordered by event name, and **one animation naming one event twice is invalid**: the second says
+ordered by event name — established by the writer, like every other ordered collection, so a
+puppet assembled in memory saves canonically rather than depending on how it was read — and **one animation naming one event twice is invalid**: the second says
 nothing the first did not, and this format refuses meaningless duplication wherever a reader
 would have to decide what it meant.
 
@@ -538,8 +541,21 @@ rules it cannot:
 - **every parameter carrying at most one base driver** — a channel mapping, a physics output, or
   none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
 - a track's keyframes ordered in time, with values within the parameter's range;
-- **a Bézier segment's control times inside the segment, and every control value finite.** The
-  reader checks it because Cubism guarantees it and a stranger's writer need not;
+- **a Bézier segment's control times inside the segment.** The reader checks it because Cubism
+  guarantees it and a stranger's writer need not. This rule is gated on the mode, deliberately: a
+  control time means nothing without a segment to lie inside;
+- **every control point's value finite, whatever mode its keyframe declares, and wherever the
+  keyframe sits in its track.** Stated apart from the rule above because it is **not** gated.
+  Folded into the mode-gated check, a keyframe with no `interpolation` member, or any keyframe
+  last in its track, carried a non-finite control value through validation to the writer, which in
+  a release build substituted `0.0` — altering a stranger's file on save;
+- **a Bézier segment declares its control points**, and a segment of any other mode may carry
+  them: the reader accepts them and the writer writes them back unchanged, since a stranger's
+  file or a rigger's mode change can leave them behind and dropping them would alter the file;
+- **an interpolation mode on a track's last keyframe is invalid**: it opens no segment, so it
+  names nothing;
+- **an animation declares its `end_behaviour`**; no default is stated, so an absence is invalid;
+- **one animation names one scene event once**, as [a trigger](#a-trigger-proposed) says;
 - binding value counts matching their mesh, or marked stale;
 - every number finite;
 - **the arity of a keypoint's coordinates and a keyframe's values against the parameter's axes —
@@ -586,12 +602,24 @@ whether a load can exhaust memory.
 
 **The figure is set by what a keyframe costs once parsed, not by what it costs resident**, and
 that distinction is the whole of why it is this small. Resident, a keyframe is on the order of
-**24 bytes** — a time, a value, a segment mode, and alignment. In the parse tree it is on the
-order of **458 bytes**: an object and an array each charged twice their own size, two member
+**24 bytes** — a time, a value, a segment mode, and alignment. In the parse tree the reader
+**charges** on the order of **458 bytes** for one: an object and an array each charged twice their own size, two member
 names held once in order and once for duplicate detection, and every number kept as its own heap
 string, because preserving a stranger's numbers verbatim means never passing them through
-anybody's float formatter. The tree therefore costs about **nineteen times** residency, and it
+anybody's float formatter. By that charge the tree costs about **nineteen times** residency, and it
 is the tree that fills first.
+
+**The charge is an accounting estimate, not a measurement of live memory.** The live cost of a
+keyframe's tree measures nearer **556 bytes**, so the `ParseTreeBytes` budget under-counts what
+is really held by roughly a fifth. The 262,144 figure stands, because its margin below the
+ceiling still holds with the under-count; the point of stating it is that a reader retuning the
+charge should retune it toward the measurement.
+
+**The ceilings below are in charge units, because that is what the budget is enforced in**, and
+the parse-tree row was found by running files through the reader rather than by dividing. So a
+file at that ceiling holds nearer 326 MB live than the 256 MiB it is charged. Do not read the
+under-count above as an error in that row and revise it downward: the two are different
+quantities, and conflating them is how the aggregate figure came to be wrong twice.
 
 **Three ceilings sit above any figure here, and only the lowest one matters.** A reader setting
 or revising this limit has to check it against all of them, because two earlier figures were set
@@ -600,7 +628,7 @@ against one and were unreachable:
 | Ceiling | Admits, in keyframes | Moves with number spelling? |
 |---|---|---|
 | `DecompressedPayloadBytes`, 64 MiB of text | about 2.9 million | **Yes** — barely half that at full double precision |
-| `ParseTreeBytes`, 256 MiB parsed | **about 586,000** | No — structure is some 418 of the 458 bytes |
+| `ParseTreeBytes`, 256 MiB parsed | **about 586,000**, measured | No — structure is some 418 of the 458 bytes |
 | This limit | 262,144 | No |
 
 **So the parse tree is the real constraint**, binding roughly five times tighter than the
@@ -626,6 +654,13 @@ the wrong rule, so neither could have the fixture
 [requirements/puppet-acceptance.md](requirements/puppet-acceptance.md)'s `LIM-1` requires of
 every declared limit. Both corrected 2026-11-28; the crossover above was measured against the
 reader rather than derived.
+
+**`CoordinateCount` bounds a keypoint's `position`, a keyframe's `value` and a control point's
+`value`, at 1024, `Provisional`.** Its figure is chosen so as **not** to answer the keypoint and
+keyframe arity question [Validation](#validation-proposed) marks `[open]`: it sits three orders
+of magnitude clear of anything that question could decide, so it refuses only a file no arity
+rule would admit. It is not slack to be tightened toward the stress workload — tightening it
+would quietly assume an answer to the arity question.
 
 **Whether a texture has a limit on its pixel *area* is `[open]`.** Each side is capped, and
 nothing caps the product, so a texture at the maximum on both sides is a gigabyte of pixels once

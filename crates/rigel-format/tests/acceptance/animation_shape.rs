@@ -22,28 +22,39 @@
 //! file can answer is asserted; what an application must do with it is named in
 //! the test that carries the other half.
 //!
-//! # Naming a rule, and where that is deliberately not done
+//! # Every rejection here names its rule
 //!
 //! [`crate::support::assert_rejected_naming`] pins a rejection to the rule it
-//! must name, which is what makes a one-defect corpus worth having. It is used
-//! wherever the criterion or `docs/format.md` **names the rule** — unmarked
-//! data for a trigger's extra field, the enumerated-value rule for an
-//! unfamiliar token. Where neither does, [`assert_refused`] asserts the
-//! rejection and no more: choosing a rule name here would be designing the
-//! validator from the test, which is the one thing this suite must not do.
-//! **Task 3 owes a `Rule` variant for each of those six fixtures**, and a later
-//! pass may tighten these assertions once the variants exist.
+//! must name, which is what makes a one-defect corpus worth having, and every
+//! defect fixture in this module is asserted through it.
+//!
+//! Six of them were not when this file was written: no `Rule` variant existed
+//! for an absent end behaviour, a mode on a last keyframe, a duplicated trigger
+//! event or any of the three Bézier control-point defects, and inventing a name
+//! would have been designing the validator from the test. The variants exist
+//! now, so the weaker form is gone — and why it had to go is on this branch's
+//! own record: `a_mode_on_the_last_keyframe_opens_no_segment_and_is_refused`
+//! passed before the rule landed, because its fixture was refused for
+//! `unmarked-data [interpolation]`, which is the wrong reason entirely. *Some
+//! rejection* cannot tell a rule from its neighbour.
+//!
+//! The standalone validator's verdict is **not** re-asserted fixture by fixture
+//! here. `VAL-13` in `validation.rs` holds `validate_file` against `load` over
+//! **every** row of the catalogue, which is the stronger claim and already
+//! covers each fixture named below.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use rigel_format::{
     Animation, Basis, EndBehaviour, Id, Interpolation, Keyframe, LimitKind, NodeBody, Parameter,
-    Puppet, Rejection, Rule, Track, declared_limit, limits::FIGURES, load, save, validate,
+    Puppet, Rejection, Rule, Track, Trigger, declared_limit, limits::FIGURES, load, save, validate,
     validate_file,
 };
 
 use crate::counting::peak_bytes;
-use crate::support::{assert_rejected_naming, bytes, fixture, puppet_json, scratch};
+use crate::support::{
+    Expect, assert_rejected_naming, bytes, catalogue, fixture, puppet_json, scratch,
+};
 
 // ---------------------------------------------------------------- scaffolding
 
@@ -66,36 +77,6 @@ fn round_trip(name: &str, label: &str) -> Puppet {
     load(&written)
         .unwrap_or_else(|e| panic!("what we wrote loads: {e}"))
         .puppet
-}
-
-/// A fixture the catalogue marks `rejected` is refused — by the loader and by
-/// the standalone validator alike — with a bounded, non-empty message.
-///
-/// Weaker than [`assert_rejected_naming`] on purpose: see the module comment.
-///
-/// **It cannot tell the right refusal from the wrong one, and today it gets
-/// the wrong one.** Before task 3, every fixture passed to this is refused for
-/// `unmarked-data` on a field this build has never heard of, rather than for
-/// the defect its catalogue row names — and `rigged:end-behaviour-absent` is
-/// not refused at all, because removing a field nothing reads changes nothing.
-/// That is the correct red for S2b, and it is also why a `Rule` variant per
-/// defect is **owed by task 3**: until one exists, these assertions hold
-/// against a build that refuses the file for any reason whatsoever.
-fn assert_refused(name: &str) -> Rejection {
-    let path = fixture(name);
-    assert!(
-        validate_file(&path).is_err(),
-        "{name} carries a defect and the standalone validator must refuse it (VAL-13)"
-    );
-    let rejection = load(&path)
-        .err()
-        .unwrap_or_else(|| panic!("{name} carries a defect and must be refused"));
-    let message = rejection.to_string();
-    assert!(
-        !message.is_empty() && message.len() <= Rejection::MAX_MESSAGE_BYTES,
-        "{name}'s rejection message is readable and bounded (VAL-12)"
-    );
-    rejection
 }
 
 /// The one animation of a puppet carrying triggers.
@@ -389,6 +370,14 @@ fn interp_4_a_parameter_carries_no_interpolation_field() {
 /// A Bézier segment's control points are validated: times inside the segment,
 /// values finite, and a mode that needs them does not arrive without them.
 ///
+/// **The two rules are gated differently and that is the point.** A control
+/// *time* names the segment it must lie inside, so a keyframe declaring no
+/// Bézier segment has no interval to be judged against. A control *value* is a
+/// number this build reads whatever its keyframe declares, so the finiteness
+/// rule reaches it unconditionally — which is what
+/// `rigged:control-value-nonfinite-without-bezier` pins, and what a reader
+/// checking control points only under the Bézier branch gets wrong.
+///
 /// Carries the `security` concern entry *a track's keyframe times are finite
 /// and strictly ordered, its values finite and within its parameter's range,
 /// and its blend durations finite and non-negative* — already enforced for the
@@ -401,12 +390,25 @@ fn interp_4_a_parameter_carries_no_interpolation_field() {
 /// accepted half of this test is what pins that reading.
 #[test]
 fn a_bezier_segments_control_points_are_validated() {
-    for name in [
-        "rigged:bezier-without-control-points",
-        "rigged:bezier-control-time-outside-segment",
-        "rigged:bezier-control-value-nonfinite",
+    for (name, rule) in [
+        (
+            "rigged:bezier-without-control-points",
+            Rule::BezierSegmentCarriesControlPoints,
+        ),
+        (
+            "rigged:bezier-control-time-outside-segment",
+            Rule::BezierControlTimeInsideSegment,
+        ),
+        (
+            "rigged:bezier-control-value-nonfinite",
+            Rule::BezierControlValueFinite,
+        ),
+        (
+            "rigged:control-value-nonfinite-without-bezier",
+            Rule::BezierControlValueFinite,
+        ),
     ] {
-        assert_refused(name);
+        assert_rejected_naming(name, rule);
     }
 
     let subject = puppet("rigged:mixed-interpolation");
@@ -538,7 +540,7 @@ fn an_end_behaviour_is_always_written_and_round_trips() {
         "byte-stably, through our writer"
     );
 
-    assert_refused("rigged:end-behaviour-absent");
+    assert_rejected_naming("rigged:end-behaviour-absent", Rule::EndBehaviourDeclared);
 }
 
 // ------------------------------------------------------------------ triggers
@@ -621,7 +623,7 @@ fn lost_3_an_event_name_nothing_raises_is_valid_and_saves_byte_stably() {
 #[test]
 fn lost_4_a_trigger_carrying_more_than_an_event_name_is_unmarked_data() {
     assert_rejected_naming("rigged:trigger-extra-field", Rule::UnmarkedData);
-    assert_refused("rigged:duplicate-trigger-event");
+    assert_rejected_naming("rigged:duplicate-trigger-event", Rule::TriggerEventsUnique);
 
     // The accepted half: an event name shaped like a condition is a **name**.
     // The set of names is open at every version, so this is an ordinary puppet
@@ -764,7 +766,10 @@ fn an_unfamiliar_mode_or_ending_is_invalid_at_the_current_version() {
 /// the earlier keyframe of a segment, and the last keyframe opens none.
 #[test]
 fn a_mode_on_the_last_keyframe_opens_no_segment_and_is_refused() {
-    assert_refused("rigged:interpolation-on-last-keyframe");
+    assert_rejected_naming(
+        "rigged:interpolation-on-last-keyframe",
+        Rule::InterpolationOpensASegment,
+    );
 }
 
 // ------------------------------------------------ order and the mappable flag
@@ -833,6 +838,34 @@ fn ord_1_the_parameter_order_is_stored_round_trips_and_resolves_nothing() {
         bytes(&fixture("rigged:ordered-parameters")),
         bytes(&save_to(&subject, "ord-1-bytes")),
         "byte-stably"
+    );
+
+    // Identifier order is the **writer's** doing, asserted on a puppet whose
+    // parameters are out of that order in memory. Reading it off a loaded
+    // fixture would not separate a writer that orders the collection from one
+    // that emits whatever order it was handed, since the file already arrives
+    // ordered.
+    let mut shuffled = subject.clone();
+    shuffled.parameters.reverse();
+    assert_ne!(
+        shuffled
+            .parameters
+            .iter()
+            .map(|p| p.id.0)
+            .collect::<Vec<_>>(),
+        subject
+            .parameters
+            .iter()
+            .map(|p| p.id.0)
+            .collect::<Vec<_>>(),
+        "the two puppets hold the same parameters in different orders, or this \
+         asserts nothing about the writer"
+    );
+    assert_eq!(
+        bytes(&save_to(&shuffled, "ord-1-shuffled")),
+        bytes(&save_to(&subject, "ord-1-unshuffled")),
+        "the collection's order is canonical and set by the writer, so the order it \
+         was assembled in makes no difference to the file"
     );
 
     // Reordering changes no identifier and no reference. ID-3 is the broader
@@ -1081,6 +1114,132 @@ fn presentation_state_does_not_leak_into_what_is_stored() {
     );
 }
 
+// ---------------------------------- marked extension data, entity by entity
+
+/// Which entity of the animation shape a preserved member sits on, or `None`
+/// for somewhere this module is not about.
+///
+/// Marked extension data on an entity with no `extensions` field of its own is
+/// carried in [`rigel_format::Preserved`], keyed by the **owner's identifier**
+/// and a path inside that entity's object — which is what makes it findable
+/// without naming a fixture's identifiers here.
+/// One place inside one entity that carried marked extension data.
+struct Located {
+    /// What it sits on, for a failure message.
+    what: &'static str,
+    owner: Id,
+    path: Vec<String>,
+    members: Vec<(String, Vec<u8>)>,
+}
+
+fn carrier(subject: &Puppet, owner: Id, path: &[String]) -> Option<&'static str> {
+    let steps: Vec<&str> = path.iter().map(String::as_str).collect();
+    let on_animation = subject.animations.iter().any(|a| a.id == owner);
+    let on_track = subject
+        .animations
+        .iter()
+        .flat_map(|a| &a.tracks)
+        .any(|t| t.id == owner);
+    let on_parameter = subject.parameters.iter().any(|p| p.id == owner);
+    match (on_animation, on_track, on_parameter, steps.as_slice()) {
+        (true, _, _, []) => Some("an animation"),
+        (true, _, _, ["triggers", _]) => Some("a trigger"),
+        (_, true, _, ["keyframes", _]) => Some("a keyframe"),
+        (_, true, _, ["keyframes", _, "control_points", _]) => Some("a control point"),
+        (_, _, true, []) => Some("a parameter"),
+        _ => None,
+    }
+}
+
+/// The `data` concern entry *unmarked data the core format does not define is
+/// rejected; marked extension data round-trips untouched*, on the entities this
+/// subsystem added.
+///
+/// The **rejected** half is asserted per defect elsewhere in this module —
+/// `rigged:trigger-extra-field` naming [`Rule::UnmarkedData`] in `LOST-4`. This
+/// is the **preserved** half, driven off the corpus rather than off a list of
+/// fixture names: every accepted fixture is loaded, every preserved member
+/// landing on an animation, a trigger, a keyframe, a control point or a
+/// parameter is collected, and each is required to survive a save and a reload
+/// byte for byte. A fixture added later is picked up without an edit here.
+///
+/// **What the corpus holds today is one of those five**, an animation's own
+/// object, which is why this test can assert no more than it does. The gap is
+/// on record rather than closed, because fixtures belong to a different pass:
+/// nothing in the corpus carries marked extension data on a **trigger**, on a
+/// **keyframe carrying an interpolation mode**, on a **control point** or on a
+/// **parameter carrying `order`**, and the code path for each of those exists
+/// and is held by nothing. Three of them are addressed **by position** — a
+/// trigger's index moves when the writer orders the list, a keyframe's and a
+/// control point's do not — so a trigger's is the one worth building first.
+#[test]
+fn marked_extension_data_round_trips_on_the_entities_of_the_animation_shape() {
+    let mut covered: BTreeSet<&'static str> = BTreeSet::new();
+    let mut seen_fixtures = 0usize;
+
+    for entry in &catalogue().fixtures {
+        if entry.expect != Expect::Accepted {
+            continue;
+        }
+        let subject = puppet(&entry.name);
+        let located: Vec<Located> = subject
+            .preserved
+            .members
+            .iter()
+            .filter_map(|held| {
+                carrier(&subject, held.owner, &held.path).map(|what| Located {
+                    what,
+                    owner: held.owner,
+                    path: held.path.clone(),
+                    members: held.members.clone(),
+                })
+            })
+            .collect();
+        if located.is_empty() {
+            continue;
+        }
+        seen_fixtures += 1;
+
+        let written = save_to(&subject, &format!("ext-{}", entry.name));
+        let reloaded = load(&written)
+            .unwrap_or_else(|e| panic!("{} saves and loads again: {e}", entry.name))
+            .puppet;
+        for held in located {
+            let what = held.what;
+            covered.insert(what);
+            let steps: Vec<&str> = held.path.iter().map(String::as_str).collect();
+            assert_eq!(
+                reloaded.preserved.at(held.owner, &steps),
+                held.members.as_slice(),
+                "{}: the material on {what} is carried untouched through a save",
+                entry.name
+            );
+            assert!(
+                held.members
+                    .iter()
+                    .all(|(name, value)| name == "x" && !value.is_empty()),
+                "{}: the material on {what} is marked, which is what licenses it at \
+                 this version",
+                entry.name
+            );
+        }
+
+        let again = save_to(&reloaded, &format!("ext-again-{}", entry.name));
+        assert_eq!(
+            bytes(&written),
+            bytes(&again),
+            "{}: and a second save reproduces the first",
+            entry.name
+        );
+    }
+
+    assert!(
+        seen_fixtures > 0 && covered.contains("an animation"),
+        "the corpus carries marked extension data on an animation, or this test \
+         asserts nothing at all: found {covered:?} over {seen_fixtures} fixtures"
+    );
+}
+
 // ----------------------------------------- what the writer canonicalises away
 
 /// The reader accepts more than the writer emits, for each of the new fields.
@@ -1091,6 +1250,16 @@ fn presentation_state_does_not_leak_into_what_is_stored() {
 /// canonical form. The first two name puppets indistinguishable from `rigged`,
 /// so the bytes a save produces are `rigged`'s own — which is the sharpest form
 /// the claim takes.
+///
+/// **The triggers case is built in memory, not read from the fixture.** A
+/// non-canonical file reaching the writer through the reader proves nothing
+/// about the writer: whatever establishes the order may already have run by the
+/// time the writer is handed the puppet, and the assertion passes with the
+/// writer doing nothing at all. So the out-of-order state is assembled on a
+/// loaded puppet — a trigger pushed at the end of a list it sorts to the front
+/// of — and the two orders are required to save to the same bytes. The
+/// fixture is still asserted to be **accepted**, which is the reader's half of
+/// the same entry.
 #[test]
 fn the_writer_canonicalises_what_the_reader_accepts() {
     for name in [
@@ -1111,8 +1280,53 @@ fn the_writer_canonicalises_what_the_reader_accepts() {
         validate_file(&path).is_ok(),
         "an unsorted triggers list is accepted — ordering binds the writer"
     );
-    let written = save_to(&puppet("rigged:triggers-unsorted"), "triggers-unsorted");
-    let events: Vec<String> = json_triggers(&puppet_json(&written))
+
+    // The writer's half, built in memory so that the reader cannot have done
+    // the work first. One event name that sorts before every one the fixture
+    // carries, appended last and inserted first; the two puppets differ in
+    // nothing else.
+    let arrived = puppet("rigged:triggered");
+    let animation = triggered_animation(&arrived).id;
+    let early = Trigger {
+        event: "a_event_nothing_raises".to_owned(),
+    };
+    assert!(
+        triggered_animation(&arrived)
+            .triggers
+            .iter()
+            .all(|t| t.event > early.event),
+        "the added event sorts before every trigger the fixture carries, or the two \
+         puppets below are not in different orders"
+    );
+
+    let with_trigger = |at: usize| -> Puppet {
+        let mut subject = arrived.clone();
+        let target = subject
+            .animations
+            .iter_mut()
+            .find(|a| a.id == animation)
+            .expect("the triggered animation");
+        target.triggers.insert(at, early.clone());
+        subject
+    };
+    let appended = with_trigger(triggered_animation(&arrived).triggers.len());
+    let in_order = with_trigger(0);
+    assert_ne!(
+        appended, in_order,
+        "the two puppets hold the same triggers in different orders, or this asserts \
+         nothing about the writer"
+    );
+
+    let from_appended = save_to(&appended, "triggers-appended");
+    let from_in_order = save_to(&in_order, "triggers-in-order");
+    assert_eq!(
+        bytes(&from_appended),
+        bytes(&from_in_order),
+        "the writer establishes the order, so where a trigger was added makes no \
+         difference to the file"
+    );
+
+    let events: Vec<String> = json_triggers(&puppet_json(&from_appended))
         .iter()
         .map(|t| t["event"].as_str().expect("an event name").to_owned())
         .collect();
@@ -1121,6 +1335,26 @@ fn the_writer_canonicalises_what_the_reader_accepts() {
     assert_eq!(
         events, sorted,
         "and an animation's triggers are written ordered by event name"
+    );
+    assert_eq!(
+        events.first().map(String::as_str),
+        Some(early.event.as_str()),
+        "with the one appended last written first, where its name puts it"
+    );
+
+    // And the fixture that arrives out of order saves to the same bytes as the
+    // puppet it is: the reader's half of the entry, which the in-memory case
+    // above does not cover.
+    let from_fixture = save_to(&puppet("rigged:triggers-unsorted"), "triggers-unsorted");
+    let fixture_events: Vec<String> = json_triggers(&puppet_json(&from_fixture))
+        .iter()
+        .map(|t| t["event"].as_str().expect("an event name").to_owned())
+        .collect();
+    let mut fixture_sorted = fixture_events.clone();
+    fixture_sorted.sort();
+    assert_eq!(
+        fixture_events, fixture_sorted,
+        "a list that arrived out of order is written ordered too"
     );
 }
 
@@ -1184,6 +1418,27 @@ fn figure_for(limit: u64, what: &str) -> LimitKind {
 /// structure this payload builds — the ceiling `docs/format.md` names as the
 /// real constraint, and the one the aggregate was set below with more than
 /// double the margin.
+///
+/// # Why this is `ParseTreeBytes` and not twice it
+///
+/// `a_payload_whose_parsed_tree_exceeds_the_budget_is_refused_before_it_is_
+/// built` in `limits.rs` asserts `peak < 2 * ParseTreeBytes`, and the doubling
+/// there is earned: that fixture's tree is **at** the budget by construction,
+/// so the peak is the budget plus whatever transient a growing collection
+/// holds, and an undoubled assertion would fail on the transient rather than on
+/// anything the criterion is about. This fixture is a different shape. Its tree
+/// is the 262,144 keyframes the aggregate admits, roughly half the budget, so
+/// the single-budget bound already clears the measured peak by about four
+/// fifths of itself — the slack the doubling exists to buy is here without it,
+/// and doubling on top would be slack for its own sake.
+///
+/// The retuning `docs/format.md` warns about does not reach this either: the
+/// 458-byte charge is the **accounting** figure, which decides how many
+/// keyframes `ParseTreeBytes` admits, not what this fixture allocates. For this
+/// assertion to start flapping, a keyframe's real cost would have to go from
+/// the measured ~556 bytes to over a kibibyte, which is a finding in its own
+/// right and should fail here. Raising the aggregate figure would also break
+/// it, and that edit passes through the `AGGREGATE` constant below anyway.
 #[test]
 fn lim_1_the_aggregate_keyframe_limit_is_declared_once_and_bites_before_allocating() {
     const AGGREGATE: u64 = 262_144;
@@ -1274,6 +1529,72 @@ fn lim_8_an_animations_triggers_are_a_collection_with_a_declared_limit() {
     assert!(
         triggered_animation(&subject).triggers.len() < TRIGGERS as usize,
         "an authored animation waits on a handful of events"
+    );
+}
+
+/// LIM-1 and LIM-8 for the limit on a **stored coordinate list** — declared in
+/// the one place, and exercised by a fixture just over it.
+///
+/// The limit bounds the numbers inside one keypoint position, keyframe value or
+/// control-point value, which is the allocation each of those is sized from.
+/// It is asserted in this module because the fixture puts its extra coordinate
+/// on a **keyframe**: the collection this subsystem added a reader for.
+///
+/// The figure is deliberately far above anything the keypoint/keyframe arity
+/// question `docs/format.md` marks `[open]` could settle on, so that it bounds
+/// an allocation without asserting the arity rule by implication. That is why
+/// the accepted corpus is required to sit orders of magnitude inside it rather
+/// than near it.
+#[test]
+fn lim_1_a_stored_coordinate_list_has_a_declared_limit_and_a_fixture_just_over_it() {
+    const COORDINATES: u64 = 1024;
+    let kind = figure_for(COORDINATES, "coordinate");
+
+    let mut outcome = None;
+    let _ = peak_bytes(|| outcome = Some(load(&fixture("rigged:coordinates-over-limit"))));
+    match outcome
+        .expect("the load ran")
+        .expect_err("one over is refused")
+    {
+        Rejection::LimitExceeded {
+            limit, declared, ..
+        } => {
+            assert_eq!(
+                limit, kind,
+                "a keyframe one coordinate over is refused by the limit on a stored \
+                 coordinate list, not by a neighbouring limit"
+            );
+            assert_eq!(
+                declared, COORDINATES,
+                "the figure reported is the one declared"
+            );
+        }
+        other => panic!("refused as {other:?} rather than as a limit"),
+    }
+
+    // An authored rig is nowhere near it: a parameter is one- or
+    // two-dimensional, so every coordinate list in the accepted corpus is a
+    // handful of numbers.
+    let subject = puppet("rigged:mixed-interpolation");
+    let longest = subject
+        .animations
+        .iter()
+        .flat_map(|a| &a.tracks)
+        .flat_map(|t| &t.keyframes)
+        .flat_map(|k| {
+            std::iter::once(k.value.len()).chain(
+                k.control_points
+                    .iter()
+                    .flatten()
+                    .map(|control| control.value.len()),
+            )
+        })
+        .max()
+        .expect("the fixture carries keyframes");
+    assert!(
+        (longest as u64) * 100 < COORDINATES,
+        "the declared limit bounds an allocation rather than asserting the [open] \
+         arity rule; the longest authored list is {longest}"
     );
 }
 

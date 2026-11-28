@@ -3,9 +3,9 @@
 Every document in the project is listed here. If it is not on this list, it does not exist —
 see [documentation.md](documentation.md).
 
-**Status: the workspace builds and the push gates run; no production code is implemented yet.**
-Requirements cover every area listed below, with the gaps that gate S2 recorded in
-[wip/plan.md](wip/plan.md), and technical design has settled the format, the evaluation pass,
+**Status: the workspace builds and the push gates run; `rigel-format` carries production code, and
+S2 is done.** Requirements cover every area listed below, with the gaps that gate the next
+subsystem recorded in [wip/plan.md](wip/plan.md), and technical design has settled the format, the evaluation pass,
 the scene, the runtime's boundaries and the stack. A phase plan
 exists in `docs/wip/`. The S0 spike's instrument has been discarded as the plan said it would
 be; [research/2026-11-27-transparency-spike.md](research/2026-11-27-transparency-spike.md) says
@@ -17,8 +17,7 @@ restated here — it supersedes its own entries in place, so a summary elsewhere
 `CLAUDE.md`.
 
 **A session picking this up starts at [wip/plan.md](wip/plan.md)**, which carries what is done,
-what is next and what is blocked. **The next work is requirements, not code** — S2 is gated on
-gaps that `plan.md` names under *What blocks S2*.
+what is next and what is blocked.
 
 Then [wip/open-questions.md](wip/open-questions.md), which is the agenda of what is still
 undecided and who it waits on. Transparent output was the largest item there and is no longer on

@@ -104,6 +104,15 @@ sweep.
 - **A change to how stored data composes states what previously saved files now do** — `judgment`
   Becomes a `test` once an evaluator exists. *Catches:* a semantics change with no data migration to prompt anyone — nothing in the file differs, so nothing flags it. Currently cheap because nothing has shipped; the entry exists for when that stops being true.
   Seeded at the animation planning sweep, 2026-11-28.
+- **A canonical-writer rule is tested against a puppet built in memory, never only one decoded from a fixture** — `test`
+  *Catches:* a rule the decoder happens to satisfy, so a fixture-fed test passes without the writer being exercised at all. Triggers were the generating case: the writer never sorted them, the reader did, and the test could not see it.
+  Harvested at the S2b review, 2026-11-28.
+- **A preserved member's path never names a position in a collection the format orders by value** — `script` for the format definition, `test` for the edit
+  *Catches:* a stranger's preserved data re-attaching to a different entity when a collection is reordered or an item inserted.
+  Harvested at the S2b review, 2026-11-28.
+- **Every collection with a stored canonical order is sorted by the writer** — `script`
+  *Catches:* a collection added whose ordering is done in the reader, so a writer that is not the reader produces non-canonical files.
+  Harvested at the S2b review, 2026-11-28.
 
 ### Writing to disk
 
