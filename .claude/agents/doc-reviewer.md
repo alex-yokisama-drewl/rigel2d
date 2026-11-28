@@ -1,6 +1,6 @@
 ---
 name: doc-reviewer
-description: Reads the documentation set for contradictions, duplicated rules and prose that has drifted from the code. Dispatch at the end of a work cycle, after scripts/docs-check.sh has passed - this agent handles only what a script cannot.
+description: Reads documentation for contradictions, duplicated rules and prose that has drifted from the code. Dispatch before every pull request, scoped to what the feature touched, and again over the whole set at the end of a work cycle - always after scripts/docs-check.sh has passed, because this agent handles only what a script cannot.
 tools: Read, Grep, Glob
 model: sonnet
 ---

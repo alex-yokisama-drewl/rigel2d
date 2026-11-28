@@ -136,7 +136,22 @@ the admission test, this `Contradicts docs` item means a named document is now w
 **You** do the routing — you hold the doc map. Then dispatch `doc-writer` with the routed items
 and the named target files. It loads the documents and makes the edits.
 
-**3. Verify the documentation.** `scripts/docs-check.sh`. Fix what it reports.
+**3. Verify the documentation.** `scripts/docs-check.sh` first, and fix what it reports. **Then
+dispatch `doc-reviewer`, scoped to what this feature touched** — the documents it changed, and
+the ones making claims about the subsystem it built. Fix what is blocking; record what you
+decline.
+
+**A clean `docs-check.sh` is not a documentation review, and this is the step that proves it.**
+The script checks index completeness, link resolution, stray work-in-flight files and invariant
+mirroring. It cannot read a rule and notice the specification never stated it, or that a
+criterion asserts something unattainable, or that an overview still says no code exists. S2b ran
+with a clean script throughout while every one of those was true of this repository, and each
+was found by an agent reading instead.
+
+`finish-cycle` dispatches `doc-reviewer` too, over the whole set. That pass is not this one:
+it reads the documentation as a body, for contradictions between areas and for accumulated
+history. **This pass is narrow and is about the feature's own blast radius** — if it is finding
+things across documents this feature never touched, the brief was too wide.
 
 **4. Update `plan.md` on the branch.** Mark the subsystem done, strip detail that no longer
 serves the next session, and add what the next subsystem inherits — scaffolding it must delete,
