@@ -163,9 +163,17 @@ pub struct PreservedMembers {
     /// decimal — which of the two is never in doubt, because the shape at each
     /// step is one the core format defines.
     ///
-    /// Only two arrays here are addressed by position, `axes` and `keyframes`,
-    /// and both are positional in the format already. Everything else a puppet
-    /// holds carries an identifier and is addressed by [`PreservedMembers::owner`].
+    /// The arrays addressed by position are the ones the format itself stores
+    /// positionally: `axes`, `keyframes` and a keyframe's `control_points`, a
+    /// binding's `values`, and an animation's `triggers` — a trigger carries no
+    /// identifier, deliberately. Everything else a puppet holds carries an
+    /// identifier and is addressed by [`PreservedMembers::owner`].
+    ///
+    /// **A positional path is what the canonical writer has to move.** Two of
+    /// these collections are reordered on save — a parameter's keypoints, which
+    /// permute a binding's `values`, and an animation's `triggers` — and
+    /// `save`'s `repath` is what carries the preserved material across with
+    /// them.
     pub path: Vec<String>,
     /// `(name, the value's canonical JSON text)`, ordered by name. The text is
     /// never reparsed through our own number formatter, because values we by

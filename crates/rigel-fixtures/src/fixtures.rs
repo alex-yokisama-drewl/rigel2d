@@ -1381,7 +1381,60 @@ fn animation_shape(c: &mut Catalogue) {
         },
     );
 
+    c.variant(
+        "rigged:control-value-nonfinite-without-bezier",
+        Expect::Rejected,
+        "a non-finite control value on a keyframe that declares no Bézier segment",
+        |doc| {
+            // No `interpolation` member at all, so the segment is linear — the
+            // absent form. A reader reads `control_points` whatever the mode
+            // says, so a check gated on the mode never sees this number and it
+            // reaches a writer that cannot spell it. `format.md` *Validation*
+            // requires every number finite, with no mode attached to the
+            // requirement.
+            let placeholder = doc.raws.add("1e400");
+            let keyframes = doc
+                .track(A_IDLE, TR_HEAD)
+                .get_mut("keyframes")
+                .and_then(Value::as_array_mut)
+                .expect("the track has keyframes");
+            keyframes[1].as_object_mut().unwrap().insert(
+                "control_points".into(),
+                json!([
+                    puppet::keyframe(0.625, 0.5),
+                    {"time": 0.875, "value": [placeholder]},
+                ]),
+            );
+        },
+    );
+
     // ------------------------------------------------------ just over a limit
+
+    c.variant(
+        "rigged:coordinates-over-limit",
+        Expect::Rejected,
+        "a keyframe carrying one coordinate more than the declared limit on a stored \
+         coordinate list",
+        |doc| {
+            // The limit bounds the allocation sized from this array's length.
+            // It says nothing about how many coordinates a keyframe may
+            // legally carry against its parameter's axes — that question is
+            // `[open]` in `format.md` *Validation* — which is why the figure
+            // is three orders of magnitude above every answer it could have.
+            let coordinates: Vec<Value> = (0..=PROVISIONAL_COORDINATE_COUNT)
+                .map(|_| json!(0.0))
+                .collect();
+            let keyframes = doc
+                .track(A_IDLE, TR_HEAD)
+                .get_mut("keyframes")
+                .and_then(Value::as_array_mut)
+                .expect("the track has keyframes");
+            keyframes[0]
+                .as_object_mut()
+                .unwrap()
+                .insert("value".into(), Value::Array(coordinates));
+        },
+    );
 
     c.variant(
         "rigged:triggers-over-limit",

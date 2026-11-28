@@ -235,6 +235,40 @@ impl Decoder {
             .ok_or_else(|| malformed(format!("{what} is {}, not a number", value.kind())))
     }
 
+    /// One stored list of coordinates — a keypoint's `position`, a keyframe's
+    /// `value`, a control point's `value` — **bounded before it is allocated**.
+    ///
+    /// The three sites share this one helper because they share one limit and
+    /// because the allocation-check rule in `docs/concerns/security.md` is a
+    /// rule about every such site, not about most of them: a length taken from
+    /// the file reserving capacity with nothing checked first is the evasion
+    /// load limits exist to close.
+    ///
+    /// [`LimitKind::CoordinateCount`] is deliberately **not**
+    /// [`LimitKind::AxisCount`]. How a coordinate count relates to the
+    /// parameter's axes is `[open]` in `docs/format.md` *Validation*, and
+    /// bounding these by the axis limit would assert an answer to it. This
+    /// bounds the allocation and decides nothing else; the validator still
+    /// zips coordinates against axes exactly as before.
+    fn coordinate_list(
+        &self,
+        value: &Json,
+        what: &str,
+        element: &str,
+    ) -> Result<Vec<f64>, Rejection> {
+        let items = self.array(value, what)?;
+        crate::archive::within(
+            LimitKind::CoordinateCount,
+            items.len() as u64,
+            "coordinates",
+        )?;
+        let mut out = Vec::with_capacity(items.len());
+        for item in items {
+            out.push(self.number(item, element)?);
+        }
+        Ok(out)
+    }
+
     fn flag(&self, value: &Json, what: &str) -> Result<bool, Rejection> {
         value
             .as_bool()
@@ -877,9 +911,7 @@ impl Decoder {
         self.sweep(owner, &["mesh"], fields, MESH_KEYS);
 
         let vertices = self.coordinates(fields, "vertices")?;
-        crate::archive::within(LimitKind::VertexCount, vertices.len() as u64, "vertices")?;
         let uvs = self.coordinates(fields, "uvs")?;
-        crate::archive::within(LimitKind::VertexCount, uvs.len() as u64, "uvs")?;
 
         let triangle_items = self.array(
             self.required(fields, "triangles", "a mesh")?,
@@ -913,12 +945,20 @@ impl Decoder {
         })
     }
 
+    /// One of a mesh's two point lists, **bounded before it is allocated**.
+    ///
+    /// The limit used to be checked on the returned vector, which is after the
+    /// capacity sized from the file had already been reserved — the same shape
+    /// the three coordinate-list sites carried, and the rule in
+    /// `docs/concerns/security.md` is a rule about the allocation, not about
+    /// the value.
     fn coordinates(
         &self,
         object: &[(String, Json)],
         key: &str,
     ) -> Result<Vec<[f64; 2]>, Rejection> {
         let items = self.array(self.required(object, key, "a mesh")?, key)?;
+        crate::archive::within(LimitKind::VertexCount, items.len() as u64, key)?;
         let mut out = Vec::with_capacity(items.len());
         for item in items {
             out.push(self.pair(item, key)?);
@@ -1086,14 +1126,11 @@ impl Decoder {
         self.extensions_preserved(id, &[], fields)?;
         self.sweep(id, &[], fields, KEYPOINT_KEYS);
 
-        let coordinates = self.array(
+        let position = self.coordinate_list(
             self.required(fields, "position", "a keypoint")?,
             "a keypoint's position",
+            "a keypoint coordinate",
         )?;
-        let mut position = Vec::with_capacity(coordinates.len());
-        for coordinate in coordinates {
-            position.push(self.number(coordinate, "a keypoint coordinate")?);
-        }
         Ok(Keypoint {
             id,
             position,
@@ -1319,8 +1356,12 @@ impl Decoder {
     /// trigger from growing a condition or a target
     /// ([I1](../../../docs/invariants.md)).
     ///
-    /// Sorted by event name here, because that is the canonical order and the
-    /// writer writes a puppet already in it.
+    /// **Read in the order the file carries, like every other collection.**
+    /// Canonical order — by event name — is [`crate::save`]'s to establish, so
+    /// that a `Puppet` built in memory and never read from a file saves to the
+    /// same bytes as one that was. A preserved member's path therefore names
+    /// the trigger's position *in the file*, and the writer moves it with the
+    /// trigger when it sorts.
     fn triggers(
         &mut self,
         owner: Id,
@@ -1336,25 +1377,18 @@ impl Decoder {
             "triggers",
         )?;
 
-        let mut found: Vec<(Trigger, &[(String, Json)])> = Vec::with_capacity(items.len());
-        for item in items {
+        let mut out = Vec::with_capacity(items.len());
+        for (at, item) in items.iter().enumerate() {
             let entry = self.object(item, "a trigger")?;
             let event = self.text(
                 self.required(entry, "event", "a trigger")?,
                 "a trigger's event",
             )?;
-            found.push((Trigger { event }, entry));
-        }
-        // Sorted before the sweep, so a preserved member's path names the
-        // trigger's canonical position and survives a round trip.
-        found.sort_by(|a, b| a.0.event.cmp(&b.0.event));
-        let mut out = Vec::with_capacity(found.len());
-        for (at, (trigger, entry)) in found.into_iter().enumerate() {
             let step = at.to_string();
             let path = ["triggers", step.as_str()];
             self.extensions_preserved(owner, &path, entry)?;
             self.sweep(owner, &path, entry, TRIGGER_KEYS);
-            out.push(trigger);
+            out.push(Trigger { event });
         }
         Ok(out)
     }
@@ -1394,14 +1428,11 @@ impl Decoder {
             self.extensions_preserved(id, &path, frame)?;
             self.sweep(id, &path, frame, KEYFRAME_KEYS);
 
-            let coordinates = self.array(
+            let coordinate_values = self.coordinate_list(
                 self.required(frame, "value", "a keyframe")?,
                 "a keyframe's value",
+                "a keyframe coordinate",
             )?;
-            let mut coordinate_values = Vec::with_capacity(coordinates.len());
-            for coordinate in coordinates {
-                coordinate_values.push(self.number(coordinate, "a keyframe coordinate")?);
-            }
             // The mode of the segment this keyframe **opens**. Linear is the
             // absent form, and is also accepted spelled out — the reader
             // accepts more than the writer emits.
@@ -1481,14 +1512,11 @@ impl Decoder {
             self.extensions_preserved(owner, &path, fields)?;
             self.sweep(owner, &path, fields, CONTROL_POINT_KEYS);
 
-            let coordinates = self.array(
+            let held = self.coordinate_list(
                 self.required(fields, "value", "a control point")?,
                 "a control point's value",
+                "a control point coordinate",
             )?;
-            let mut held = Vec::with_capacity(coordinates.len());
-            for coordinate in coordinates {
-                held.push(self.number(coordinate, "a control point coordinate")?);
-            }
             out.push(ControlPoint {
                 time: self.number(
                     self.required(fields, "time", "a control point")?,

@@ -991,6 +991,88 @@ fn the_trigger_limit_fixture_is_one_over_the_declared_figure() {
     );
 }
 
+/// The coordinate-list fixture is one over its figure, and clear of every
+/// neighbouring limit — the per-track and aggregate keyframe counts above all,
+/// since it is a keyframe it lengthens.
+#[test]
+fn the_coordinate_limit_fixture_is_one_over_the_declared_figure() {
+    let puppet = &parsed("rigged:coordinates-over-limit");
+    let lists: Vec<usize> = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("tracks").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|t| t.get("keyframes").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|k| k.get("value").and_then(Value::as_array))
+        .map(Vec::len)
+        .collect();
+    assert_eq!(
+        lists.iter().copied().max(),
+        Some(PROVISIONAL_COORDINATE_COUNT + 1),
+        "the just-over fixture is not just over"
+    );
+    assert_eq!(
+        lists.iter().filter(|held| **held > 2).count(),
+        1,
+        "exactly one coordinate list is over, so the fixture names one defect"
+    );
+    // A keyframe is what it lengthens, so both keyframe counts have to stay
+    // far inside their own limits or the fixture is refused for the wrong
+    // rule — the mistake that cost `rigged:keyframes-over-aggregate` two
+    // rounds.
+    let per_track: Vec<usize> = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("tracks").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|t| t.get("keyframes").and_then(Value::as_array))
+        .map(Vec::len)
+        .collect();
+    let longest = per_track.iter().copied().max().unwrap_or_default();
+    let total: usize = per_track.iter().sum();
+    assert!(
+        longest < KEYFRAMES_PER_TRACK,
+        "a track carries {longest} keyframes and the fixture would be refused per track"
+    );
+    assert!(
+        total < AGGREGATE_KEYFRAME_LIMIT,
+        "the fixture carries {total} keyframes and would be refused for the aggregate"
+    );
+}
+
+/// A keyframe carrying control points on a segment that is **not** Bézier is
+/// still refused for a non-finite control value.
+///
+/// The fixture exists because the check was gated on the mode while the reader
+/// reads `control_points` whatever the mode says, so the number reached a
+/// writer with no way to spell it. This holds the fixture to the shape that
+/// makes it that defect and no other.
+///
+/// Asserted over the **text**, because the fixture's whole point is a number
+/// `serde_json` refuses to parse — the same reason
+/// `rigged:positive-infinity` carries one.
+#[test]
+fn the_non_bezier_control_value_fixture_declares_no_mode() {
+    let bytes = entry(
+        &fixture("rigged:control-value-nonfinite-without-bezier").bytes,
+        "puppet.json",
+    )
+    .expect("the fixture carries a puppet.json");
+    let text = String::from_utf8(bytes).expect("UTF-8");
+    assert_eq!(
+        text.matches("control_points").count(),
+        1,
+        "one keyframe carries control points, so the fixture names one defect"
+    );
+    assert!(
+        text.contains("1e400"),
+        "the overflowing control value is gone, so the fixture tests nothing"
+    );
+    assert!(
+        !text.contains("interpolation"),
+        "a mode is declared somewhere, so the defect is not the one the name says"
+    );
+}
+
 #[test]
 fn the_aggregate_keyframe_fixture_is_one_over_and_clear_of_every_neighbouring_limit() {
     // The fixture that took three attempts. Two earlier figures for this limit

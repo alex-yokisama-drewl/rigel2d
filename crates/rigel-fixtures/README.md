@@ -59,12 +59,14 @@ strict JSON and overflows on parse, so those two can.
 one place a load limit is declared, and it carries a figure for every kind. A fixture built here
 against a limit reads that figure rather than inventing one.
 
-Two figures this crate still invents, and both are a problem of a different size:
+The figures this crate still spells out for itself are the `PROVISIONAL_*` constants in
+`src/puppet.rs`, each carrying on its own doc comment why it is here and what pins it:
 
-- `PROVISIONAL_TRIGGERS_PER_ANIMATION` is **ahead** of `limits.rs` rather than behind it.
-  `triggers` is a new stored collection and S2b task 3 adds its row; the figure here is what that
-  row must carry, and a unit test pins `rigged:triggers-over-limit` to it so the two cannot drift
-  silently.
+- `PROVISIONAL_TRIGGERS_PER_ANIMATION` and `PROVISIONAL_COORDINATE_COUNT` are **in step** with
+  `limits.rs`. Each names a collection whose limit landed in S2b, each has its just-over fixture
+  — `rigged:triggers-over-limit`, `rigged:coordinates-over-limit` — and a unit test here pins the
+  fixture to the constant, so the constant and the row in `limits.rs` can only drift if both are
+  edited. `limits.rs` names the constant in its own note for the same reason.
 - `PROVISIONAL_NODE_LIMIT` is **stale**. It is 256; `limits.rs` sets `NodeCount` at 2160, so
   `rigged:near-limit` is nowhere near the node limit and no longer tests what its name says.
   Regenerating it means two thousand nodes in the committed corpus, which is a decision rather

@@ -95,6 +95,23 @@ pub const PROVISIONAL_NODE_LIMIT: usize = 256;
 /// `rigged:triggers-over-limit` stops being just over anything.
 pub const PROVISIONAL_TRIGGERS_PER_ANIMATION: usize = 64;
 
+/// The provisional limit on **one stored coordinate list** — a keypoint's
+/// `position`, a keyframe's `value`, a Bézier control point's `value`.
+///
+/// Each of those is an array whose length comes from the file and is used to
+/// size an allocation, so `docs/concerns/security.md` requires a limit in front
+/// of it and `LIM-1` requires a fixture just over that limit.
+///
+/// **It is not an answer to the arity question.** `docs/format.md`
+/// *Validation* marks how a coordinate count relates to the parameter's axes
+/// `[open]` and says nothing may assume an answer. A parameter is one- or
+/// two-dimensional, so every candidate answer is a very small number and this
+/// figure is deliberately three orders of magnitude clear of it: it bounds the
+/// allocation and decides nothing else. **The figure in
+/// `crates/rigel-format/src/limits.rs` must match this one**, or
+/// `rigged:coordinates-over-limit` stops being just over anything.
+pub const PROVISIONAL_COORDINATE_COUNT: usize = 1024;
+
 /// The most keyframes one track may carry, from `docs/format.md` *Load limits*.
 ///
 /// `rigged:keyframes-over-aggregate` has to stay at or under it on every track,

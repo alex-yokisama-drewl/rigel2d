@@ -86,6 +86,18 @@ pub enum LimitKind {
     AxisCount,
     /// Keypoints on one parameter.
     KeypointCount,
+    /// Numbers in **one stored coordinate list**: a keypoint's `position`, a
+    /// keyframe's `value`, a Bézier control point's `value`.
+    ///
+    /// **This is not an arity rule and must not be read as one.**
+    /// `docs/format.md` *Validation* marks how these counts relate to the
+    /// parameter's axes `[open]` and says nothing may assume an answer, so
+    /// this figure is deliberately far above every answer that question could
+    /// have — it bounds an allocation sized from the file and decides nothing
+    /// about what a reader should then accept. Bounding these by
+    /// [`LimitKind::AxisCount`] would assert the arity rule by implication,
+    /// which is why it is a kind of its own.
+    CoordinateCount,
     /// Bindings in one puppet.
     BindingCount,
     /// Animations in one puppet.
@@ -147,6 +159,7 @@ impl LimitKind {
         LimitKind::ParameterCount,
         LimitKind::AxisCount,
         LimitKind::KeypointCount,
+        LimitKind::CoordinateCount,
         LimitKind::BindingCount,
         LimitKind::AnimationCount,
         LimitKind::TracksPerAnimation,
@@ -177,6 +190,7 @@ impl LimitKind {
             LimitKind::ParameterCount => "parameter-count",
             LimitKind::AxisCount => "axis-count",
             LimitKind::KeypointCount => "keypoint-count",
+            LimitKind::CoordinateCount => "coordinate-count",
             LimitKind::BindingCount => "binding-count",
             LimitKind::AnimationCount => "animation-count",
             LimitKind::TracksPerAnimation => "tracks-per-animation",
@@ -350,6 +364,20 @@ pub const FIGURES: &[Figure] = &[
         basis: Basis::Provisional,
         note: "no dimension: the table counts parameters, never keypoints along \
                one. 256 positions on one axis is far past any authored rig",
+    },
+    Figure {
+        kind: LimitKind::CoordinateCount,
+        limit: Some(1024),
+        basis: Basis::Provisional,
+        note: "no dimension: the table counts keypoints and keyframes, never the \
+               numbers inside one. Deliberately far above anything the [open] \
+               arity question in docs/format.md could settle on — a parameter is \
+               one- or two-dimensional, so every candidate answer is at most \
+               AxisCount, and 1024 is three orders of magnitude clear of it. The \
+               figure exists to bound an allocation sized from the file, and a \
+               smaller one would start asserting the arity rule by implication. \
+               It must match PROVISIONAL_COORDINATE_COUNT in crates/rigel-fixtures, \
+               or rigged:coordinates-over-limit is just over nothing",
     },
     Figure {
         kind: LimitKind::BindingCount,

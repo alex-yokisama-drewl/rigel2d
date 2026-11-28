@@ -990,11 +990,42 @@ impl<'a> Checks<'a> {
     /// **closed** interval between its two keyframes — the endpoints count,
     /// because a control point coincident with a keyframe is the only way to
     /// express a degenerate curve — and every control value is finite.
+    ///
+    /// **The two control-point rules are gated differently, deliberately.** A
+    /// control *time* is meaningless without a segment to sit inside, so it is
+    /// checked only where one exists: a Bézier mode on a keyframe that is not
+    /// the track's last. A control *value* has no such dependence, and
+    /// [`crate::decode`] reads `control_points` on **every** keyframe whatever
+    /// its mode, so every keyframe carrying them is checked. Gating the value
+    /// on the mode let a non-finite number through `validate` and into the
+    /// writer, which has nothing to spell it with (`docs/format.md`,
+    /// *Validation*, *every number finite*).
+    ///
+    /// Control points stay out of [`Self::numbers`] rather than being folded
+    /// into [`Rule::NumbersFinite`], so that one defect names one rule.
     fn segments(&mut self, animation: Id, track: &crate::puppet::Track) {
         use crate::puppet::Interpolation;
 
         let last = track.keyframes.len().saturating_sub(1);
         for (at, keyframe) in track.keyframes.iter().enumerate() {
+            if let Some(controls) = keyframe.control_points.as_ref() {
+                for control in controls {
+                    for coordinate in &control.value {
+                        if !finite(*coordinate) {
+                            let found = *coordinate;
+                            self.violate(
+                                Rule::BezierControlValueFinite,
+                                vec![animation, track.id],
+                                Some("control_points"),
+                                format!(
+                                    "{found} is not a finite number at the precision \
+                                     evaluation uses"
+                                ),
+                            );
+                        }
+                    }
+                }
+            }
             if at == last {
                 if keyframe.interpolation != Interpolation::Linear {
                     self.violate(
@@ -1031,19 +1062,6 @@ impl<'a> Checks<'a> {
                         Some("control_points"),
                         format!("{found} is outside the segment {opens}..{closes}"),
                     );
-                }
-                for coordinate in &control.value {
-                    if !finite(*coordinate) {
-                        let found = *coordinate;
-                        self.violate(
-                            Rule::BezierControlValueFinite,
-                            vec![animation, track.id],
-                            Some("control_points"),
-                            format!(
-                                "{found} is not a finite number at the precision evaluation uses"
-                            ),
-                        );
-                    }
                 }
             }
         }
@@ -1939,6 +1957,58 @@ mod tests {
             ])))
             .contains(&Rule::NumbersFinite),
             "a control value is checked where the rest of the segment is"
+        );
+    }
+
+    /// A control value is checked on **every** keyframe carrying control
+    /// points, not only on the ones that open a Bézier segment.
+    ///
+    /// [`crate::decode`] reads `control_points` whatever the mode says and
+    /// wherever the keyframe sits, so a keyframe with no `interpolation`
+    /// member — linear, the absent form — can carry one. Gated on the mode,
+    /// the number reached the writer, which has nothing to spell a non-finite
+    /// value with.
+    #[test]
+    fn a_control_value_is_checked_whatever_the_segment_interpolates() {
+        use crate::puppet::{ControlPoint, Interpolation};
+
+        let control = |time: f64, value: f64| ControlPoint {
+            time,
+            value: vec![value],
+        };
+        let carried = |at: usize, mode: Interpolation| {
+            let mut puppet = subject();
+            let keyframe = &mut puppet.animations[0].tracks[0].keyframes[at];
+            keyframe.interpolation = mode;
+            keyframe.control_points = Some([control(0.25, f64::INFINITY), control(0.75, 1.0)]);
+            puppet
+        };
+
+        let last = subject().animations[0].tracks[0].keyframes.len() - 1;
+        for (at, mode) in [
+            (0, Interpolation::Linear),
+            (0, Interpolation::Stepped),
+            (0, Interpolation::InverseStepped),
+            (0, Interpolation::Unfamiliar(String::from("ease_out"))),
+            // The last keyframe opens no segment, so no control *time* is
+            // meaningful there — the value still is.
+            (last, Interpolation::Linear),
+        ] {
+            assert!(
+                rules(&carried(at, mode.clone())).contains(&Rule::BezierControlValueFinite),
+                "a non-finite control value under {mode:?} at {at} reached the writer"
+            );
+        }
+
+        // And the time rule stays Bézier-only: it names no segment otherwise.
+        let mut outside = subject();
+        let opening = &mut outside.animations[0].tracks[0].keyframes[0];
+        opening.interpolation = Interpolation::Stepped;
+        opening.control_points = Some([control(-5.0, 0.0), control(9.0, 1.0)]);
+        assert_eq!(
+            rules(&outside),
+            Vec::new(),
+            "a control time is meaningless without a segment and is not checked"
         );
     }
 

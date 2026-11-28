@@ -22,11 +22,15 @@ the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) 
 
 ## Status
 
-**Current task:** 1 and 2 done. Task 3 is done but for one assertion; task 4 is next
-**Blocked on:** one acceptance assertion in
-`lim_1_the_aggregate_keyframe_limit_is_declared_once_and_bites_before_allocating`, which this
-reader cannot satisfy and which is reported as a finding rather than edited — see *Contradicts
-docs*, **the peak assertion**. Everything else is green.
+**Current task:** 1, 2 and 3 done. The code half of task 4's review findings is done — see
+*Fix pass* at the end of this file. What remains of task 4 is routing the handoff, the
+documentation pass, and marking S2b done in [plan.md](plan.md)
+**Blocked on:** nothing. `cargo test --workspace`, `cargo fmt --all -- --check`,
+`cargo clippy --workspace --all-targets`, `scripts/fixtures-check.sh` and `scripts/docs-check.sh`
+are all clean, and `scripts/test-record.sh` has recorded the run. The aggregate limit's peak
+assertion no longer blocks: it now asserts against `TotalLoadMemory` and a doubling of
+`ParseTreeBytes`, which is the suite's own precedent for a limit the tree reaches before the
+decoder does, and the reasoning stays recorded under *Contradicts docs*, **the peak assertion**
 **Was blocked on:** nothing. The aggregate keyframe limit is **262,144**, settled by the owner on
 2026-11-28, and `rigged:keyframes-over-aggregate` is built against it and verified to be
 refused for that rule and no other. Both earlier figures were unreachable and the record of why
@@ -746,6 +750,146 @@ than deleting it.
 - **Writing the two `script` concern entries the assignment expected to run.** They do not
   exist, and writing them is a task of its own rather than a side effect of this one.
 
+
+---
+
+## Fix pass
+
+The code half of the three reviewers' findings on this branch, against `92e66dc`. Nothing in the
+slots above is changed; this is what the fix pass added.
+
+**Built:**
+
+- **A non-finite control value is refused whatever the segment interpolates.**
+  `validate.rs`'s `segments()` now checks every keyframe carrying `control_points`, before either
+  of the two `continue`s that used to skip it — the last keyframe, and any mode that is not
+  Bézier. The control-*time* check stays Bézier-only and non-last, because it names a segment and
+  has none otherwise. The two gates are now different on purpose and the doc comment says why.
+- **`rigged:control-value-nonfinite-without-bezier`**, the defect fixture for it: a keyframe with
+  no `interpolation` member at all carrying `control_points` with `1e400`. Verified through
+  `rigel-validate` to be refused for `bezier-control-value-finite` and nothing else;
+  `rigged:bezier-control-value-nonfinite` still names that rule and no other.
+- **The writer establishes an animation's trigger order.** `canonicalise()` sorts `triggers` by
+  event name and repaths the preserved material sitting on them, exactly as a keypoint reorder
+  permutes a binding's values. `repath` is now generic over the first path step. The decoder no
+  longer sorts — see *Decisions made*.
+- **`LimitKind::CoordinateCount`**, at **1024**, basis `Provisional`, with
+  `PROVISIONAL_COORDINATE_COUNT` beside it in `rigel-fixtures` and a unit test pinning
+  `rigged:coordinates-over-limit` to it. One `Decoder::coordinate_list` helper now bounds all
+  three sites — a keypoint's `position`, a keyframe's `value`, a control point's `value` —
+  before the `Vec::with_capacity` sized from the file.
+- **A fourth allocation site fixed, found while fixing the three.** `Decoder::coordinates`, the
+  mesh's point lists, checked `VertexCount` on the *returned vector* rather than on the array
+  length, so the capacity was reserved first. Moved in front of the allocation; the rejection and
+  its message are unchanged.
+- Unit tests for each: the control value under every mode and on the last keyframe, the time rule
+  staying Bézier-only, the writer's trigger sort carrying a preserved member to its new seat, and
+  both new fixtures held to the shape that makes them the defect their name says.
+- The two spliced doc comments repaired — `save.rs`'s `an_empty_collection_is_not_written` and
+  `tests/acceptance/limits.rs`'s `lim_3_a_decompression_bomb_fails_as_a_limit`, the second of
+  which is also on `master`.
+
+**Decisions made:**
+
+- **Fix 2 is the sort-and-repath option, not the key-by-event-name one.** Both remove the
+  position dependence the recorded objection rested on. Sorting follows a mechanism that already
+  exists, is already tested and is already understood — `canonicalise` permutes a parameter's
+  keypoints and repaths the binding values underneath them — and generalising `repath` to take
+  its path head is the whole change. Keying a preserved path by event name would introduce a
+  *second* way of addressing preserved material, name-keyed beside position-keyed, for one
+  collection; it also keys on a value whose uniqueness is a validation rule, and `decode` runs
+  before `validate`, so a file with a duplicate event would collide two preserved rows during a
+  decode that is about to be refused anyway. One mechanism beats two.
+- **The decoder no longer sorts triggers, and the writer owns the order outright.** The decoder
+  sorts no other domain collection — textures, parameters, bindings, animations, tracks and
+  keypoints are all ordered by `canonicalise` — and triggers were the sole exception. Keeping
+  both sorts would also leave the writer's repath dead for every file that ever came through the
+  reader. `rigged:triggers-unsorted` now exercises the writer end to end.
+- **`CoordinateCount` is 1024.** Three orders of magnitude above every answer the arity `[open]`
+  could have — a parameter is one- or two-dimensional, so the candidates are at most `AxisCount`
+  — which is what keeps it a bound on an allocation rather than an assertion about the rule. The
+  style is `KeypointCount`'s and `ResponseCurvePoints`': a provisional figure with its reason
+  written down. Nothing downstream reads it; the validator still zips coordinates against axes.
+- **The mesh allocation fix was taken rather than reported.** It is the same rule, the same
+  shape, in the function next to the three the brief named, and a one-line move. Writing a doc
+  comment about the allocation-check rule while leaving a known violation of it two screens away
+  was the alternative.
+
+**Contradicts docs:**
+
+- **`docs/concerns/security.md`'s allocation entry is a `script` with no script, and the gap is
+  not theoretical.** The sites in `decode.rs` that sized an allocation from a file-derived length
+  with no check in front of it were a keypoint's `position`, a keyframe's `value` and a control
+  point's `value` — the ones the review found — plus `Decoder::coordinates`, the mesh's point
+  lists, whose `VertexCount` check ran *after* the capacity was reserved. A hand audit found that
+  last one; the entry's own grep would have found every one of them without being asked. Task 3
+  already reported the script's absence, and this is what that absence cost.
+- **`docs/format.md` *Validation* folds the Bézier control-point rules into one bullet** — *a
+  Bézier segment's control times inside the segment, and every control value finite* — and the
+  two are not one rule. The time rule is meaningless without a segment and so is properly gated
+  on the mode; the value rule is not, and gating it on the mode is exactly the defect this pass
+  fixed. The list should carry them as two lines with the second stated unconditionally: **every
+  control point's value is finite, whatever mode its keyframe declares**. Task 3 already reported
+  that the list names no rule for the value at all.
+- **`docs/format.md` *Validation* is silent on a control point on a non-Bézier segment**, which
+  the reader accepts and writes back (task 3's assumption, unchanged). The new fixture makes that
+  silence load-bearing: it is a file the reader keeps, refused only for the non-finite number in
+  it. If such a keyframe should instead be refused, that is a document change and a rule, not an
+  edit here.
+- **`docs/format.md` *Load limits* lists the limits on animation but not the one on a coordinate
+  list**, which is new here and is the only limit in `limits.rs` whose figure is deliberately
+  chosen so as *not* to answer a question the same document marks `[open]`. That relationship —
+  a limit sized to stay clear of an open rule — is worth a line, because the next reader
+  tightening figures would otherwise read 1024 as slack.
+- **`PreservedMembers::path`'s own doc comment said only `axes` and `keyframes` are addressed by
+  position.** `values`, `triggers` and `control_points` are too, and `values` already was when
+  the comment was written — `save.rs`'s `repath` has always existed to move it. Corrected in
+  place, since it is the field's own comment.
+- **`crates/rigel-fixtures/README.md` said two figures the crate invents and listed them.**
+  Corrected in place to point at the constants instead, and to record that the trigger and
+  coordinate figures are now in step with `limits.rs` rather than ahead of it. The
+  `PROVISIONAL_NODE_LIMIT` staleness it records is unchanged and still owed.
+
+**Traps:**
+
+- **`Writer` does not canonicalise.** `save`'s one entry point calls `canonicalise` and then
+  `Writer`, in that order, and a unit test that builds a `Writer` directly sees the puppet
+  exactly as it was assembled. A test written to check canonical order through `Writer` alone
+  passes or fails for reasons that have nothing to do with the writer.
+- **A fixture carrying `1e400` cannot be asserted on through `serde_json`.** `parsed()` in
+  `rigel-fixtures`'s tests panics on it — the number is out of range — so a unit test over such a
+  fixture reads the entry's text. `rigged:positive-infinity` has the same property for the same
+  reason.
+- **`decode.rs` already had a method called `coordinates`**, the mesh's pair lists. The new
+  single-value helper is `coordinate_list`; the collision is silent until the argument counts
+  disagree.
+
+**Assumptions:**
+
+- **A keyframe may carry `control_points` without declaring Bézier, and that stays accepted.**
+  Unchanged from task 3, and now the premise the new fixture rests on: it is refused for its
+  non-finite number and for nothing else. Stated in *Contradicts docs* as a gap in the document.
+
+**Deferred:**
+
+- **Writing the `script` concern entries for the limits-completeness and allocation walks.** Still
+  absent, still a task of its own, and now with a measured cost attached — see *Contradicts docs*.
+
+**Tried and rejected:**
+
+- **Keying a trigger's preserved path by event name instead of by position.** Reasons under
+  *Decisions made*. Recorded so it is not re-proposed: it is a reasonable design and it loses on
+  having two addressing schemes where one does.
+- **Sorting triggers in both the decoder and the writer.** Correct and harmless, and it leaves
+  the writer's repath unexercised by every file the corpus holds, since the decoder would have
+  sorted them already.
+
+> **Superseded above:** *Tried and rejected*'s **Sorting an animation's triggers in the writer
+> rather than in the decoder** and **Folding a non-finite Bézier control value into
+> `Rule::NumbersFinite`**. The first is now what the writer does — the objection was that a
+> preserved path carries an index, and `canonicalise` already moves indexed preserved material.
+> The second stands as written: control points are still outside the `numbers()` walk and still
+> have their own rule. What changed is only *which keyframes* that rule is applied to.
 
 ---
 

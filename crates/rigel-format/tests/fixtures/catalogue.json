@@ -428,6 +428,18 @@
     },
     {
       "expect": "rejected",
+      "file": "rigged.control-value-nonfinite-without-bezier.rigel2d",
+      "name": "rigged:control-value-nonfinite-without-bezier",
+      "note": "a non-finite control value on a keyframe that declares no Bézier segment"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.coordinates-over-limit.rigel2d",
+      "name": "rigged:coordinates-over-limit",
+      "note": "a keyframe carrying one coordinate more than the declared limit on a stored coordinate list"
+    },
+    {
+      "expect": "rejected",
       "file": "rigged.triggers-over-limit.rigel2d",
       "name": "rigged:triggers-over-limit",
       "note": "an animation carrying one trigger more than the declared limit on `triggers`"
