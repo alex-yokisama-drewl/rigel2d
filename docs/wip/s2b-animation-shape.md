@@ -893,6 +893,103 @@ slots above is changed; this is what the fix pass added.
 
 ---
 
+## Fixtures pass: marked extension data on the animation shape
+
+Fixtures only, closing the gap a review found: the corpus carried marked extension data on a
+node and on an animation, and on nothing else this subsystem added. No code outside
+`crates/rigel-fixtures` was touched, and no acceptance test was edited.
+
+**Built:**
+
+- The accepted fixtures below, each its base fixture with one further namespace under `x` and
+  no other change. The namespace is `com.alt.notes`, which `rigged` already carries on a node, so
+  the material is of a shape the corpus already proves nothing understands.
+
+  | Fixture | Base | Where the material sits |
+  |---|---|---|
+  | `rigged:ext-on-trigger` | `rigged:triggered` | `triggers/1`, on the event nothing raises |
+  | `rigged:ext-on-keyframe` | `rigged:mixed-interpolation` | `keyframes/0` of the head-turn track, the keyframe opening the stepped segment |
+  | `rigged:ext-on-control-point` | `rigged:mixed-interpolation` | `keyframes/3/control_points/0`, the symmetric Bézier's first control point |
+  | `rigged:ext-on-parameter` | `rigged:ordered-parameters` | The head-turn parameter's own object, beside its `order` |
+
+- `rigged:triggered`'s and `rigged:ordered-parameters`' inline builders are now the named
+  functions `triggered` and `ordered_parameters`, so a variant composes the base rather than
+  restating it.
+- `annotate`, `keyframe_at` and `trigger_at` in
+  [fixtures.rs](../../crates/rigel-fixtures/src/fixtures.rs), the reach-and-mark helpers they
+  share.
+- Unit tests in [tests.rs](../../crates/rigel-fixtures/src/tests.rs): a **differential** one that
+  takes the `x` block off the named entity and requires what is left to equal the base fixture's
+  document — which is what pins *one marked namespace and nothing else new* — and one asserting
+  the annotated keyframe really does carry an `interpolation` and the annotated parameter really
+  does carry an `order`, so neither fixture quietly stops sitting beside a core field.
+
+**Decisions made:**
+
+- **The material goes in `com.alt.notes` rather than a new namespace.** A new one would need a
+  marker, a version and a name of its own and would prove nothing further; reusing the one the
+  corpus already has keeps the fixtures' only novelty the *place* the material sits.
+- **`a_trigger_carries_an_event_name_and_nothing_else` admits `x` on the one fixture named for
+  it**, by name, rather than admitting `x` generally. `x` is legal on any object, but the
+  assertion exists to catch a trigger growing a condition or a target, and widening it to *any
+  key the format permits anywhere* is how that assertion would stop biting.
+- **The annotated trigger is the middle one**, so the material is neither first nor last in the
+  list the writer orders.
+
+**Contradicts docs:**
+
+- **The catalogue-driven test cannot cover a trigger whose index actually moves, and
+  `rigged:ext-on-trigger` therefore does not exercise the writer's repath.**
+  `marked_extension_data_round_trips_on_the_entities_of_the_animation_shape` collects a
+  preserved member's path from the **first** load and asserts the same path holds the same
+  members after a save and a reload. That is only true when the writer's sort is the identity —
+  which it is for `rigged:triggered`, whose triggers are already in canonical order. A fixture
+  whose triggers arrived unsorted would have its material legitimately move from `triggers/0` to
+  `triggers/1`, and the test would fail on a correct implementation. So the sort-and-repath path
+  the *Fix pass* built is still held only by its own unit test, which is the gap this pass was
+  commissioned to close. Closing it needs an acceptance assertion that resolves the material by
+  **event name** after the save rather than by the path it arrived at; that is a test change and
+  so is not this pass's.
+- **`crates/rigel-fixtures/README.md`'s *one defect per defect fixture* has no stated counterpart
+  for an accepted fixture.** The rule that actually bound this pass — an accepted variant carries
+  one new thing and no other change — is real, is what the differential unit test enforces, and
+  is written down nowhere. Worth a line beside the rules at the top of
+  [fixtures.rs](../../crates/rigel-fixtures/src/fixtures.rs).
+- **`docs/format.md` *A trigger* says a trigger "carries one thing: the name of the scene event it
+  waits for", without noting that `x` is permitted on it as on any object.** Read strictly, the
+  sentence makes `rigged:ext-on-trigger` invalid. *Extension data* governs — `x` is "present on
+  any object" — but the two sentences are a page apart and the trigger one is the emphatic one.
+
+**Traps:**
+
+- **A fixture that hangs extension data on a position the writer reorders cannot be asserted
+  through the catalogue-driven test.** See *Contradicts docs*. The failure is confusing because
+  the fixture is correct and the implementation is correct.
+- **`rigged:mixed-interpolation` already carries marked material on its animation**, so the
+  fixtures derived from it each yield a located member for the animation as well as one for the
+  entity they are named for. Nothing breaks, but a
+  test that assumed one preserved member per fixture would.
+
+**Assumptions:**
+
+- **Marked extension data is permitted on a trigger, a keyframe, a control point and a
+  parameter.** Taken from *Extension data*'s "present on any object"; no document names these
+  four, and the decoder already carries a preserved path for each.
+
+**Deferred:**
+
+- **The unmarked-data defect fixtures on a keyframe, a control point and a parameter.** The
+  review that found this gap found that one too. Still owed; scoped out of this pass.
+- **`rigged:near-limit`'s staleness against `NodeCount`.** Unchanged, recorded above.
+
+**Tried and rejected:**
+
+- **Building the trigger fixture on an unsorted triggers list**, so that the writer's sort really
+  permutes it. It is the fixture the repath deserves and the catalogue-driven test fails against
+  it for the reason under *Contradicts docs* — the test compares against the path the material
+  arrived at. Rejected rather than built-and-left-failing, because the brief and
+  [testing.md](../testing.md) both forbid editing the acceptance test to fit a fixture.
+
 <!--
 Cleanup rule for a completed task: keep the heading, the `done` status, and anything a fresh
 session still needs. Delete the working detail. Decisions and handoff entries are never deleted

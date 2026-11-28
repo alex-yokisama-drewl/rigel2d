@@ -1075,6 +1075,89 @@ fn set_triggers(doc: &mut Doc, animation: u64, triggers: Value) {
 /// still opens.
 const EVENT_UNRAISED: &str = "plugin_ribbon_snapped";
 
+/// An animation waiting on the load event, the source-lost event and one
+/// nothing raises. Canonically ordered by event name, which here is also
+/// alphabetical.
+fn triggered(doc: &mut Doc) {
+    set_triggers(
+        doc,
+        A_IDLE,
+        json!([
+            puppet::trigger(EVENT_ON_LOAD),
+            puppet::trigger(EVENT_UNRAISED),
+            puppet::trigger(EVENT_SOURCE_LOST),
+        ]),
+    );
+}
+
+/// The rigger's order, differing from identifier order; `mappable: false` on
+/// the parameter a channel mapping feeds *and* on one no mapping feeds; and a
+/// track on the mapped parameter, so one parameter is mapped, animated and
+/// declared not mappable at once. The physics-driven parameter carries no
+/// order, which is legal and sorts it last.
+fn ordered_parameters(doc: &mut Doc) {
+    for (parameter, order) in [(P_HEAD_TURN, 3), (P_MOUTH_OPEN, 1), (P_BODY_LEAN, 2)] {
+        doc.parameter(parameter)
+            .insert("order".into(), json!(order));
+    }
+    for parameter in [P_MOUTH_OPEN, P_HAIR_SWAY] {
+        doc.parameter(parameter)
+            .insert("mappable".into(), json!(false));
+    }
+    doc.entity("animations", A_IDLE)
+        .get_mut("tracks")
+        .and_then(Value::as_array_mut)
+        .unwrap()
+        .push(json!({
+            "blend_duration": 0.15,
+            "id": 930,
+            "keyframes": [
+                puppet::keyframe(0.0, 0.0),
+                puppet::keyframe(1.0, 1.0),
+            ],
+            "parameter": P_MOUTH_OPEN,
+        }));
+}
+
+/// Hang a marked note on one entity, in a namespace no build understands.
+///
+/// `com.alt.notes` is already in `rigged`, on a node. The fixtures below put
+/// the same shape of material on the entities the animation shape added, each
+/// of which a reader reaches by a route of its own — three of them addressed
+/// by **position** inside the entity that owns them.
+fn annotate(entity: &mut serde_json::Map<String, Value>, note: &str) {
+    let block = crate::json::extension_block(entity);
+    block.insert(
+        "com.alt.notes".into(),
+        puppet::extension("0.4", "Rig Notes", json!({ "note": note })),
+    );
+}
+
+/// One keyframe of one track, by its position in the list.
+fn keyframe_at(
+    doc: &mut Doc,
+    animation: u64,
+    track: u64,
+    at: usize,
+) -> &mut serde_json::Map<String, Value> {
+    doc.track(animation, track)
+        .get_mut("keyframes")
+        .and_then(Value::as_array_mut)
+        .expect("the track has keyframes")[at]
+        .as_object_mut()
+        .expect("a keyframe is an object")
+}
+
+/// One trigger of one animation, by its position in the list.
+fn trigger_at(doc: &mut Doc, animation: u64, at: usize) -> &mut serde_json::Map<String, Value> {
+    doc.entity("animations", animation)
+        .get_mut("triggers")
+        .and_then(Value::as_array_mut)
+        .expect("the animation has triggers")[at]
+        .as_object_mut()
+        .expect("a trigger is an object")
+}
+
 fn animation_shape(c: &mut Catalogue) {
     // ------------------------------------------------- the accepted fixtures
 
@@ -1139,24 +1222,11 @@ fn animation_shape(c: &mut Catalogue) {
         },
     );
 
-    // An event the scene raises on load, one for the loss of a source, and one
-    // nothing raises. Canonically ordered by event name, which here is also
-    // alphabetical: on_load, plugin_ribbon_snapped, source_lost.
     c.variant(
         "rigged:triggered",
         Expect::Accepted,
         "an animation waiting on the load event, the source-lost event and one nothing raises",
-        |doc| {
-            set_triggers(
-                doc,
-                A_IDLE,
-                json!([
-                    puppet::trigger(EVENT_ON_LOAD),
-                    puppet::trigger(EVENT_UNRAISED),
-                    puppet::trigger(EVENT_SOURCE_LOST),
-                ]),
-            );
-        },
+        triggered,
     );
 
     // An event name shaped like a condition. The set of names is open at every
@@ -1175,38 +1245,81 @@ fn animation_shape(c: &mut Catalogue) {
         },
     );
 
-    // The rigger's order, differing from identifier order; `mappable: false` on
-    // the parameter a channel mapping feeds *and* on one no mapping feeds; and
-    // a track on the mapped parameter, so one parameter is mapped, animated and
-    // declared not mappable at once. The physics-driven parameter carries no
-    // order, which is legal and sorts it last.
     c.variant(
         "rigged:ordered-parameters",
         Expect::Accepted,
         "a rigger's parameter order unlike identifier order, with `mappable: false` on a \
          mapped parameter and on an unmapped one",
+        ordered_parameters,
+    );
+
+    // --------------- marked extension data, on each entity added by this round
+    //
+    // The corpus carried marked material on a node and on an animation, and on
+    // nothing else the animation shape added. Each fixture below is one of the
+    // fixtures above with one further namespace under `x` and no other change,
+    // so that the entity it sits on is the only thing that distinguishes it.
+    // What a conforming loader does with each is the same: accept it, and
+    // carry the material through a save untouched.
+
+    c.variant(
+        "rigged:ext-on-trigger",
+        Expect::Accepted,
+        "marked extension data on a trigger, which the writer addresses by its position in a \
+         list it orders",
         |doc| {
-            for (parameter, order) in [(P_HEAD_TURN, 3), (P_MOUTH_OPEN, 1), (P_BODY_LEAN, 2)] {
-                doc.parameter(parameter)
-                    .insert("order".into(), json!(order));
-            }
-            for parameter in [P_MOUTH_OPEN, P_HAIR_SWAY] {
-                doc.parameter(parameter)
-                    .insert("mappable".into(), json!(false));
-            }
-            doc.entity("animations", A_IDLE)
-                .get_mut("tracks")
-                .and_then(Value::as_array_mut)
-                .unwrap()
-                .push(json!({
-                    "blend_duration": 0.15,
-                    "id": 930,
-                    "keyframes": [
-                        puppet::keyframe(0.0, 0.0),
-                        puppet::keyframe(1.0, 1.0),
-                    ],
-                    "parameter": P_MOUTH_OPEN,
-                }));
+            triggered(doc);
+            annotate(
+                trigger_at(doc, A_IDLE, 1),
+                "the ribbon event comes from the plugin",
+            );
+        },
+    );
+
+    c.variant(
+        "rigged:ext-on-keyframe",
+        Expect::Accepted,
+        "marked extension data on a keyframe that also carries an interpolation mode, so the \
+         preserved material sits beside a core field the build reads",
+        |doc| {
+            mixed_interpolation(doc);
+            annotate(
+                keyframe_at(doc, A_IDLE, TR_HEAD, 0),
+                "hold the turn until the head snaps over",
+            );
+        },
+    );
+
+    c.variant(
+        "rigged:ext-on-control-point",
+        Expect::Accepted,
+        "marked extension data on a control point of the symmetric Bézier segment, the deepest \
+         position-addressed place the format has",
+        |doc| {
+            mixed_interpolation(doc);
+            annotate(
+                keyframe_at(doc, A_IDLE, TR_HEAD, 3)
+                    .get_mut("control_points")
+                    .and_then(Value::as_array_mut)
+                    .expect("the keyframe opens a Bézier segment")[0]
+                    .as_object_mut()
+                    .expect("a control point is an object"),
+                "the editor's own handle for this control point",
+            );
+        },
+    );
+
+    c.variant(
+        "rigged:ext-on-parameter",
+        Expect::Accepted,
+        "marked extension data on a parameter carrying an order, which is owner-keyed and sits \
+         beside a field a reordering edits",
+        |doc| {
+            ordered_parameters(doc);
+            annotate(
+                doc.parameter(P_HEAD_TURN),
+                "the rigger put the head turn last on purpose",
+            );
         },
     );
 

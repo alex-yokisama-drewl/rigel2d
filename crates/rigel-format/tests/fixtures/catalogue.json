@@ -344,6 +344,30 @@
     },
     {
       "expect": "accepted",
+      "file": "rigged.ext-on-trigger.rigel2d",
+      "name": "rigged:ext-on-trigger",
+      "note": "marked extension data on a trigger, which the writer addresses by its position in a list it orders"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-keyframe.rigel2d",
+      "name": "rigged:ext-on-keyframe",
+      "note": "marked extension data on a keyframe that also carries an interpolation mode, so the preserved material sits beside a core field the build reads"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-control-point.rigel2d",
+      "name": "rigged:ext-on-control-point",
+      "note": "marked extension data on a control point of the symmetric Bézier segment, the deepest position-addressed place the format has"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-parameter.rigel2d",
+      "name": "rigged:ext-on-parameter",
+      "note": "marked extension data on a parameter carrying an order, which is owner-keyed and sits beside a field a reordering edits"
+    },
+    {
+      "expect": "accepted",
       "file": "rigged.interpolation-linear-explicit.rigel2d",
       "name": "rigged:interpolation-linear-explicit",
       "note": "a segment spelling out `linear`, which is the absent form the writer canonicalises to"

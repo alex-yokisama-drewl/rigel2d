@@ -841,6 +841,12 @@ fn the_endings_fixture_carries_one_animation_per_end_behaviour() {
 fn a_trigger_carries_an_event_name_and_nothing_else() {
     // docs/format.md: no identifier, no target, no command. The rejected
     // fixture is the one place a trigger carries more, and it is named for it.
+    //
+    // `x` is the one further key a trigger may carry, because `x` is permitted
+    // on any object and the material under it is inert by construction. It is
+    // also the one key that must not be reached for to widen this rule: a
+    // trigger growing a condition or a target is what the assertion exists to
+    // catch, so `x` is admitted only on the fixture named for carrying it.
     for fixture in corpus() {
         let Some(puppet) = puppet_json(&fixture.bytes) else {
             continue;
@@ -853,15 +859,20 @@ fn a_trigger_carries_an_event_name_and_nothing_else() {
                 continue;
             };
             for trigger in triggers {
-                let keys: Vec<&String> = trigger.as_object().unwrap().keys().collect();
+                let keys: Vec<&str> = trigger
+                    .as_object()
+                    .unwrap()
+                    .keys()
+                    .map(String::as_str)
+                    .collect();
                 if fixture.name == "rigged:trigger-extra-field" {
                     assert!(keys.len() > 1, "the extra-field fixture carries no extra");
                     continue;
                 }
-                assert_eq!(
-                    keys,
-                    vec!["event"],
-                    "{} carries a trigger with more than an event name",
+                let marked = fixture.name == "rigged:ext-on-trigger" && keys == ["event", "x"];
+                assert!(
+                    keys == ["event"] || marked,
+                    "{} carries a trigger with more than an event name: {keys:?}",
                     fixture.name
                 );
                 assert!(trigger["event"].is_string());
@@ -1142,5 +1153,127 @@ fn the_aggregate_keyframe_fixture_is_one_over_and_clear_of_every_neighbouring_li
     assert!(
         fixture.bytes.len() < 2 * 1024 * 1024,
         "the committed fixture has grown past two megabytes"
+    );
+}
+
+/// Each fixture hanging marked extension data on one entity of the animation
+/// shape is its base fixture plus exactly that, and nothing else.
+///
+/// The assertion is differential: reach the entity the fixture is named for,
+/// take the `x` block off it, require that block to hold the one namespace and
+/// to be marked — a namespace key, a declared version and a human-readable
+/// name — and then require what is left to equal the base fixture's document.
+/// Without the differential half, a variant that quietly changed a second
+/// thing would exercise a shape nobody described, and the acceptance test
+/// driven off the catalogue would still pass.
+#[test]
+fn the_marked_material_fixtures_are_their_base_plus_one_namespace() {
+    fn by_id(items: &mut Value, id: u64) -> &mut Value {
+        items
+            .as_array_mut()
+            .expect("a collection")
+            .iter_mut()
+            .find(|item| item["id"].as_u64() == Some(id))
+            .unwrap_or_else(|| panic!("no entity {id}"))
+    }
+
+    type Reach = fn(&mut Value) -> &mut Value;
+    let on_trigger: Reach = |doc| &mut by_id(&mut doc["animations"], A_IDLE)["triggers"][1];
+    let on_keyframe: Reach = |doc| {
+        &mut by_id(
+            &mut by_id(&mut doc["animations"], A_IDLE)["tracks"],
+            TR_HEAD,
+        )["keyframes"][0]
+    };
+    let on_control_point: Reach = |doc| {
+        &mut by_id(
+            &mut by_id(&mut doc["animations"], A_IDLE)["tracks"],
+            TR_HEAD,
+        )["keyframes"][3]["control_points"][0]
+    };
+    let on_parameter: Reach = |doc| by_id(&mut doc["parameters"], P_HEAD_TURN);
+
+    for (name, base, reach, what) in [
+        (
+            "rigged:ext-on-trigger",
+            "rigged:triggered",
+            on_trigger,
+            "a trigger",
+        ),
+        (
+            "rigged:ext-on-keyframe",
+            "rigged:mixed-interpolation",
+            on_keyframe,
+            "a keyframe",
+        ),
+        (
+            "rigged:ext-on-control-point",
+            "rigged:mixed-interpolation",
+            on_control_point,
+            "a control point",
+        ),
+        (
+            "rigged:ext-on-parameter",
+            "rigged:ordered-parameters",
+            on_parameter,
+            "a parameter",
+        ),
+    ] {
+        let mut doc = parsed(name);
+        let entity = reach(&mut doc);
+        let block = entity
+            .as_object_mut()
+            .expect("an object")
+            .remove("x")
+            .unwrap_or_else(|| panic!("{name} carries no marked material on {what}"));
+        let block = block.as_object().expect("`x` is an object");
+        assert_eq!(
+            block.keys().map(String::as_str).collect::<Vec<&str>>(),
+            vec!["com.alt.notes"],
+            "{name} carries more than the one namespace on {what}"
+        );
+        let entry = &block["com.alt.notes"];
+        for part in ["version", "name", "data"] {
+            assert!(
+                entry.get(part).is_some(),
+                "{name}: the material on {what} declares no {part}, so it is not marked"
+            );
+        }
+        assert_eq!(
+            doc,
+            parsed(base),
+            "{name} differs from {base} in more than the marked material on {what}"
+        );
+    }
+}
+
+/// The entity each of those fixtures is named for is the one a reader reaches
+/// by position, or by a field this build also reads — which is what makes them
+/// worth having beyond the animation `rigged:mixed-interpolation` already
+/// carries material on.
+#[test]
+fn the_marked_material_sits_beside_what_the_build_reads() {
+    let keyframe = &parsed("rigged:ext-on-keyframe")["animations"][0]["tracks"];
+    let keyframe = &keyframe
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["id"].as_u64() == Some(TR_HEAD))
+        .expect("the head track")["keyframes"][0];
+    assert!(
+        keyframe.get("interpolation").is_some(),
+        "the annotated keyframe opens no segment, so the material sits beside no core field"
+    );
+
+    let parameter = parsed("rigged:ext-on-parameter")["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"].as_u64() == Some(P_HEAD_TURN))
+        .expect("the head-turn parameter")
+        .clone();
+    assert!(
+        parameter.get("order").is_some(),
+        "the annotated parameter carries no order, so a reordering would disturb nothing"
     );
 }
