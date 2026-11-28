@@ -6,7 +6,11 @@ The current phase: which subsystems get built, in what order where order matters
 2026-11-28. `rigel-format` is the first subsystem with production code: a puppet file can be
 read, validated and written, and the rest of the phase builds on it.
 
-**S3 and S4 are both clear to start**, and are independent of each other.
+**S2b is in flight** on `feature/s2b-animation-shape`, and S3 and S4 both block on it. It was
+added on 2026-11-28, after S2 landed: the animation requirements that round settled are
+specified in [format.md](../format.md) and implemented nowhere, and both S3 and S4 touch
+animation data. Attaching the debt to either would have made the other block on it, so it is a
+subsystem of its own and S3 and S4 stay independent of each other.
 
 ## Where this phase ends, and why there
 
@@ -31,16 +35,22 @@ Ordered. `Blocks on` names what genuinely must come first; everything else may m
 | S0 | **Transparency and alpha-output spike** | **Done 2026-11-27** — measured on Linux and Windows, recorded in [research/2026-11-27-transparency-spike.md](../research/2026-11-27-transparency-spike.md). The `[open]` in [performing.md](../requirements/performing.md#which-platforms-need-an-obs-plugin-decided) is resolved and the Game Capture capability tension answered. **macOS was not attempted** — no Mac was reachable — so Syphon alpha stays unobserved, which [platform.md](../requirements/platform.md) permits at its tier | Nothing |
 | S1 | **Workspace and the push gates** | **Done 2026-11-27** — the workspace builds from a clean clone with `--locked`, the gates that have a subject run and are required on `master`, `scripts/test-record.sh` records a result, and *Running locally* and *Running it* were corrected from a verbatim container walk. Gate 3 waits for a counter baseline; [stack.md](../stack.md#on-push-proposed) says which gates are live and why | S0 |
 | S2 | **`rigel-format`: read, validate, write** | **Done 2026-11-28** — a puppet archive round-trips byte-identically, the hand-authored malformed corpus is rejected with stale bindings accepted as a state, load limits bite before allocating, extension data survives untouched, and every write goes through the one atomic path. The third-party gate was run by the owner and found one defect, now fixed. A review sweep found the reader's work and memory unbounded in four shapes and a late task closed them; *What S3 and S4 inherit* carries what that leaves | S1 |
-| S3 | **The workload generator and the fixture corpus** | The reference and stress puppets are generated from the committed dimension table in [platform.md](../requirements/platform.md), both validate, and the generated puppet doubles as the conformance fixture [puppet.md](../requirements/puppet.md) requires | S2 |
-| S4 | **The evaluation pass** | A generated puppet evaluates to a posed tree for given channel input, in the order [evaluation.md](../evaluation.md) sets; one parameter has one driver, enforced by the validator; stale bindings behave as specified; the name-resolution counter is zero | S2 |
+| S2b | **The animation stored shape** | A puppet carrying per-segment interpolation, an end behaviour, triggers, and a parameter's order and `mappable` flag round-trips byte-identically; each field's unfamiliar-value and defect cases behave as [format.md](../format.md) specifies; the aggregate keyframe limit bites before allocating; the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) section R passes. **Stores and restores only — nothing is evaluated** | S2 |
+| S3 | **The workload generator and the fixture corpus** | The reference and stress puppets are generated from the committed dimension table in [platform.md](../requirements/platform.md), both validate, and the generated puppet doubles as the conformance fixture [puppet.md](../requirements/puppet.md) requires | S2b |
+| S4 | **The evaluation pass** | A generated puppet evaluates to a posed tree for given channel input, in the order [evaluation.md](../evaluation.md) sets; one parameter has one driver, enforced by the validator; stale bindings behave as specified; the name-resolution counter is zero | S2b |
 | S5 | **The render stage: command stream and backend** | Evaluation output produces an explicit command stream countable with no GPU present; the wgpu backend submits it; the warm-up pass begins every configuration the loaded puppet can reach, enumerated from puppet data; GPU resource creations after the first presented frame are zero on both workloads | S3, S4 |
 | S6 | **The counter gate, growth and soak** | Counters have a committed baseline, CI fails above it, growth is asserted per dimension on the stress workload, and the soak shows counters and resident bytes flat | S5 |
 
 ### What does not block what
 
-S3 and S4 both depend only on S2 and are independent of each other. S3 is placed first because it
-gives S4 its fixture, not because S4 needs it to exist. Ordering them the other way costs only a
-hand-built fixture.
+S3 and S4 both depend only on S2b and are independent of each other. S3 is placed first because
+it gives S4 its fixture, not because S4 needs it to exist. Ordering them the other way costs only
+a hand-built fixture.
+
+S2b sits between them and S2 because both touch animation data, and
+[format.md](../format.md)'s animation shape is implemented nowhere. It is deliberately the
+narrowest subsystem in the phase: the stored form and nothing that evaluates it, so that the
+evaluation half stays whole in S4 rather than arriving in two pieces.
 
 S0 blocked everything, and that was the point rather than an inconvenience — see below.
 
@@ -71,8 +81,8 @@ measurements are in
 | | |
 |---|---|
 | **The reader's cost is bounded by figures that are mostly provisional** | S2 found and closed four shapes where the reader's work or memory was unbounded — a quadratic string scan, a quadratic duplicate-member scan, an uncounted parse tree and three unbounded collections. The figures that now bound them are in `crates/rigel-format/src/limits.rs`, and most are still `Provisional`. **S3 is where several stop being guesses**, because it commits the workload dimensions the limits table is supposed to be derived from. Note the basis column: `Memory` means the figure is **not** a workload multiple and must not be re-derived as one |
-| **The animation requirements changed after S2 shipped, and the code does not implement them** | A requirements round on 2026-11-28 settled additive track composition, absolute keyframes contributing pose-less-neutral, per-segment interpolation in four modes, animation end behaviour, triggers and scene events, and a parameter's stored order and `mappable` flag. **`rigel-format` implements none of it** — it reads and writes the animation shape as it stood before. Whichever subsystem touches animation data owes the format change, the fixtures and the criteria in `puppet-acceptance.md` section R, which were written against the new design and are the specification for it |
-| **One figure moved in `limits.rs` without an implementation behind it** | `KeyframesPerTrack` is 65536, raised from 4096 because the old justification was false. The **aggregate** keyframe limit the same round decided — 16,777,216, in `format.md` under *Load limits* — is **declared in prose and not in code**, because enforcing it needs a decode path that does not exist yet. A subsystem adding one owes the `LimitKind`, the check before allocating, and a just-over fixture |
+| **The animation requirements changed after S2 shipped, and the code does not implement them** | A requirements round on 2026-11-28 settled additive track composition, absolute keyframes contributing pose-less-neutral, per-segment interpolation in four modes, animation end behaviour, triggers and scene events, and a parameter's stored order and `mappable` flag. **`rigel-format` implements none of it** — it reads and writes the animation shape as it stood before. **This is now S2b**, which owes the format half: the fields, their canonical form, their validation, their limits and their round-trip. The evaluation half of `puppet-acceptance.md` section R stays with S4 |
+| **One figure moved in `limits.rs` without an implementation behind it** | `KeyframesPerTrack` is 65536, raised from 4096 because the old justification was false. The **aggregate** keyframe limit the same round decided — 16,777,216, in `format.md` under *Load limits* — is **declared in prose and not in code**, because enforcing it needs a decode path that does not exist yet. **S2b owes it** — the `LimitKind`, the check before allocating, and a just-over fixture — along with a limit on an animation's `triggers`, which is a new stored collection |
 | **Every `ValidRange::max` is still `[open]`** | Pending the integrator-stability sweep due with the evaluation pass. The validator reads the table, so a figure landing there is the whole change — no code moves. **S4 owns this** |
 | **The fuzz target bounds one input, not the campaign** | `drive` runs on a worker thread with a per-input timeout, which is what catches a hang. A hung thread cannot be killed, so the run fails and the thread dies with the process. A subsystem adding a slower loader path should check the figure still has margin |
 | **The corpus is written by our own canonical writer** | So every fixture satisfies every writer rule, and no fixture can show that the *reader* accepts a container ordinary tooling wrote. This is what let a defect reach a human gate. The `data` entry that closes it is table-driven over the canonical-serialisation list and is not yet written |
