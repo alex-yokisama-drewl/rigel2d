@@ -580,18 +580,52 @@ stops a hostile file and a budget describes what is tuned for
 `KeyframesPerTrack` is **65536**: one keyframe per frame is about eighteen minutes at 60 fps,
 where the earlier figure of 4096 is reached at 68 seconds, which the minute-plus animations
 this format must carry already exceed. **A total keyframe limit for the whole puppet is new**,
-at **16,777,216**. Per-track limits multiply — the animation, track and keyframe figures
-together permit billions of keyframes, bounded only by the parse-tree cap — so the
-aggregate is the one that decides whether a load can exhaust memory.
+at **262,144**. Per-track limits multiply — the animation, track and keyframe figures together
+permit billions of keyframes — so an aggregate is needed, and this is the figure that decides
+whether a load can exhaust memory.
 
-The figure is set from memory rather than from authoring, and the arithmetic is stated so a
-reader can redo it: a keyframe costs on the order of **24 bytes** resident — a time, a value, a
-segment mode, and alignment — so the limit admits about 400 MB of keyframes. That is far beyond
-any authored puppet, survivable on the machine
-[platform.md](requirements/platform.md) names, and inside the whole-load memory limit alongside
-the payload and the textures. A puppet anywhere near it misses the frame budget long before it
-threatens the limit, which is the intended ordering: the budget is what a rig is tuned against,
-and the limit is only what stops a hostile file.
+**The figure is set by what a keyframe costs once parsed, not by what it costs resident**, and
+that distinction is the whole of why it is this small. Resident, a keyframe is on the order of
+**24 bytes** — a time, a value, a segment mode, and alignment. In the parse tree it is on the
+order of **458 bytes**: an object and an array each charged twice their own size, two member
+names held once in order and once for duplicate detection, and every number kept as its own heap
+string, because preserving a stranger's numbers verbatim means never passing them through
+anybody's float formatter. The tree therefore costs about **nineteen times** residency, and it
+is the tree that fills first.
+
+**Three ceilings sit above any figure here, and only the lowest one matters.** A reader setting
+or revising this limit has to check it against all of them, because two earlier figures were set
+against one and were unreachable:
+
+| Ceiling | Admits, in keyframes | Moves with number spelling? |
+|---|---|---|
+| `DecompressedPayloadBytes`, 64 MiB of text | about 2.9 million | **Yes** — barely half that at full double precision |
+| `ParseTreeBytes`, 256 MiB parsed | **about 586,000** | No — structure is some 418 of the 458 bytes |
+| This limit | 262,144 | No |
+
+**So the parse tree is the real constraint**, binding roughly five times tighter than the
+payload limit and nineteen times tighter than residency. The figure sits below it with more than
+double the margin deliberately: the per-keyframe charge above is an estimate that may be retuned
+as the reader changes, and a limit set close under it would quietly stop firing when that
+happened, with every completeness check still green.
+
+**What it refuses is a workload nobody authors.** It admits a single track baked at one keyframe
+per frame for over an hour at 60 fps, or four tracks at the full `KeyframesPerTrack` figure,
+against a stress workload that carries some thirty thousand keyframes in all. What it turns away
+is one animation driving two hundred tracks at that density for the eighteen minutes
+`KeyframesPerTrack` permits, which [platform.md](requirements/platform.md) already names as the
+reason the stress workload carries one animation at extreme density and the rest at corpus
+density. The per-track and aggregate figures therefore disagree about what a single animation may
+hold, and **the aggregate wins**: it is the one bounding what is actually held.
+
+**Two earlier figures could never fire, and both failed the same way** — set against one ceiling
+without checking the next one down. 16,777,216 was derived from residency alone, some six times
+what the payload limit admits. 1,048,576 was then checked against the payload limit but not
+against the parse tree, which admits barely half of it. A file just over either was refused for
+the wrong rule, so neither could have the fixture
+[requirements/puppet-acceptance.md](requirements/puppet-acceptance.md)'s `LIM-1` requires of
+every declared limit. Both corrected 2026-11-28; the crossover above was measured against the
+reader rather than derived.
 
 **Whether a texture has a limit on its pixel *area* is `[open]`.** Each side is capped, and
 nothing caps the product, so a texture at the maximum on both sides is a gigabyte of pixels once

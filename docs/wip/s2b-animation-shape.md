@@ -22,11 +22,12 @@ the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) 
 
 ## Status
 
-**Current task:** 1 done except the aggregate keyframe just-over fixture; task 2 is next
-**Blocked on:** nothing for task 2. One question is owed to design and does not block it —
-[format.md](../format.md)'s aggregate keyframe limit of 16,777,216 cannot be reached by any file
-the payload limit admits, so `LIM-1`'s *every declared limit has a fixture just over it* cannot
-be satisfied for it. See *Contradicts docs* below.
+**Current task:** 1, finishing the aggregate keyframe just-over fixture at the settled figure;
+task 2 can start
+**Blocked on:** nothing. The figure is **262,144**, settled by the owner on 2026-11-28 — see
+*Decisions*. Both earlier figures were unreachable and the record of why is in
+*Contradicts docs*, because the failure mode repeats: a figure checked against one ceiling and
+not the next one down.
 
 ---
 
@@ -107,7 +108,7 @@ version, and an unrecognised name never fires and is never a validation failure.
 (`LIM-1`), and every stored collection has one (`LIM-8`). Two kinds are missing:
 
 - **the aggregate keyframe limit**, which [format.md](../format.md) *Load limits* sets at
-  **16,777,216** over the whole puppet, on a stated 24-bytes-per-keyframe argument. Its basis is
+  **262,144** over the whole puppet, below what `ParseTreeBytes` admits. Its basis is
   `Memory` and **not** `Stress` — `KeyframesPerTrack` carries the note on why re-deriving it as
   a workload multiple is the error. It must be checked **before allocating**, which needs a
   running count across the decode path rather than a check on a finished collection;
@@ -196,6 +197,19 @@ cleanup.
 - **`format.md` governs over the research file on where the aggregate keyframe limit binds** —
   whole puppet, not per animation. The design document is the format's specification, and the
   figure's stated arithmetic is a whole-puppet one.
+- **The aggregate keyframe limit is 262,144** — owner's decision, 2026-11-28, at the second
+  attempt. Two earlier figures could never fire, each set against one ceiling without checking
+  the next one down: 16,777,216 against residency, then 1,048,576 against the payload limit but
+  not against `ParseTreeBytes`, which admits about 586,000 and is the real constraint. A
+  keyframe costs some 458 bytes parsed against 24 resident, so the tree fills roughly nineteen
+  times faster than memory does. The figure sits below the crossover with more than double the
+  margin, deliberately: the per-keyframe charge is an estimate that may be retuned, and a limit
+  set close under it would quietly stop firing when that happened.
+  [format.md](../format.md) *Load limits* carries the three ceilings, the arithmetic and what
+  the figure refuses. Rejected alongside it: 524,288, whose tenth of margin is thin against a
+  figure already wrong twice; raising the payload limit, which would stop the catalogued
+  decompression bomb being refused; and dropping the aggregate entirely, which would leave the
+  bound legible only by dividing 256 MiB by a charge documented in `json.rs`.
 - **The acceptance tests are written after the fixtures and before the implementation, by
   `acceptance-planner`, which also binds the public surface** — the shape S2 used, for the
   reason [testing.md](../testing.md) gives. The planner may read `format.md`,
@@ -208,9 +222,16 @@ cleanup.
 Approaches discarded during this branch. Not worth a permanent record; worth keeping until the
 branch ends so nobody re-proposes them.
 
-- **Committing a just-over fixture for the aggregate keyframe limit at any size.** Measured at
-  519 MB of text and 44 MB deflated, and refused by the payload limit rather than the aggregate
-  one. The arithmetic is in the handoff's *Contradicts docs*.
+- **Committing a just-over fixture for the aggregate keyframe limit at 16,777,216.** 519 MB of
+  text, 44 MB deflated, and refused by the payload limit rather than the aggregate one.
+- **Committing one at the corrected 1,048,576.** Small enough to commit — 33.4 MB of text,
+  2.66 MB deflated — and still the wrong fixture: `rigel-validate` refuses it for
+  `parse-tree-bytes`. Both figures and the measured crossover are in the handoff's
+  *Contradicts docs*; nobody needs to rebuild either.
+- **Spelling keyframes more compactly to buy parse-tree margin.** The charge is dominated by
+  structure, not digits: about 418 of the 458 bytes a keyframe costs are the object, its two
+  member names and the enums, none of which a terser number spelling touches. Shortening every
+  number to one character moves the crossover by under a tenth.
 - **A Bézier whose control times stay strictly inside its segment, for the degenerate case.**
   There is no such curve: the zero derivative `INTERP-5` exists to sweep requires a control
   point on a keyframe.
@@ -373,16 +394,44 @@ than deleting it.
   smallest honest one — 128 animations at two or three tracks each, every track at the 65,536
   per-track limit, 16,777,217 keyframes in all — measures **519 MB of `puppet.json` text and
   44 MB deflated**, and would be refused for exceeding the payload limit rather than the
-  aggregate one, which is the wrong rule. The figure needs re-deriving against what the payload
-  limit admits, and that is a design decision rather than this feature's.
-- **[README.md](../README.md) in `crates/rigel-fixtures` states *The load limits are not here*
-  and that the just-over fixture per declared limit is deferred because the limits do not
+  aggregate one, which is the wrong rule. **Settled 2026-11-28** — the owner lowered the figure
+  to 1,048,576, below what the payload limit admits at any number spelling, and
+  [format.md](../format.md) *Load limits* now carries the corrected figure, the arithmetic, and
+  what it refuses. **That correction was itself wrong** — it cleared the payload limit and not
+  the parse tree. Next entry.
+- **The aggregate keyframe limit at 1,048,576 is refused by `ParseTreeBytes` before it is
+  reached.** The correction moved the figure below what `DecompressedPayloadBytes` admits, but
+  the payload limit bounds the *text* and `ParseTreeBytes` bounds what the text parses into,
+  which for keyframes is the larger quantity by an order of magnitude. A keyframe parses to
+  about **458 bytes** charged against that budget — the object's enum and its growth slot, two
+  member names held twice over, an enum per number, an array, and each number kept as its own
+  heap string — so 256 MiB admits roughly **586,000** keyframes. 1,048,577 is about 1.8 times
+  that. **Measured, not estimated:** the candidate archives were built and run through
+  `rigel-validate`, and the crossover bisected.
+
+  | Keyframes over the whole puppet | `puppet.json` text | Archive | What `rigel-validate` says |
+  |---|---|---|---|
+  | 1,048,577 | 33.4 MB | 2.66 MB | `limit.parse-tree-bytes` — the wrong rule |
+  | 587,500 | 18.7 MB | 1.49 MB | `limit.parse-tree-bytes` — the wrong rule |
+  | 586,250 | 18.7 MB | 1.49 MB | parses; reaches the aggregate rule |
+  | 524,289 | 16.7 MB | 1.33 MB | parses; reaches the aggregate rule |
+  | 262,145 | 8.4 MB | 0.67 MB | parses; reaches the aggregate rule |
+
+  Every row keeps each track at or under `KeyframesPerTrack`, the animation count far inside
+  `AnimationCount`, and the text far inside `DecompressedPayloadBytes`; the only limit that
+  changes between the rows is the parse tree. **Settled 2026-11-28** — the owner chose
+  **262,144**, which fires with more than double the margin and commits a 0.67 MB fixture, over
+  524,288, whose tenth of margin is thin against a figure already wrong twice. The table above
+  was reproduced independently by the dispatching session before the figure was changed.
+- **[README.md](../../crates/rigel-fixtures/README.md) stated *The load limits are not here*
+  and that the just-over fixture per declared limit was deferred because the limits did not
   exist.** They landed in S2: [limits.rs](../../crates/rigel-format/src/limits.rs) carries a
-  figure for every kind. The consequence is live rather than cosmetic —
+  figure for every kind. **Corrected in place**, since it is that crate's own README and the
+  edit is small. The live consequence it now records is **not** fixed and is still owed:
   `PROVISIONAL_NODE_LIMIT` in that crate is 256 while `NodeCount` is 2,160, so
   `rigged:near-limit` is nowhere near the node limit and the fixture no longer tests what its
-  name says. Not touched here: regenerating it would add two thousand nodes to the committed
-  corpus and is outside this task.
+  name says. Regenerating it would add two thousand nodes to the committed corpus, which is a
+  decision rather than an edit.
 - **[format.md](../format.md) *How a segment interpolates* says a Bézier segment's control times
   *lie inside the segment* and does not say whether the endpoints count.** They must: the only
   way to make a degenerate Bézier — the one
@@ -427,8 +476,12 @@ than deleting it.
 **Deferred:**
 
 - **`rigged:keyframes-over-aggregate`, the just-over fixture for the aggregate keyframe limit.**
-  Impossible at the figure `format.md` states — the arithmetic is in *Contradicts docs*. It
-  returns when the figure does.
+  Still not buildable at the figure `format.md` states, now because of `ParseTreeBytes` rather
+  than `DecompressedPayloadBytes` — see *Contradicts docs* for the measurements. It is a short
+  change once the figure sits below about 586,000: an added `animation_shape` entry that pads
+  rigged's four parameters with full tracks across added animations, the catalogue note, and a
+  unit test pinning the count to the constant, in the shape `rigged:triggers-over-limit`
+  already has.
 - **Regenerating `rigged:near-limit` against the real `NodeCount` limit.** Reported above;
   outside this task.
 

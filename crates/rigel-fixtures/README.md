@@ -53,11 +53,19 @@ parser rather than from the finiteness rule, so it cannot name an offending iden
 `VAL-12` asks. `rigged:positive-infinity` and `rigged:negative-infinity` use `1e400`, which is
 strict JSON and overflows on parse, so those two can.
 
-## The load limits are not here
+## The load limits
 
-`rigged:near-limit` sits one node under `PROVISIONAL_NODE_LIMIT`, a figure this builder invented.
-`LIM-4` ties every load limit to four times the corresponding `stress` workload dimension, and
-that workload is S3's. The just-over fixture per declared limit that `LIM-1`, `LIM-2` and `LIM-7`
-want is therefore deferred: the limits do not exist yet, and a fixture built against a guessed
-figure would have to be rebuilt anyway. When the figures land, they go in one table here and the
-fixtures regenerate.
+**Most of them are no longer here.** S2 landed `crates/rigel-format/src/limits.rs`, which is the
+one place a load limit is declared, and it carries a figure for every kind. A fixture built here
+against a limit reads that figure rather than inventing one.
+
+Two figures this crate still invents, and both are a problem of a different size:
+
+- `PROVISIONAL_TRIGGERS_PER_ANIMATION` is **ahead** of `limits.rs` rather than behind it.
+  `triggers` is a new stored collection and S2b task 3 adds its row; the figure here is what that
+  row must carry, and a unit test pins `rigged:triggers-over-limit` to it so the two cannot drift
+  silently.
+- `PROVISIONAL_NODE_LIMIT` is **stale**. It is 256; `limits.rs` sets `NodeCount` at 2160, so
+  `rigged:near-limit` is nowhere near the node limit and no longer tests what its name says.
+  Regenerating it means two thousand nodes in the committed corpus, which is a decision rather
+  than an edit. Reported in `docs/wip/s2b-animation-shape.md`'s handoff.
