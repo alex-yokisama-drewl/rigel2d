@@ -67,6 +67,60 @@ fn lim_1_every_load_limit_is_declared_in_one_place() {
 ///
 /// *Checked before allocating* means the expansion was never produced: the limit
 /// is enforced against bytes **actually decompressed**, and the entry's
+/// A payload inside every byte limit whose **parsed tree** is not.
+///
+/// **Written at task 10, from a review finding, not from the criteria** — the
+/// separation that keeps acceptance tests independent of the implementation
+/// does not apply to it, and it is marked so that nobody mistakes it for a
+/// criterion.
+///
+/// `LIM-3`'s own fixture is a decompression bomb: text that expands. This is
+/// the shape underneath it. The text stays inside
+/// `DecompressedPayloadBytes`, and the *tree* built from it does not, because
+/// every value is a 32-byte enum and every number a separately allocated
+/// string. Nothing downstream can refuse it: every collection limit in
+/// `decode` runs once the tree already exists.
+///
+/// Measured before the limit was added: a 63 KB archive of this shape reached
+/// 1.9 GiB resident, against a `TotalLoadMemory` of 1 GiB. The assertion that
+/// matters is the peak, not the verdict — the verdict was always correct, and
+/// arrived after the allocation.
+#[test]
+fn a_payload_whose_parsed_tree_exceeds_the_budget_is_refused_before_it_is_built() {
+    let tree_limit = declared_limit(LimitKind::ParseTreeBytes).expect("a declared figure");
+    let total = declared_limit(LimitKind::TotalLoadMemory).expect("a declared figure");
+    let mut outcome = None;
+    let peak = peak_bytes(|| outcome = Some(load(&fixture("rigged:parse-tree-bomb"))));
+    assert!(
+        peak < total,
+        "the failed load held {peak} bytes, which is not below the whole load's          budget of {total}"
+    );
+    assert!(
+        peak < 2 * tree_limit,
+        "the tree limit is {tree_limit}; a load refused by it held {peak} bytes,          which is not within a doubling of the figure it was refused by"
+    );
+
+    let rejection = outcome
+        .expect("the load ran")
+        .expect_err("a payload whose tree exceeds the budget is refused");
+    match rejection {
+        Rejection::LimitExceeded {
+            limit, declared, ..
+        } => {
+            assert_eq!(
+                limit,
+                LimitKind::ParseTreeBytes,
+                "refused as the wrong limit"
+            );
+            assert_eq!(
+                declared, tree_limit,
+                "the figure reported is the one declared"
+            );
+        }
+        other => panic!("refused as {other:?} rather than as a limit"),
+    }
+}
+
 /// declaration — which is attacker-controlled — is used only to refuse early. A
 /// loader that trusts the header has a decompression bomb.
 ///

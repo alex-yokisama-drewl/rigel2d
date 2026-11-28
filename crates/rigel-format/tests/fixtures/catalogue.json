@@ -457,6 +457,12 @@
       "note": "a `textures/` directory marker, as ordinary repacking tooling emits"
     },
     {
+      "expect": "rejected",
+      "file": "rigged.parse-tree-bomb.rigel2d",
+      "name": "rigged:parse-tree-bomb",
+      "note": "a payload inside every byte limit whose parsed tree is not"
+    },
+    {
       "expect": "accepted",
       "file": "rigged.directory-marker-deflated.rigel2d",
       "name": "rigged:directory-marker-deflated",

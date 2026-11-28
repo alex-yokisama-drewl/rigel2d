@@ -584,6 +584,56 @@ fixed. Re-run after the fix, the owner's own repacked file is accepted.
 **Approved.** The owner accepted the fix and the reader's tolerance of directory markers, with
 no further issues against any of the four steps.
 
+### 11. The reader's work and memory are bounded — `in progress`
+
+**Added at task 10, from review.** Three independent sweeps and the code review found the same
+family of defect, and the measurements confirmed it: the reader's cost is not bounded by
+anything the limits table declares. Each was refused with the **correct verdict**, after paying
+the cost — the third instance in this subsystem of the shape task 8 was created to catch.
+
+Measured on this branch before the fix, release build:
+
+| Shape | Archive | Cost before | Cost after |
+|---|---|---|---|
+| One long string, `json.rs` revalidating all remaining UTF-8 per character | 4 KB | 23.1 s | 0.00 s |
+| Dense tiny array elements, parse tree uncounted | 63 KB | 1.94 GiB peak, 9.4 s | 252 MB peak, 0.20 s |
+
+The owner's priority ordering — Live's smoothness first, Studio's second, load time last — puts
+**memory**, not speed, at the top of this task: the player's budget is 700 MB resident and Live
+shares the machine with OBS and a game. The string defect is fixed on hostile-input grounds
+(`LIM-6`, the no-hang claim), not on load-time grounds, and ordinary load speed is explicitly
+not optimised here.
+
+**Done when:** the parser's work is linear in its input, the parse tree is charged against a
+declared limit that bites during the parse, every collection the reader builds is bounded, and
+the fuzz deadline can actually interrupt a hang. No user gate.
+
+**Done so far:**
+
+- **The quadratic string scan is gone.** `json.rs` held the document as bytes and called
+  `str::from_utf8` on *all remaining input* once per character, despite `parse` having validated
+  it already. It now copies a run at a time out of a `&str` it holds. 23.1 s to 0.00 s.
+- **Duplicate member detection is no longer a linear scan per member**, which was quadratic in
+  an object whose arity nothing bounds.
+- **`LimitKind::ParseTreeBytes`, 256 MiB, charged as the tree is built.** Distinct from
+  `DecompressedPayloadBytes`, which bounds the *text*: a tree costs several times its text, and
+  every collection limit in `decode` runs once the tree already exists, so nothing downstream
+  could refuse it. A payload refused by it reports `limit.parse-tree-bytes`, not `malformed` —
+  the bytes are good JSON this build will not hold, and sending someone to hunt a syntax error
+  that is not there is a worse message than the limit.
+- **`LimitKind::AxisCount`, 2, `Derived`.** `axes`, and a physics node's `output_source` and
+  `output_scale` which `format.md` states are *per axis of that parameter*, were unbounded —
+  `LIM-8` says such a collection cannot exist. The figure is not provisional:
+  [vocabulary.md](../vocabulary.md) defines a parameter as one- or two-dimensional and governs,
+  so a third axis is not a large parameter, it is not a parameter.
+- **`rigged:parse-tree-bomb`**, 7 KB, catalogued `rejected`, with a peak-memory assertion over
+  the counting allocator. Confirmed non-vacuous: with the budget disabled the assertion fails on
+  the peak, not on the verdict.
+
+**Still to do:** the fuzz deadline, which is checked *between* inputs so a hang inside one is
+not bounded by it — the thing the module table claims it bounds; and the smaller review
+findings listed under *Caught at review*.
+
 ### 10. Finish — `todo`
 
 Review (`code-reviewer`, and `concern-analyst` in review mode for data, security and ops), route

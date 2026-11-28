@@ -51,6 +51,15 @@ pub enum LimitKind {
     DecompressedPayloadBytes,
     /// Resident bytes across the whole load, successful or failed.
     TotalLoadMemory,
+    /// Heap bytes the parsed JSON tree of **one entry** is allowed to occupy.
+    ///
+    /// Distinct from [`LimitKind::DecompressedPayloadBytes`], which bounds the
+    /// *text*. A tree costs several times its text — every value is a 32-byte
+    /// enum and every number is a separately allocated string — so a payload
+    /// inside its own limit can still exceed the whole load's budget. Nothing
+    /// downstream can refuse it, because every collection limit in `decode`
+    /// runs after the tree exists.
+    ParseTreeBytes,
     /// Entries in the archive.
     ArchiveEntries,
     /// Bytes in one archive entry's name.
@@ -71,6 +80,10 @@ pub enum LimitKind {
     TreeDepth,
     /// Parameters in one puppet.
     ParameterCount,
+    /// Axes on one parameter, and so also the length of a physics node's
+    /// `output_source` and `output_scale`, which `docs/format.md` states are
+    /// *per axis of that parameter*.
+    AxisCount,
     /// Keypoints on one parameter.
     KeypointCount,
     /// Bindings in one puppet.
@@ -100,6 +113,7 @@ impl LimitKind {
     pub const ALL: &'static [LimitKind] = &[
         LimitKind::DecompressedPayloadBytes,
         LimitKind::TotalLoadMemory,
+        LimitKind::ParseTreeBytes,
         LimitKind::ArchiveEntries,
         LimitKind::EntryNameBytes,
         LimitKind::TextureDimension,
@@ -109,6 +123,7 @@ impl LimitKind {
         LimitKind::NodeCount,
         LimitKind::TreeDepth,
         LimitKind::ParameterCount,
+        LimitKind::AxisCount,
         LimitKind::KeypointCount,
         LimitKind::BindingCount,
         LimitKind::AnimationCount,
@@ -126,6 +141,7 @@ impl LimitKind {
         match self {
             LimitKind::DecompressedPayloadBytes => "decompressed-payload-bytes",
             LimitKind::TotalLoadMemory => "total-load-memory",
+            LimitKind::ParseTreeBytes => "parse-tree-bytes",
             LimitKind::ArchiveEntries => "archive-entries",
             LimitKind::EntryNameBytes => "entry-name-bytes",
             LimitKind::TextureDimension => "texture-dimension",
@@ -135,6 +151,7 @@ impl LimitKind {
             LimitKind::NodeCount => "node-count",
             LimitKind::TreeDepth => "tree-depth",
             LimitKind::ParameterCount => "parameter-count",
+            LimitKind::AxisCount => "axis-count",
             LimitKind::KeypointCount => "keypoint-count",
             LimitKind::BindingCount => "binding-count",
             LimitKind::AnimationCount => "animation-count",
@@ -210,6 +227,12 @@ pub const FIGURES: &[Figure] = &[
                needing more than this could not be held open anyway",
     },
     Figure {
+        kind: LimitKind::ParseTreeBytes,
+        limit: Some(256 * 1024 * 1024),
+        basis: Basis::Provisional,
+        note: "no dimension: a quarter of TotalLoadMemory, which leaves room for the                payload text and the decoded puppet beside the tree. Far above any                stress-scale puppet.json, whose tree is tens of megabytes, and far                below the 1.9 GiB a 63 KB archive of tiny array elements reached                before this limit existed",
+    },
+    Figure {
         kind: LimitKind::ArchiveEntries,
         limit: Some(4 * 300 + 2),
         basis: Basis::Derived,
@@ -275,6 +298,12 @@ pub const FIGURES: &[Figure] = &[
         limit: stress(150),
         basis: Basis::Stress,
         note: "the Parameters row",
+    },
+    Figure {
+        kind: LimitKind::AxisCount,
+        limit: Some(2),
+        basis: Basis::Derived,
+        note: "docs/vocabulary.md defines a parameter as a one- or two-dimensional                axis, which governs. Not a provisional figure to be measured later:                a third axis is not a large parameter, it is not a parameter",
     },
     Figure {
         kind: LimitKind::KeypointCount,

@@ -740,6 +740,11 @@ impl Decoder {
         let sources = match self.optional(fields, "output_source") {
             Some(value) => {
                 let items = self.array(value, "output_source")?;
+                crate::archive::within(
+                    LimitKind::AxisCount,
+                    items.len() as u64,
+                    "a physics node's output sources",
+                )?;
                 let mut out = Vec::with_capacity(items.len());
                 for item in items {
                     let token = self.text(item, "an output source")?;
@@ -763,6 +768,11 @@ impl Decoder {
         let scales = match self.optional(fields, "output_scale") {
             Some(value) => {
                 let items = self.array(value, "output_scale")?;
+                crate::archive::within(
+                    LimitKind::AxisCount,
+                    items.len() as u64,
+                    "a physics node's output scales",
+                )?;
                 let mut out = Vec::with_capacity(items.len());
                 for item in items {
                     out.push(self.number(item, "an output scale")?);
@@ -943,6 +953,11 @@ impl Decoder {
 
             let axis_items = self.array(
                 self.required(fields, "axes", "a parameter")?,
+                "a parameter's axes",
+            )?;
+            crate::archive::within(
+                LimitKind::AxisCount,
+                axis_items.len() as u64,
                 "a parameter's axes",
             )?;
             let mut axes = Vec::with_capacity(axis_items.len());

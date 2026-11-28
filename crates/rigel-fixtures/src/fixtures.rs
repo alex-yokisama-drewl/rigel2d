@@ -1261,6 +1261,36 @@ fn containers(c: &mut Catalogue) {
         archive::write_with_directory_markers(marked.clone(), &["textures/"]),
     );
 
+    // A payload inside every byte limit whose *parsed tree* is not. Dense
+    // tiny array elements cost many times their text — each is a 32-byte enum
+    // plus a separately allocated number string — so a legal `puppet.json`
+    // can expand past the whole load's memory budget while every byte limit
+    // reads green. Before `LIM-8`'s parse-tree figure existed, a 63 KB archive
+    // of this shape reached 1.9 GiB resident; the elements here are sized to
+    // pass the parse-tree limit while keeping the committed fixture small.
+    let mut amplifying: Vec<u8> = Vec::new();
+    amplifying.extend_from_slice(br#"{"format":"rigel2d","parse_bomb":["#);
+    for n in 0..3_200_000u32 {
+        if n > 0 {
+            amplifying.push(b',');
+        }
+        amplifying.push(b'0');
+    }
+    amplifying.extend_from_slice(b"]}");
+    let mut bomb_entries = vec![
+        Entry::new("puppet.json", amplifying),
+        Entry::new("rigel2d.json", manifest_bytes.clone()),
+    ];
+    for (id, bytes) in &payloads {
+        bomb_entries.push(Entry::new(format!("textures/{id}.png"), bytes.clone()));
+    }
+    c.push(
+        "rigged:parse-tree-bomb",
+        Expect::Rejected,
+        "a payload inside every byte limit whose parsed tree is not",
+        archive::write(bomb_entries),
+    );
+
     // The same marker deflated rather than stored, which is `size == 0` with a
     // compressed size of two. The first fix for the gate's catch keyed on the
     // compressed size and so accepted the stored form and refused this one —

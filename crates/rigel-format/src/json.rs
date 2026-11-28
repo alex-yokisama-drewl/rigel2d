@@ -208,16 +208,33 @@ fn write_string(text: &str, out: &mut String) {
 pub struct ParseError {
     /// Bounded, and for a person to read.
     pub detail: String,
+    /// Set when the document was refused for exceeding
+    /// [`LimitKind::ParseTreeBytes`] rather than for being malformed. The
+    /// caller reports it as the limit it is, so that "this file is too big for
+    /// this build" is never dressed up as "this file is not JSON".
+    pub over_budget: bool,
 }
 
 /// Parses a whole document, which must be one value and nothing after it.
 pub fn parse(bytes: &[u8]) -> Result<Json, ParseError> {
     let text = std::str::from_utf8(bytes).map_err(|e| ParseError {
         detail: format!("not UTF-8: {e}"),
+        over_budget: false,
     })?;
+    let budget = crate::limits::declared_limit(crate::limits::LimitKind::ParseTreeBytes).ok_or(
+        ParseError {
+            detail: String::from(
+                "no figure is declared for the parse-tree limit, and an undeclared                  limit is a defect rather than permission",
+            ),
+            over_budget: true,
+        },
+    )?;
     let mut parser = Parser {
+        text,
         bytes: text.as_bytes(),
         at: 0,
+        budget,
+        spent: 0,
     };
     parser.skip_whitespace();
     let value = parser.value(0)?;
@@ -229,15 +246,48 @@ pub fn parse(bytes: &[u8]) -> Result<Json, ParseError> {
 }
 
 struct Parser<'a> {
+    /// The document as text. Validated once, by [`parse`], so that slicing it
+    /// is a boundary check rather than a second validation.
+    text: &'a str,
     bytes: &'a [u8],
     at: usize,
+    /// Heap bytes this tree may occupy, from
+    /// [`LimitKind::ParseTreeBytes`](crate::limits::LimitKind::ParseTreeBytes).
+    budget: u64,
+    /// Charged as the tree is built, so the limit bites **during** the parse.
+    /// Checking afterwards is checking after the allocation, which is the
+    /// defect this exists to prevent.
+    spent: u64,
 }
 
 impl Parser<'_> {
     fn fail(&self, what: &str) -> ParseError {
         ParseError {
             detail: format!("{what}, at byte {}", self.at),
+            over_budget: false,
         }
+    }
+
+    /// Charges the tree's running cost and refuses once it passes the budget.
+    ///
+    /// The figures are what the values actually occupy: a [`Json`] is a 32-byte
+    /// enum, and a `Vec` holding them overshoots by up to double while it
+    /// grows, so an element is charged twice its own size. This is an estimate
+    /// and is meant to be one — the alternative is a counting allocator, which
+    /// a library cannot impose on the binaries that embed it.
+    fn charge(&mut self, bytes: u64) -> Result<(), ParseError> {
+        self.spent = self.spent.saturating_add(bytes);
+        if self.spent > self.budget {
+            return Err(ParseError {
+                detail: format!(
+                    "the parsed structure needs more than {} bytes, which is the \
+                     most this build will hold for one entry",
+                    self.budget
+                ),
+                over_budget: true,
+            });
+        }
+        Ok(())
     }
 
     fn peek(&self) -> Option<u8> {
@@ -272,6 +322,9 @@ impl Parser<'_> {
         if depth > MAX_DEPTH {
             return Err(self.fail("nested deeper than this build will parse"));
         }
+        // Every value costs its own enum, plus the slot it will occupy in a
+        // parent that overshoots as it grows.
+        self.charge(2 * std::mem::size_of::<Json>() as u64)?;
         match self.peek() {
             None => Err(self.fail("the document ends where a value was expected")),
             Some(b'{') => self.object(depth),
@@ -300,6 +353,10 @@ impl Parser<'_> {
     fn object(&mut self, depth: usize) -> Result<Json, ParseError> {
         self.expect(b'{')?;
         let mut members: Vec<(String, Json)> = Vec::new();
+        // Beside the ordered members, so that detecting a repeat does not cost
+        // a scan of everything already seen. A linear scan per member is
+        // quadratic in an object whose arity nothing bounds.
+        let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         self.skip_whitespace();
         if self.peek() == Some(b'}') {
             self.at += 1;
@@ -308,7 +365,10 @@ impl Parser<'_> {
         loop {
             self.skip_whitespace();
             let name = self.string()?;
-            if members.iter().any(|(existing, _)| *existing == name) {
+            // The name is held twice — once in `members`, once in `seen` —
+            // plus the `String` header each time.
+            self.charge(2 * (name.len() + std::mem::size_of::<String>()) as u64)?;
+            if !seen.insert(name.clone()) {
                 return Err(self.fail(&format!(
                     "the member {name:?} appears twice, so what it holds is undecidable"
                 )));
@@ -373,14 +433,28 @@ impl Parser<'_> {
                     return Err(self.fail("an unescaped control character in a string"));
                 }
                 _ => {
-                    // The input is known-valid UTF-8, so the character
-                    // beginning at this byte is whole.
-                    let rest = &self.bytes[self.at..];
-                    let text = std::str::from_utf8(rest)
-                        .map_err(|_| self.fail("not UTF-8 inside a string"))?;
-                    let character = text.chars().next().expect("a character");
-                    out.push(character);
-                    self.at += character.len_utf8();
+                    // **A run at a time, not a character at a time.** The
+                    // document is known-valid UTF-8 — `parse` validated it —
+                    // so a run that stops at a quote, a backslash or a control
+                    // byte stops on a character boundary, and copying it whole
+                    // is one `memcpy`.
+                    //
+                    // This loop used to revalidate `self.bytes[self.at..]`
+                    // with `str::from_utf8` for **every character**, which is
+                    // linear in the rest of the document each time and so
+                    // quadratic overall. A 4 KB file holding one long string
+                    // took 23 seconds to refuse: `LIM-6`'s linear-work rule
+                    // broken, and the no-hang claim with it.
+                    let start = self.at;
+                    while let Some(byte) = self.peek() {
+                        if matches!(byte, b'"' | b'\\' | 0x00..=0x1f) {
+                            break;
+                        }
+                        self.at += 1;
+                    }
+                    debug_assert!(start < self.at, "a run of at least one byte");
+                    self.charge((self.at - start) as u64)?;
+                    out.push_str(&self.text[start..self.at]);
                 }
             }
         }
@@ -484,6 +558,9 @@ impl Parser<'_> {
                 self.at += 1;
             }
         }
+        // A number is held as its own heap string, which is most of what
+        // makes a dense numeric array cost many times its text.
+        self.charge(((self.at - start) + std::mem::size_of::<String>()) as u64)?;
         let text = std::str::from_utf8(&self.bytes[start..self.at])
             .expect("a number is ASCII")
             .to_owned();

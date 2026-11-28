@@ -306,12 +306,29 @@ pub fn read_version(path: &Path) -> Result<FormatVersion, Rejection> {
     manifest_version(&bytes)
 }
 
+/// A parse failure, reported as what it is.
+///
+/// A document refused for exceeding the parse-tree budget is a limit, not a
+/// malformed file: the bytes may be perfectly good JSON that this build will
+/// not hold. Reporting it as `malformed` would tell the person to go looking
+/// for a syntax error that is not there.
+fn parse_rejection(entry: &str, error: json::ParseError) -> Rejection {
+    if error.over_budget {
+        return Rejection::LimitExceeded {
+            limit: LimitKind::ParseTreeBytes,
+            declared: crate::limits::declared_limit(LimitKind::ParseTreeBytes).unwrap_or(0),
+            detail: format!("{entry}: {}", error.detail),
+        };
+    }
+    Rejection::Malformed {
+        detail: format!("{entry}: {}", error.detail),
+    }
+}
+
 /// The format name and the two numbers `rigel2d.json` carries, and nothing
 /// a reader must interpret.
 fn manifest_version(bytes: &[u8]) -> Result<FormatVersion, Rejection> {
-    let document = json::parse(bytes).map_err(|e| Rejection::Malformed {
-        detail: format!("rigel2d.json: {}", e.detail),
-    })?;
+    let document = json::parse(bytes).map_err(|e| parse_rejection("rigel2d.json", e))?;
     let declared = document
         .get("format")
         .and_then(json::Json::as_str)
@@ -406,9 +423,7 @@ pub(crate) fn read_file(path: &Path) -> Result<Opened, Rejection> {
         .expect("archive::open refuses a file with no structure entry")
         .clone();
     let bytes = container.read(&structure)?;
-    let document = json::parse(&bytes).map_err(|e| Rejection::Malformed {
-        detail: format!("puppet.json: {}", e.detail),
-    })?;
+    let document = json::parse(&bytes).map_err(|e| parse_rejection("puppet.json", e))?;
     let mut decoded = crate::decode::decode(&document, found)?;
 
     // The texture payloads, each under the same per-entry limit.
