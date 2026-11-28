@@ -26,7 +26,7 @@
 //! which is how `VER-5` asserts it rather than inspecting it.
 
 use std::collections::BTreeMap;
-use std::fs::{self, File};
+use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
