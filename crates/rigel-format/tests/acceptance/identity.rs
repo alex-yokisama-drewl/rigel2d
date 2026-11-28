@@ -317,6 +317,10 @@ fn id_4_a_deleted_identifier_is_never_reissued() {
                 position: vec![0.0],
                 neutral: true,
             }],
+            // Presentation, and this parameter states neither: an absent order
+            // sorts last and `mappable` is absent when true.
+            order: None,
+            mappable: true,
         });
 
         subject = reload(&save_to(

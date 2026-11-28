@@ -22,7 +22,7 @@ the format half of [puppet-acceptance.md](../requirements/puppet-acceptance.md) 
 
 ## Status
 
-**Current task:** 1 done. Task 2 is next
+**Current task:** 1 and 2 done. Task 3 is next
 **Blocked on:** nothing. The aggregate keyframe limit is **262,144**, settled by the owner on
 2026-11-28, and `rigged:keyframes-over-aggregate` is built against it and verified to be
 refused for that rule and no other. Both earlier figures were unreachable and the record of why
@@ -235,6 +235,10 @@ branch ends so nobody re-proposes them.
 - **A Bézier whose control times stay strictly inside its segment, for the degenerate case.**
   There is no such curve: the zero derivative `INTERP-5` exists to sweep requires a control
   point on a keyframe.
+- **Carrying a Bézier segment's control points as a payload on `Interpolation::Bezier`.** It
+  reads better and it makes `rigged:bezier-without-control-points` unrepresentable in memory —
+  so only the decoder could refuse that fixture, and `validate(&Puppet)` could never reach it.
+  The defect has a committed fixture precisely so a validator refuses it. See *Decisions made*.
 
 ## Caught at gate
 
@@ -269,7 +273,7 @@ each one and what a conforming loader does with it, and the committed bytes are 
 user gate — the third-party gate on the corpus was run in S2 and this adds to it rather than
 changing how it is written.
 
-### 2. The acceptance tests, and the surface they bind — `todo`
+### 2. The acceptance tests, and the surface they bind — `done`
 
 Dispatch `acceptance-planner`. It writes the section R format-half criteria as tests in
 `crates/rigel-format/tests/acceptance/`, and adds the public fields to `puppet.rs` that those
@@ -330,6 +334,17 @@ than deleting it.
   corpus-wide one asserting that no **accepted** fixture carries a malformed Bézier segment and
   one asserting that no trigger outside `rigged:trigger-extra-field` carries anything but an
   event name.
+- The acceptance tests for section R's format half, in
+  [animation_shape.rs](../../crates/rigel-format/tests/acceptance/animation_shape.rs), registered
+  in that suite's `main.rs` — cargo discovers `tests/<dir>/main.rs` only, so the `mod` line is
+  what makes the file run. Each test names its criterion and says which half of it is S4's,
+  Studio's or Live's.
+- The public surface those tests call, in
+  [puppet.rs](../../crates/rigel-format/src/puppet.rs): `Keyframe::interpolation` and
+  `Keyframe::control_points`, `Animation::end_behaviour` and `Animation::triggers`,
+  `Parameter::order` and `Parameter::mappable`, with the types `Interpolation`, `ControlPoint`,
+  `EndBehaviour` and `Trigger` beside them and re-exported from `lib.rs`. **The surface only** —
+  no decode, no validation, no writing.
 
 **Decisions made:**
 
@@ -367,6 +382,29 @@ than deleting it.
   **Task 3's figure in `limits.rs` must be this one**, or `rigged:triggers-over-limit` stops
   being just over anything; the crate's unit test asserts the fixture is exactly one over the
   constant, so the two can only drift if both are edited.
+- **`Parameter::order` is `i64`.** `format.md` says only *an integer*. A stranger's writer may
+  emit a negative one and nothing forbids it, so the signed type admits everything the
+  specification permits. Task 3's decoder and the JSON Schema must agree.
+- **A Bézier segment's control points are a field of the keyframe, not a payload on
+  `Interpolation::Bezier`.** This is what keeps `rigged:bezier-without-control-points`
+  **representable in memory**, so the *validator* refuses it rather than the decoder — which is
+  what *one validator gates load and save* (`VAL-13`) means for this defect. The variant-payload
+  shape makes it unreachable from `validate(&Puppet)` entirely.
+- **Exactly two control points is a type invariant**, `Option<[ControlPoint; 2]>`. `format.md`
+  states no count rule and no fixture carries a wrong count, so a three-point file is refused at
+  decode. Task 3 must change this to a `Vec` if that is to be a validation rule instead.
+- **The six defect fixtures with no rule named in the test.** `rigged:end-behaviour-absent`,
+  `rigged:interpolation-on-last-keyframe`, `rigged:duplicate-trigger-event` and the three Bézier
+  defects are asserted as *refused by the loader and by the standalone validator, with a bounded
+  message*, and no further. `Rule` lives in `validate.rs`, which the planner may not read or
+  edit, and no existing variant covers them — naming one would be designing the validator from
+  the test. **Task 3 owes a `Rule` variant for each**, and a later pass can then tighten these to
+  `assert_rejected_naming`. Where the criterion or `format.md` does name the rule — unmarked data
+  for a trigger's extra field, the enumerated-value rule for an unfamiliar token — it is pinned.
+- **The two new limits are asserted by their figure and their note, not by a `LimitKind` name.**
+  `figure_for(262_144, "keyframe")` and `figure_for(64, "trigger")` find the single row in
+  `FIGURES` carrying that figure. Task 3 is therefore free to name the kinds, and is not free to
+  move either figure without the tests noticing.
 - **Defect fixtures beyond the four the assignment named.** The assignment called its list a
   floor. Added from `format.md`'s *Validation* and from the enumerated-field rule: an end
   behaviour that is absent, an interpolation mode on a track's last keyframe, a Bézier segment
@@ -450,6 +488,20 @@ than deleting it.
   `mappable` but gives no key for a trigger's event name and no encoding for a Bézier segment's
   control points.** Both were decided here; see *Decisions made*.
 
+- **[format.md](../format.md) *Validation* lists no rule for four defects the corpus now
+  carries**: an absent `end_behaviour`, an interpolation mode on a track's last keyframe, a
+  Bézier segment declaring the mode and carrying no control points, and one animation naming one
+  scene event twice. The last is stated under *A trigger* but not in the *Validation* list, and
+  the first three are only task 1's stated assumptions. The rule list is where a completeness
+  check will look, so each needs a line there — and task 3 needs a `Rule` variant per line.
+- **[format.md](../format.md) does not say whether a parameter's `order` may be negative.** The
+  surface admits it; nothing in the document or the corpus decides it. See *Decisions made*.
+- **[puppet-acceptance.md](../requirements/puppet-acceptance.md)'s *Criteria not written* still
+  records *the figure of the total-keyframes limit* as missing** — *the requirement ... states no
+  figure, so none can be asserted*. The figure is settled at 262,144 and
+  [format.md](../format.md) *Load limits* carries it with its arithmetic, so that row is stale
+  and `LIM-9` can assert the figure after all. The acceptance test does assert it.
+
 **Traps:**
 
 - **`rigged` is the control, and a field added to it silently disarms a criterion.** Adding
@@ -485,6 +537,19 @@ than deleting it.
   Nothing here is near a limit on any machine this project targets, but it is the first fixture
   whose cost is visible at all, and S3's generated workloads are larger again — so if the suite
   needs a diet, this is where it starts, and *Deferred* names the lever.
+- **`EndBehaviour::Loop` in `decode.rs` is an invented placeholder, and the only value in the
+  tree that nobody chose.** The field is not `Option`, there is no end behaviour decoded today,
+  and the crate has to compile — so every `Animation` the decoder builds currently claims to
+  loop. A test that passes against that is testing nothing. Every placeholder task 2 left is
+  tagged `// Task 2 (acceptance surface)`, in `decode.rs` and in the `#[cfg(test)]` blocks of
+  `validate.rs`, `save.rs` and `puppet.rs`.
+- **Four of the new tests pass today, and one of those passes for the wrong reason.**
+  `end_4_…`, `interp_4_…` and `a_track_carries_no_field_saying_how_it_composes` read the
+  committed fixture bytes and assert an absence, which holds because task 1 built the fixtures
+  correctly — they guard the corpus rather than the reader. The fourth,
+  `a_mode_on_the_last_keyframe_opens_no_segment_and_is_refused`, passes because the fixture is
+  currently refused for `unmarked-data [interpolation]` rather than for the defect it carries.
+  It only becomes meaningful when task 3 lands the rule.
 
 **Assumptions:**
 
@@ -499,6 +564,11 @@ than deleting it.
   not exist. `rigged:interpolation-on-last-keyframe` is catalogued `rejected` on that reading.
 - **An empty `triggers` is absent rather than written empty.** Taken from the corpus's existing
   treatment of empty collections rather than from a stated rule.
+- **An animation's and a track's key sets are closed to what `format.md` defines.**
+  `end_4_…` and `a_track_carries_no_field_saying_how_it_composes` enumerate the keys an
+  animation, a track and a keyframe may carry. A field added to any of the three in a later
+  version fails those tests, which is deliberate — but it means the enumeration has to be
+  maintained with the format.
 
 **Deferred:**
 

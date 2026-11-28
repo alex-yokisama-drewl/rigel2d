@@ -980,6 +980,9 @@ impl Decoder {
             }
 
             out.push(Parameter {
+                // Task 2 (acceptance surface): placeholders, as above.
+                order: None,
+                mappable: true,
                 id,
                 name,
                 axes,
@@ -1214,7 +1217,14 @@ impl Decoder {
             for track in track_items {
                 tracks.push(self.track(track)?);
             }
-            out.push(Animation { id, name, tracks });
+            out.push(Animation {
+                id,
+                name,
+                tracks,
+                // Task 2 (acceptance surface): placeholders, as above.
+                end_behaviour: crate::puppet::EndBehaviour::Loop,
+                triggers: Vec::new(),
+            });
         }
         Ok(out)
     }
@@ -1251,6 +1261,12 @@ impl Decoder {
                 coordinate_values.push(self.number(coordinate, "a keyframe coordinate")?);
             }
             keyframes.push(Keyframe {
+                // Task 2 (acceptance surface): the stored shape these carry is
+                // task 3's. Placeholders only, chosen to keep the crate
+                // compiling, and they are what makes the new acceptance tests
+                // fail rather than not build.
+                interpolation: crate::puppet::Interpolation::Linear,
+                control_points: None,
                 time: self.number(
                     self.required(frame, "time", "a keyframe")?,
                     "a keyframe's time",

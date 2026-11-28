@@ -1505,6 +1505,9 @@ mod tests {
     fn keypoints_sort_and_take_their_binding_values_with_them() {
         let mut puppet = subject();
         puppet.parameters.push(Parameter {
+            // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
+            order: None,
+            mappable: true,
             id: Id(20),
             name: String::from("p"),
             axes: vec![Axis {

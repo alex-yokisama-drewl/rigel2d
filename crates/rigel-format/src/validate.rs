@@ -1323,6 +1323,9 @@ mod tests {
                 node(4, 2, NodeBody::Physics(physics())),
             ],
             parameters: vec![Parameter {
+                // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
+                order: None,
+                mappable: true,
                 id: Id(20),
                 name: String::from("head_turn"),
                 axes: vec![Axis {
@@ -1356,6 +1359,9 @@ mod tests {
                 stale: false,
             }],
             animations: vec![Animation {
+                // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
+                end_behaviour: crate::puppet::EndBehaviour::Loop,
+                triggers: Vec::new(),
                 id: Id(40),
                 name: String::from("idle"),
                 tracks: vec![Track {
@@ -1364,10 +1370,16 @@ mod tests {
                     blend_duration: 0.25,
                     keyframes: vec![
                         Keyframe {
+                            // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
+                            interpolation: crate::puppet::Interpolation::Linear,
+                            control_points: None,
                             time: 0.0,
                             value: vec![0.0],
                         },
                         Keyframe {
+                            // Task 2 (acceptance surface): a placeholder keeping the crate compiling.
+                            interpolation: crate::puppet::Interpolation::Linear,
+                            control_points: None,
                             time: 1.0,
                             value: vec![1.0],
                         },
