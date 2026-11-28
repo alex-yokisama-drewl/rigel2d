@@ -29,7 +29,12 @@ const MALFORMED_CONTAINER: &[&str] = &[
 /// structural assertions still apply; the canonical-archive ones do not,
 /// because the point of the fixture is that a reader accepts a container
 /// ordinary tooling wrote.
-const NONCANONICAL_CONTAINER: &[&str] = &["rigged:directory-marker"];
+const NONCANONICAL_CONTAINER: &[&str] = &[
+    "rigged:directory-marker",
+    "rigged:directory-marker-deflated",
+    "rigged:directory-marker-undefined",
+    "rigged:directory-marker-not-empty",
+];
 
 /// Fixtures whose name says they declare something other than the current
 /// version.
@@ -184,14 +189,33 @@ fn every_well_formed_fixture_carries_the_entries_the_format_defines() {
             "{} has no texture payload",
             fixture.name
         );
+        // A non-canonical fixture is exempt from exactly its stated
+        // deviation and from nothing else: the entries that are not directory
+        // names must still be sorted, and it may carry at most the one
+        // directory entry that is the point of the fixture. Exempting the
+        // whole assertion would let a second stray entry in unnoticed.
+        let directories: Vec<&String> = names.iter().filter(|n| n.ends_with('/')).collect();
         if NONCANONICAL_CONTAINER.contains(&fixture.name.as_str()) {
+            assert!(
+                directories.len() <= 1,
+                "{} carries more than one directory entry: {directories:?}",
+                fixture.name
+            );
+            let mut rest: Vec<&String> = names.iter().filter(|n| !n.ends_with('/')).collect();
+            let ordered = rest.clone();
+            rest.sort();
+            assert_eq!(
+                rest, ordered,
+                "{}'s non-directory entries are not sorted",
+                fixture.name
+            );
             continue;
         }
         let mut sorted = names.clone();
         sorted.sort();
         assert_eq!(sorted, names, "{}'s entries are not sorted", fixture.name);
         assert!(
-            !names.iter().any(|n| n.ends_with('/')),
+            directories.is_empty(),
             "{} carries a directory entry",
             fixture.name
         );

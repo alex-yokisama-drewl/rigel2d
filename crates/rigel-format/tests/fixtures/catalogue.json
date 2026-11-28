@@ -455,6 +455,24 @@
       "file": "rigged.directory-marker.rigel2d",
       "name": "rigged:directory-marker",
       "note": "a `textures/` directory marker, as ordinary repacking tooling emits"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.directory-marker-deflated.rigel2d",
+      "name": "rigged:directory-marker-deflated",
+      "note": "a `textures/` directory marker written deflated, as Python's `zipfile` emits"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.directory-marker-undefined.rigel2d",
+      "name": "rigged:directory-marker-undefined",
+      "note": "an `assets/` directory marker, which the entry table does not name"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.directory-marker-not-empty.rigel2d",
+      "name": "rigged:directory-marker-not-empty",
+      "note": "a `textures/` entry carrying bytes, which is not a marker"
     }
   ],
   "version": {

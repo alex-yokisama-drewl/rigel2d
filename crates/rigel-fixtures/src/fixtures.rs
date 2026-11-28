@@ -1258,6 +1258,41 @@ fn containers(c: &mut Catalogue) {
         "rigged:directory-marker",
         Expect::Accepted,
         "a `textures/` directory marker, as ordinary repacking tooling emits",
-        archive::write_with_directory_markers(marked, &["textures/"]),
+        archive::write_with_directory_markers(marked.clone(), &["textures/"]),
+    );
+
+    // The same marker deflated rather than stored, which is `size == 0` with a
+    // compressed size of two. The first fix for the gate's catch keyed on the
+    // compressed size and so accepted the stored form and refused this one —
+    // the same defect in a narrower shape, and the reason the boundary below
+    // is now pinned from both sides.
+    c.push(
+        "rigged:directory-marker-deflated",
+        Expect::Accepted,
+        "a `textures/` directory marker written deflated, as Python's `zipfile` emits",
+        archive::write_with_deflated_directory_markers(marked.clone(), &["textures/"]),
+    );
+
+    // A directory the format's entry table does not name. Tolerating markers
+    // must not become tolerating any empty entry.
+    c.push(
+        "rigged:directory-marker-undefined",
+        Expect::Rejected,
+        "an `assets/` directory marker, which the entry table does not name",
+        archive::write_with_directory_markers(marked.clone(), &["assets/"]),
+    );
+
+    // `textures/` carrying bytes is a name the format does not define, not a
+    // marker, however the archive spells it.
+    let mut fat = marked.clone();
+    fat.push(Entry::new(
+        "textures/",
+        b"an entry wearing a marker's name".to_vec(),
+    ));
+    c.push(
+        "rigged:directory-marker-not-empty",
+        Expect::Rejected,
+        "a `textures/` entry carrying bytes, which is not a marker",
+        archive::write_naming_a_directory(fat),
     );
 }

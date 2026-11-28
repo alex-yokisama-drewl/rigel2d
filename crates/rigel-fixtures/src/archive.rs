@@ -20,6 +20,7 @@ use std::io::{Cursor, Write};
 use zip::write::SimpleFileOptions;
 
 /// One entry of the archive.
+#[derive(Clone)]
 pub struct Entry {
     pub name: String,
     pub data: Vec<u8>,
@@ -60,13 +61,38 @@ fn method_for(name: &str) -> zip::CompressionMethod {
 /// repacking a puppet with ordinary tooling produces exactly this, and
 /// `TOOL-3` is the requirement that they can.
 pub fn write_with_directory_markers(entries: Vec<Entry>, directories: &[&str]) -> Vec<u8> {
+    write_with_markers_compressed(entries, directories, false)
+}
+
+/// As [`write_with_directory_markers`], with the markers deflated rather than
+/// stored.
+///
+/// An empty deflate stream is two bytes, so a marker written this way has
+/// `size == 0` and `compressed_size == 2`. Python's `zipfile` produces exactly
+/// this, and a reader keying its tolerance on the compressed size accepts the
+/// stored form and refuses this one.
+pub fn write_with_deflated_directory_markers(entries: Vec<Entry>, directories: &[&str]) -> Vec<u8> {
+    write_with_markers_compressed(entries, directories, true)
+}
+
+fn write_with_markers_compressed(
+    entries: Vec<Entry>,
+    directories: &[&str],
+    deflate_markers: bool,
+) -> Vec<u8> {
     let mut entries = entries;
     entries.sort_by(|a, b| a.name.cmp(&b.name));
 
     let mut buffer = Cursor::new(Vec::new());
     {
         let mut writer = zip::ZipWriter::new(&mut buffer);
+        let marker_method = if deflate_markers {
+            zip::CompressionMethod::Deflated
+        } else {
+            zip::CompressionMethod::Stored
+        };
         let options = SimpleFileOptions::default()
+            .compression_method(marker_method)
             .last_modified_time(fixed_time())
             .large_file(false)
             .unix_permissions(0o755);
@@ -96,6 +122,19 @@ pub fn write_with_directory_markers(entries: Vec<Entry>, directories: &[&str]) -
 /// Sorting happens here rather than at the call sites, so a fixture cannot
 /// accidentally depend on the order it listed its entries in.
 pub fn write(entries: Vec<Entry>) -> Vec<u8> {
+    write_checking_names(entries, true)
+}
+
+/// As [`write`], without the no-directory-entry assertion.
+///
+/// For the one fixture whose purpose is an entry wearing a directory name
+/// while carrying bytes. The canonical writer must never produce one, which is
+/// why [`write`] refuses it.
+pub fn write_naming_a_directory(entries: Vec<Entry>) -> Vec<u8> {
+    write_checking_names(entries, false)
+}
+
+fn write_checking_names(entries: Vec<Entry>, refuse_directories: bool) -> Vec<u8> {
     let mut entries = entries;
     entries.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -109,7 +148,7 @@ pub fn write(entries: Vec<Entry>) -> Vec<u8> {
                 entry.name
             );
             assert!(
-                !entry.name.ends_with('/'),
+                !refuse_directories || !entry.name.ends_with('/'),
                 "no directory entries: {}",
                 entry.name
             );

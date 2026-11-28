@@ -270,6 +270,19 @@ What the user caught that automation did not. **Each becomes a checklist entry i
   serialisation*, which binds the **writer**, and was being enforced against the **reader**.
   Fixed in this task; see *Decisions made*.
 
+  **The first fix was itself incomplete, and review caught it.** It keyed on the marker's
+  *compressed* size being zero. An empty entry is not always zero compressed bytes — an empty
+  deflate stream is two — so a marker written by a tool that deflates directory entries, which
+  Python's `zipfile` does, was still refused. The stored form Info-ZIP writes was accepted and
+  the deflated form was not: the same defect in a narrower shape, and the fixture could not see
+  it because the builder emitted only the stored form. The predicate is now `size == 0` under a
+  defined directory name, with the compression method checked before the skip for every entry,
+  and the boundary is pinned from both sides by four fixtures.
+
+  **The second checklist entry this becomes:** a tolerance added for a third-party tool is
+  tested against the output of more than one such tool, or it encodes the first tool's
+  incidental choices. One sample is not a boundary.
+
   **The checklist entry this becomes:** a rule the specification states for the canonical
   writer must not be enforced by the reader unless the specification separately says a reader
   refuses it. The corpus is written by our own canonical writer, so every fixture satisfies
@@ -818,6 +831,17 @@ are untouched: a marker read in is dropped on save, which is correct, because it
 puppet data. **Because** `TOOL-3` is the requirement that a third party can inspect, change and
 regenerate a puppet with ordinary tooling, and `zip -r` is that tooling; a reader that refuses
 its output refuses the whole claim the archive container was chosen to deliver.
+
+Task 10. **The marker predicate ignores the compressed size and the compression method.** The
+entry is never read, so neither is the loader's business; the method is nonetheless checked for
+every entry *before* the skip, so a method the format does not define is still refused even for
+an entry about to be dropped. **Because** keying on the compressed size is what made the first
+fix accept Info-ZIP and refuse Python's `zipfile`.
+
+Task 10. **The corpus exemption is scoped per assertion, not per fixture.** A fixture in
+`NONCANONICAL_CONTAINER` must still carry its non-directory entries in sorted order and at most
+one directory entry. **Because** exempting a fixture from the whole assertion lets an unrelated
+stray entry in unnoticed, which review raised as the exemption being scoped on the wrong axis.
 
 Task 9. **The regression guard is a fixture, not a unit test** — `rigged:directory-marker`,
 built by `archive::write_with_directory_markers`, catalogued `accepted`. The catalogue walk in

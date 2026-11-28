@@ -155,21 +155,9 @@ pub(crate) fn open(path: &Path) -> Result<Container, Rejection> {
                 "an entry name that is not UTF-8",
             )
         })?;
-        // Most archivers emit a directory entry for `textures/`, and `zip -r`
-        // does so by default. It carries no payload, so it is skipped rather
-        // than refused: "no directory entries" is a rule for the *writer*
-        // (`docs/format.md` — *Canonical serialisation*), and enforcing it on
-        // load refuses a file repacked with the ordinary tooling the container
-        // exists to permit.
-        if is_directory_marker(name, entry.size(), entry.compressed_size()) {
-            continue;
-        }
-        let Some(role) = role_of(name) else {
-            return Err(fault(
-                ArchiveFault::UndefinedEntryName,
-                format!("{name:?} is not an entry the format defines"),
-            ));
-        };
+        // The compression method is checked before anything else about the
+        // entry, so that a method the format does not define is refused even
+        // for an entry that is about to be skipped.
         match entry.compression() {
             zip::CompressionMethod::Stored | zip::CompressionMethod::Deflated => {}
             other => {
@@ -179,6 +167,27 @@ pub(crate) fn open(path: &Path) -> Result<Container, Rejection> {
                 ));
             }
         }
+        // Most archivers emit a directory entry for `textures/`, and `zip -r`
+        // does so by default. It carries no payload, so it is skipped rather
+        // than refused: "no directory entries" is a rule for the *writer*
+        // (`docs/format.md` — *Canonical serialisation*), and enforcing it on
+        // load refuses a file repacked with the ordinary tooling the container
+        // exists to permit.
+        //
+        // **The compressed size is deliberately not part of the test.** An
+        // empty entry is not always zero compressed bytes — an empty deflate
+        // stream is two — and keying on that refused every marker written by a
+        // tool that deflates directory entries, Python's `zipfile` among them,
+        // which is the same defect in a narrower shape.
+        if is_directory_marker(name, entry.size()) {
+            continue;
+        }
+        let Some(role) = role_of(name) else {
+            return Err(fault(
+                ArchiveFault::UndefinedEntryName,
+                format!("{name:?} is not an entry the format defines"),
+            ));
+        };
         entries.push(Entry {
             index,
             role,
@@ -207,10 +216,13 @@ pub(crate) fn open(path: &Path) -> Result<Container, Rejection> {
 /// Whether an entry is a bare directory marker for a path the format defines.
 ///
 /// Only the prefixes the format's entry table names are tolerated, and only
-/// when the entry is empty — `assets/` and a `textures/` carrying bytes are
-/// both still names the format does not define, and are still refused.
-fn is_directory_marker(name: &str, size: u64, compressed_size: u64) -> bool {
-    name == TEXTURE_PREFIX && size == 0 && compressed_size == 0
+/// when the entry decompresses to nothing — `assets/` and a `textures/`
+/// carrying bytes are both still names the format does not define, and are
+/// still refused. The entry is never read, so its compressed size and its
+/// method are not this predicate's business; the method is checked for every
+/// entry before this is reached.
+fn is_directory_marker(name: &str, size: u64) -> bool {
+    name == TEXTURE_PREFIX && size == 0
 }
 
 /// The entry a name denotes, or `None` for a name the format does not define.
@@ -497,6 +509,28 @@ impl Container {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The marker predicate, from both sides. The fixtures pin this end to
+    /// end; this pins the predicate itself, including the compressed-size
+    /// independence that the first attempt got wrong.
+    #[test]
+    fn a_marker_is_an_empty_entry_under_a_defined_directory_name() {
+        assert!(is_directory_marker("textures/", 0));
+        // `role_of` still refuses the name, so the tolerance lives in exactly
+        // one branch and cannot leak into the entry table.
+        assert_eq!(role_of("textures/"), None);
+
+        assert!(
+            !is_directory_marker("textures/", 1),
+            "an entry carrying bytes is not a marker, whatever it is named"
+        );
+        for undefined in ["assets/", "/", "", "Textures/", "textures", "a/textures/"] {
+            assert!(
+                !is_directory_marker(undefined, 0),
+                "{undefined:?} is not a directory the entry table names"
+            );
+        }
+    }
 
     #[test]
     fn the_names_the_format_defines_and_no_others() {
