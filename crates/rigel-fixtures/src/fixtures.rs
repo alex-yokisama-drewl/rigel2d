@@ -1242,4 +1242,22 @@ fn containers(c: &mut Catalogue) {
         "an entry the format's table does not define",
         archive::write(archive_entries),
     );
+
+    // `rigged` repacked the way ordinary tooling repacks it. `zip -r` emits a
+    // directory marker for `textures/` by default, and a reader that refuses
+    // one refuses every puppet a third party has opened and rezipped, which is
+    // the whole of `TOOL-3`. Caught at task 9's gate.
+    let mut marked = vec![
+        Entry::new("puppet.json", puppet_bytes.clone()),
+        Entry::new("rigel2d.json", manifest_bytes.clone()),
+    ];
+    for (id, bytes) in &payloads {
+        marked.push(Entry::new(format!("textures/{id}.png"), bytes.clone()));
+    }
+    c.push(
+        "rigged:directory-marker",
+        Expect::Accepted,
+        "a `textures/` directory marker, as ordinary repacking tooling emits",
+        archive::write_with_directory_markers(marked, &["textures/"]),
+    );
 }

@@ -19,8 +19,9 @@ untouched.
 ## Status
 
 **Current task:** tasks 1 to 8 are `done`. **Task 9 is `awaiting approval` — the human gate.**
-**Blocked on:** the owner looking at `rigged` with the specification and ordinary tooling, and
-reading the load messages. Nothing else remains before task 10.
+**Blocked on:** the owner's word that the gate is settled. The gate has been **run** and found
+one defect — a puppet repacked with `zip -r` was refused — which is fixed, asserted by a new
+fixture and recorded under *Caught at gate*. Nothing else remains before task 10.
 
 **The suite is green.** Every acceptance test passes, and so does every unit test, every
 fixture check and every gate. That is the first time since task 3, which is the designed
@@ -260,7 +261,21 @@ branch ends so nobody re-proposes them.
 What the user caught that automation did not. **Each becomes a checklist entry in
 `docs/concerns/` before the phase closes** — `finish-cycle` harvests this section.
 
-- *(none yet)*
+- **A puppet repacked with `zip -r` was refused.** Task 9, gate step 2. The owner extracted
+  `rigged`, changed an animation name, repacked with ordinary tooling and got
+  `archive.undefined-entry-name` on `"textures/"`. `zip -r` emits a directory marker for every
+  directory it walks, and `archive::open` refused it as a name the format does not define. The
+  JSON edit and the reformatting were never the problem — a repack with `zip -D` of the same
+  tree was accepted. This is the gate's own failure criterion, *a repacked file refused for a
+  reason the specification does not state*: "no directory entries" is stated in *Canonical
+  serialisation*, which binds the **writer**, and was being enforced against the **reader**.
+  Fixed in this task; see *Decisions made*.
+
+  **The checklist entry this becomes:** a rule the specification states for the canonical
+  writer must not be enforced by the reader unless the specification separately says a reader
+  refuses it. The corpus is written by our own canonical writer, so every fixture satisfies
+  every writer rule and no test could see the difference. Nothing but a third party with
+  ordinary tooling was ever going to catch this, which is what the gate is for.
 
 ---
 
@@ -546,6 +561,18 @@ exists.
 **Not gated on the owner re-running the suite.** Everything deterministic is already asserted in
 tasks 1–8; this gate exists for the judgment those cannot express.
 
+**Run, and it caught one defect.** The owner did the inspection, the standalone texture and the
+messages; step 2, the edit-and-repack, was finished in session against their own extracted and
+edited tree. Inspection, standalone extraction and every message passed against the stated
+criteria — including that nothing offers an install route for a missing extension, and that the
+future-minor wording matches what the save actually preserves, which `version.rs` asserts.
+**Step 2 failed**, on `zip -r`'s directory marker; *Caught at gate* carries it and the reader is
+fixed. Re-run after the fix, the owner's own repacked file is accepted.
+
+Still `awaiting approval`: the fix changed what the gate was looking at, and the owner has not
+seen the result. Approving it needs no re-run — `rigged.modified/` repacked with plain `zip -r`
+is accepted, and `rigged:directory-marker` asserts it stays that way.
+
 ### 10. Finish — `todo`
 
 Review (`code-reviewer`, and `concern-analyst` in review mode for data, security and ops), route
@@ -782,6 +809,26 @@ The default budget is half a second or 512 inputs; `RIGEL_FUZZ_SECONDS`, `RIGEL_
 the budget — were confirmed to fire against a planted fault.
 
 **Decisions made:**
+
+Task 9. **The reader accepts a zero-length `textures/` directory marker and ignores it**;
+`is_directory_marker` in `archive.rs` gates it and nothing else. Only the prefix the format's
+entry table names, and only when the entry is empty — `assets/` and a `textures/` carrying
+bytes are both still refused as undefined, and `role_of` still maps `"textures/"` to no role,
+so the leniency is one explicit branch rather than a loosened name rule. The canonical writer
+is unchanged and still emits no directory entry, so `CANON` and byte-identical round-tripping
+are untouched: a marker read in is dropped on save, which is correct, because it carries no
+puppet data. **Because** `TOOL-3` is the requirement that a third party can inspect, change and
+regenerate a puppet with ordinary tooling, and `zip -r` is that tooling; a reader that refuses
+its output refuses the whole claim the archive container was chosen to deliver.
+
+Task 9. **The regression guard is a fixture, not a unit test** — `rigged:directory-marker`,
+built by `archive::write_with_directory_markers`, catalogued `accepted`. The catalogue walk in
+`execution.rs` and the verdict check in `validation.rs` both pick it up with no new test code,
+and `fixtures-check.sh` keeps the bytes reproducible. Confirmed non-vacuous: with the reader
+branch disabled, both acceptance tests fail naming this fixture. `tests.rs` gains
+`NONCANONICAL_CONTAINER`, which exempts it from the sorted-entries and no-directory-entry
+assertions and from those only — the fixture is a valid puppet in a container the canonical
+writer would not have produced, and that distinction is the one the gate catch turned on.
 
 - **The current format version is `1.1`.** `rigged:old-version` must declare "an earlier version
   this build upgrades", and an earlier *minor* exists only if the current one is not the first.
@@ -1111,6 +1158,16 @@ Task 8.
   behind it rather than reading as one nobody has looked at.
 
 **Contradicts docs:**
+
+Task 9. **[format.md](../format.md) never says what a reader does with a non-canonical
+container.** *Canonical serialisation* lists what the writer pins, including "no directory
+entries", and the container section promises a third party can repack with ordinary tooling —
+but nothing states that the two meet, so the reader's author had no sentence to implement and
+enforced the writer's list. **Routed at task 10:** *The container is an archive with a
+manifest* should state that a reader accepts an archive that is not canonical as long as every
+entry carrying data is one the table defines, and that a directory marker for a defined prefix
+is ignored; *Canonical serialisation* should say its list binds the writer only. Both are
+`[proposed]` sections.
 
 - **`one-part` cannot be what both documents say it is.**
   [puppet-acceptance.md](../requirements/puppet-acceptance.md) calls it "the smallest valid

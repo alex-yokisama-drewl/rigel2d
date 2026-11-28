@@ -51,6 +51,46 @@ fn method_for(name: &str) -> zip::CompressionMethod {
     }
 }
 
+/// Write entries into an archive carrying directory markers, as the ordinary
+/// command-line `zip -r` emits by default.
+///
+/// Not canonical — [`write`] refuses a directory entry, because the canonical
+/// writer must not emit one (`docs/format.md` — *Canonical serialisation*).
+/// This exists because a reader must nonetheless **accept** one: a third party
+/// repacking a puppet with ordinary tooling produces exactly this, and
+/// `TOOL-3` is the requirement that they can.
+pub fn write_with_directory_markers(entries: Vec<Entry>, directories: &[&str]) -> Vec<u8> {
+    let mut entries = entries;
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut buffer = Cursor::new(Vec::new());
+    {
+        let mut writer = zip::ZipWriter::new(&mut buffer);
+        let options = SimpleFileOptions::default()
+            .last_modified_time(fixed_time())
+            .large_file(false)
+            .unix_permissions(0o755);
+        for directory in directories {
+            writer
+                .add_directory(*directory, options)
+                .expect("directory marker starts");
+        }
+        for entry in &entries {
+            let options = SimpleFileOptions::default()
+                .compression_method(method_for(&entry.name))
+                .last_modified_time(fixed_time())
+                .large_file(false)
+                .unix_permissions(0o644);
+            writer
+                .start_file(entry.name.clone(), options)
+                .expect("archive entry starts");
+            writer.write_all(&entry.data).expect("archive entry writes");
+        }
+        writer.finish().expect("archive finishes");
+    }
+    buffer.into_inner()
+}
+
 /// Write entries into a canonical archive.
 ///
 /// Sorting happens here rather than at the call sites, so a fixture cannot

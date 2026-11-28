@@ -24,6 +24,13 @@ const MALFORMED_CONTAINER: &[&str] = &[
     "rigged:overlapping-local-header-data",
 ];
 
+/// Fixtures that are valid puppets in a container the canonical writer would
+/// not have produced. They carry every entry the format defines, so the
+/// structural assertions still apply; the canonical-archive ones do not,
+/// because the point of the fixture is that a reader accepts a container
+/// ordinary tooling wrote.
+const NONCANONICAL_CONTAINER: &[&str] = &["rigged:directory-marker"];
+
 /// Fixtures whose name says they declare something other than the current
 /// version.
 fn declares_another_version(name: &str) -> bool {
@@ -177,6 +184,9 @@ fn every_well_formed_fixture_carries_the_entries_the_format_defines() {
             "{} has no texture payload",
             fixture.name
         );
+        if NONCANONICAL_CONTAINER.contains(&fixture.name.as_str()) {
+            continue;
+        }
         let mut sorted = names.clone();
         sorted.sort();
         assert_eq!(sorted, names, "{}'s entries are not sorted", fixture.name);

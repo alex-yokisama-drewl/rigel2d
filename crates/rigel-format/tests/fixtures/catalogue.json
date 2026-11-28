@@ -449,6 +449,12 @@
       "file": "rigged.undefined-entry-name.rigel2d",
       "name": "rigged:undefined-entry-name",
       "note": "an entry the format's table does not define"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.directory-marker.rigel2d",
+      "name": "rigged:directory-marker",
+      "note": "a `textures/` directory marker, as ordinary repacking tooling emits"
     }
   ],
   "version": {

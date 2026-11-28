@@ -155,6 +155,15 @@ pub(crate) fn open(path: &Path) -> Result<Container, Rejection> {
                 "an entry name that is not UTF-8",
             )
         })?;
+        // Most archivers emit a directory entry for `textures/`, and `zip -r`
+        // does so by default. It carries no payload, so it is skipped rather
+        // than refused: "no directory entries" is a rule for the *writer*
+        // (`docs/format.md` — *Canonical serialisation*), and enforcing it on
+        // load refuses a file repacked with the ordinary tooling the container
+        // exists to permit.
+        if is_directory_marker(name, entry.size(), entry.compressed_size()) {
+            continue;
+        }
         let Some(role) = role_of(name) else {
             return Err(fault(
                 ArchiveFault::UndefinedEntryName,
@@ -193,6 +202,15 @@ pub(crate) fn open(path: &Path) -> Result<Container, Rejection> {
         entries,
         spent: 0,
     })
+}
+
+/// Whether an entry is a bare directory marker for a path the format defines.
+///
+/// Only the prefixes the format's entry table names are tolerated, and only
+/// when the entry is empty — `assets/` and a `textures/` carrying bytes are
+/// both still names the format does not define, and are still refused.
+fn is_directory_marker(name: &str, size: u64, compressed_size: u64) -> bool {
+    name == TEXTURE_PREFIX && size == 0 && compressed_size == 0
 }
 
 /// The entry a name denotes, or `None` for a name the format does not define.
