@@ -18,10 +18,9 @@ untouched.
 
 ## Status
 
-**Current task:** tasks 1 to 8 are `done`. **Task 9 is `awaiting approval` — the human gate.**
-**Blocked on:** the owner's word that the gate is settled. The gate has been **run** and found
-one defect — a puppet repacked with `zip -r` was refused — which is fixed, asserted by a new
-fixture and recorded under *Caught at gate*. Nothing else remains before task 10.
+**Current task:** tasks 1 to 9 are `done`; the human gate is **approved**. **Task 10 — finish —
+is in flight.** The gate found one defect, a puppet repacked with `zip -r` refused, now fixed
+and asserted by `rigged:directory-marker`; *Caught at gate* carries it for `finish-cycle`.
 
 **The suite is green.** Every acceptance test passes, and so does every unit test, every
 fixture check and every gate. That is the first time since task 3, which is the designed
@@ -542,7 +541,7 @@ over* fixtures, `LIM-6`'s linear-work assertion, `EXEC-1`'s interception harness
 decided against, with the cheaper assertion named — and `EXEC-3`'s script, which is that
 assertion and is nobody's yet.
 
-### 9. The third-party gate — `awaiting approval` *(human gate)*
+### 9. The third-party gate — `done`
 
 The one thing in S2 a person must settle, and the whole case for the format being an archive.
 
@@ -569,9 +568,8 @@ future-minor wording matches what the save actually preserves, which `version.rs
 **Step 2 failed**, on `zip -r`'s directory marker; *Caught at gate* carries it and the reader is
 fixed. Re-run after the fix, the owner's own repacked file is accepted.
 
-Still `awaiting approval`: the fix changed what the gate was looking at, and the owner has not
-seen the result. Approving it needs no re-run — `rigged.modified/` repacked with plain `zip -r`
-is accepted, and `rigged:directory-marker` asserts it stays that way.
+**Approved.** The owner accepted the fix and the reader's tolerance of directory markers, with
+no further issues against any of the four steps.
 
 ### 10. Finish — `todo`
 
