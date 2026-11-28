@@ -204,9 +204,34 @@ not intended and is the kind of contradiction a reader has to reconcile alone.
 no port, no address, no scene identity. A puppet file must not be able to learn which trackers
 or ports a person has, and that is far cheaper to fix now than once files exist.
 
-**`[open]`: the signal needs a name, and `docs/vocabulary.md` needs it before any code uses
-one.** This is the one genuinely new concept in this round, and an unnamed concept is how
-implementers invent three words for it.
+**The concept is a `scene event`**, and `docs/vocabulary.md` gains the entry before any code
+uses the term:
+
+> **Scene event** — a named occurrence the scene raises, which a puppet's animation may listen
+> for. Named outward, like a channel, never by identifier. *Not* a command: the scene says what
+> happened, never what to do about it, which is the puppet's to decide.
+
+**Named outward, which is the part that carries weight.** The owner's reason for preferring
+*scene* over a puppet-side name is that a plugin may one day wire into a scene and raise its
+own events rather than reaching into puppets directly. That makes the set of event names
+**open**, and an open set changes two things:
+
+- A puppet references a scene event **by name**, the way it references a channel.
+  [I3](../invariants.md) requires stored references to be by identifier *within* a file; a
+  channel and a scene event are both named outward, which is the case that rule already carves
+  out.
+- **An unrecognised event name never fires.** It is not a validation failure, because the
+  scene that defines it may simply not be loaded, or the plugin may not be installed. A puppet
+  carrying triggers for events nothing raises is a normal puppet.
+
+**This does not reopen [I1](../invariants.md).** Matching a name against the set of events that
+were raised is a lookup, not evaluation. What would cross the line is a condition, a comparison
+or an expression attached to the match — and none exists.
+
+**`[open]`: whether `docs/vocabulary.md`'s Scene entry needs softening.** It currently says a
+scene "holds placement, not behaviour". [performing.md](../requirements/performing.md) already
+has the scene deciding what a dropped source means, and scene events make that wiring explicit,
+so the line overstates the case as written.
 
 **`[open]`: with several sources, whether loss is per source or per puppet.** The puppet never
 learns which source, so the scene must decide what counts as lost.
@@ -226,7 +251,8 @@ These are deliberately separate, and conflating them is how a format grows a sta
 
 **A trigger lives on the animation it starts, and is only a start event.** It carries no target,
 because the animation that owns it is the target, and no command, because the command is always
-*start*. The events are *on load* and *on source lost*.
+*start*. A trigger names the **scene event** it waits for; *on load* and *source lost* are the
+two the owner named a use for, and the set is open because a plugin may raise its own.
 
 **Because the shape enforces the scope decision.** A trigger that cannot name another animation
 cannot sequence one, so the state machine ruled out above is structurally inexpressible rather
@@ -237,6 +263,11 @@ fields and the two unfamiliar-value questions that came with them.
 released when it clears, blending out over its declared duration — so *source regained* needs no
 trigger of its own, and a tracker that recovers never leaves an idle layered on top of live
 tracking. *On load* does not clear, so an animation it starts runs to its end behaviour.
+
+**An animation started on load begins before the first presented frame.** Otherwise the puppet's
+first frame shows it un-posed and then pops, which is a visible hitch on stream; and the
+load-in-progress marker that protects against a crash loop is cleared at that frame, so an
+on-load animation starting after it would never be covered.
 
 **A person can always stop a playing animation.** Live's control surface lists what is playing
 and what started it, and can stop any of them or all of them, by keyboard, without reloading.
@@ -307,17 +338,41 @@ Inochi Session and it is a small fix to a daily irritation.
 **An order is not an identity.** Every stored reference is still by identifier
 ([I3](../invariants.md)); the order is presentation and nothing resolves through it.
 
-## 9. A parameter declares whether it is offered for mapping **[proposed]**
+## 9. A parameter declares whether it is `mappable` **[proposed]**
 
-**A parameter carries a mark saying whether Live offers it as a mapping target**, set in Studio
-and stored in the puppet.
+**A parameter carries a `mappable` flag saying whether Live offers it as a mapping target**, set
+in Studio and stored in the puppet.
 
 **Because** a parameter only ever driven by animation is not a candidate for a channel, and no
 rule can infer that: under additive composition a parameter may legitimately be both mapped and
 animated, so *is it animated* does not answer *should it be offered*. Only the author knows.
 
-**The mark hides, it does not forbid.** It is presentation, not validation — a file whose mark
-disagrees with its mappings is not malformed.
+**Not called a *mark*.** The format already has *marked* extension data, and two unrelated marks
+is the collision [vocabulary.md](../vocabulary.md) exists to prevent — the kind that only bites
+once two people have implemented against different readings of one word.
+
+### The stored flag is trusted only where nothing contradicts it **[decided]**
+
+**A parameter that has a channel mapping is `mappable` whatever the stored flag says.** The
+effective value is the stored flag *or* the presence of a mapping.
+
+**Because it makes the word honest.** `mappable: false` on a parameter that is in fact mapped
+would be a false statement in the file, and it is the state every concern sweep independently
+found bugs around — a streamer seeing a mapping they can neither locate nor remove, because the
+flag can only be changed in the other application. Deriving the value makes that state
+unreachable rather than making it somebody's job to remember.
+
+**The derived value is never written back.** Only what the author set is stored. A save that
+persisted the derived `true` would destroy the rigger's intent the moment a mapping was removed,
+and silently.
+
+**Removing a mapping therefore hides the parameter again**, which is correct and is also
+surprising to anyone who was experimenting. Live offers a way to reveal hidden parameters, which
+is the same affordance [concerns/accessibility.md](../concerns/accessibility.md) requires so that
+nothing is reachable only by opening Studio.
+
+**Still presentation, not validation.** A file whose flag disagrees with its mappings is not
+malformed — that disagreement is a defined state with a defined reading, not an error.
 
 ## 10. A build that does not understand a value does not guess **[proposed]**
 
@@ -331,7 +386,10 @@ stated rather than left to an implementer:
 |---|---|
 | Interpolation mode | The **track** contributes nothing. Not the segment alone: a track that contributes across part of its timeline and vanishes across the rest pops at the boundary, which looks like a bug rather than like a missing feature |
 | End behaviour | The animation **never starts**. Treating it as loop, hold or release is the guess the rule forbids |
-| Trigger event | The trigger **never fires**, and the other triggers on that animation are unaffected |
+*(A trigger's event is **not** in this table. It is an outward name and not an enumerated
+value, so the set is open and an unrecognised one is never invalid at any version — it simply
+never fires. An earlier draft of this section listed it here, which contradicted §5 and §6; §5
+is the one that holds.)*
 
 At the **current** declared version each of these is invalid rather than inert, which is the
 existing rule applied unchanged: a writer at this version had the whole list and used something

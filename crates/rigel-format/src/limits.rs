@@ -181,6 +181,19 @@ pub enum Basis {
     /// **No `stress` dimension exists for this kind.** A placeholder with a
     /// stated reason, to be replaced by a measurement.
     Provisional,
+    /// **Set from memory safety, not from what an author would write.**
+    ///
+    /// The distinction `docs/requirements/puppet.md` draws between a *limit*
+    /// and a *budget*: a budget describes the workload the frame targets are
+    /// measured against, a limit only stops a file from exhausting memory. A
+    /// figure on this basis is deliberately far above any authored puppet, and
+    /// raising it is a memory argument rather than a workload one.
+    ///
+    /// Not `Provisional`: nothing is missing and no measurement would replace
+    /// it. Not `Stress`: a multiple of the workload would be the wrong
+    /// quantity, and is how this kind came to carry a figure a one-minute
+    /// animation already exceeded.
+    Memory,
 }
 
 /// One kind's stated figure, or its absence.
@@ -337,10 +350,14 @@ pub const FIGURES: &[Figure] = &[
     },
     Figure {
         kind: LimitKind::KeyframesPerTrack,
-        limit: Some(4096),
-        basis: Basis::Provisional,
-        note: "no dimension, for the reason the row above gives. 4096 authored \
-               positions on one track is far past any hand-made animation",
+        limit: Some(65536),
+        basis: Basis::Memory,
+        note: "set from memory rather than from authoring, which is why it is far \
+               above the measured corpus. One keyframe per frame is ordinary for \
+               script-generated motion and reaches 65536 at about eighteen minutes \
+               at 60fps. The earlier figure of 4096 was justified as `far past any \
+               hand-made animation` and was wrong: a one-minute animation at 60fps \
+               passes it at 68 seconds. docs/format.md, *Load limits*",
     },
     Figure {
         kind: LimitKind::ChannelMappingCount,
@@ -454,6 +471,14 @@ mod tests {
                 assert!(
                     figure.note.contains("no dimension"),
                     "{:?} is provisional and must say which dimension is missing",
+                    figure.kind
+                );
+            }
+            if figure.basis == Basis::Memory {
+                assert!(
+                    figure.note.contains("memory"),
+                    "{:?} is set from memory and must say so, because the figure \
+                     looks arbitrary beside a workload-derived one",
                     figure.kind
                 );
             }

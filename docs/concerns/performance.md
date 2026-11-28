@@ -59,6 +59,18 @@ Universal entries reference them.
 - **Nothing in the frame loop resolves by name or scans linearly** — `judgment`
   → `test`: the name-resolution counter is zero, and animation lookup is independent of animation length.
   Seeded at planning, 2026-11-26.
+- **Seeking a keyframe is logarithmic in the worst case, and a time jump never scans** — `test`
+  Fixture with a forward jump, a loop wrap, a backward seek and a first evaluation, on the smallest animation and on one keyframe per frame. Makes the entry above concrete for keyframes. *Catches:* a forward-advancing cursor that walks every keyframe it skipped — which passes every steady-state test and fails precisely on a deadline miss, when the budget is already blown.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Issuing a playback command or firing a trigger allocates nothing** — `test`
+  *Catches:* per-track playback state created lazily at play time, which is CPU allocation in the frame loop at the exact moment a source drops.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Work per frame is counted by playing state, and held animations have a stated ceiling** — `test`
+  *Catches:* hold animations accumulating with nothing stopping them, quietly raising per-frame cost over a stream.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **A looping playhead is wrapped, not accumulated, and the soak asserts it** — `test`
+  *Catches:* float drift that grows with elapsed time and appears only hours into a stream.
+  Seeded at the animation planning sweep, 2026-11-28.
 - **No first-use work after the first presented frame** — `judgment`
   → `test`: resource creations and pipeline preparation after frame one are zero, for every blend, mask and composite combination the puppet uses.
   Seeded at planning, 2026-11-26.
@@ -77,6 +89,9 @@ Universal entries reference them.
 - **Import peak memory is independent of PSD layer count** — `judgment`
   → `test`.
   Seeded at planning, 2026-11-26.
+- **Resident bytes for animation are linear in keyframes at a stated per-keyframe size** — `test`
+  *Catches:* storage that fits the payload limit and not the memory budget — the distinction between a limit and a budget, made checkable.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Input and editing
 

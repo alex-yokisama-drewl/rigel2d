@@ -89,6 +89,21 @@ sweep.
 - **Preserved unknown material follows its entity through in-memory edits, including entities addressed by position** — `test`
   Material from a later-version file that the writer keys by position within a collection, after a keypoint, keyframe or axis is inserted or deleted. *Would have caught:* a stranger's data silently re-attaching to a different entity.
   Harvested at the S2 review, 2026-11-28.
+- **A value stored by position survives its neighbours being inserted, deleted or split** — `test`
+  A segment's interpolation mode lives on the earlier keyframe, and keyframes have no identifier. *Catches:* a mode silently moving to the next segment after an insert. Extends the preserved-material entry above from material a build does not understand to material it does.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Every enumerated field declares what a build that does not know its value does, and carries a fixture of one** — `test`
+  The unfamiliar-data entries above cover the fields the format already lists; this one binds the next field added. *Catches:* an interpolation mode, end behaviour or trigger event added with no answer for a stranger's build — which is the gap the animation draft had until it was swept.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Contributions to one value are summed in an order fixed by data, never by runtime state** — `test`
+  Permute the file's collection order and the runtime start order over three or more contributions whose float sum differs by grouping, and assert bit-identical output. *Catches:* the belief that summation being commutative makes order irrelevant. It is commutative and **not associative**, so three contributions depend on grouping — and `evaluation.md` calls three bindings on one node ordinary rigging. Applies equally to any fixed iteration count.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **Presentation data is stored as a field, never as a collection's order, and every save that does not own it leaves it untouched** — `test`
+  Covers a parameter's stored order and its `mappable` flag. *Catches:* a canonical sort by identifier erasing a rigger's arrangement, and Live's save path dropping what Studio set.
+  Seeded at the animation planning sweep, 2026-11-28.
+- **A change to how stored data composes states what previously saved files now do** — `judgment`
+  Becomes a `test` once an evaluator exists. *Catches:* a semantics change with no data migration to prompt anyone — nothing in the file differs, so nothing flags it. Currently cheap because nothing has shipped; the entry exists for when that stops being true.
+  Seeded at the animation planning sweep, 2026-11-28.
 
 ### Writing to disk
 
@@ -151,6 +166,9 @@ sweep.
 - **Every node kind carries a containment declaration and a constitutive-or-incidental declaration for each reference it holds; a kind missing either fails the check** — `judgment`
   → `script` over the format definition. This is what keeps *a physics node contains only physics* a row in a table rather than a special case, and what makes the next kind arrive with a stated answer.
   Seeded at planning, 2026-11-27, on the physics-and-track revision.
+- **A new reference kind declares whether it is constitutive or incidental, and the deletion report names every record a cascade removes** — `script` over the format definition
+  Extends the declaration check above from node kinds to every reference kind. *Catches:* an animation deleted leaving a trigger that names nothing.
+  Seeded at the animation planning sweep, 2026-11-28.
 - **The derived mirror axes are computed from drawn geometry alone** — `judgment`
   → `test`: change a physics node's local offset and assert both derived axes are unchanged. Physics has an offset and draws nothing, so it is the first kind that could wrongly move them.
   Seeded at planning, 2026-11-27, on the physics-and-track revision.
