@@ -41,6 +41,7 @@ mod counting;
 #[global_allocator]
 static ALLOCATOR: counting::Counting = counting::Counting;
 
+mod animation_shape;
 mod canonical;
 mod execution;
 mod extensions;

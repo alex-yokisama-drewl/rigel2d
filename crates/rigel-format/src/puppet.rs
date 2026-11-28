@@ -163,9 +163,17 @@ pub struct PreservedMembers {
     /// decimal — which of the two is never in doubt, because the shape at each
     /// step is one the core format defines.
     ///
-    /// Only two arrays here are addressed by position, `axes` and `keyframes`,
-    /// and both are positional in the format already. Everything else a puppet
-    /// holds carries an identifier and is addressed by [`PreservedMembers::owner`].
+    /// The arrays addressed by position are the ones the format itself stores
+    /// positionally: `axes`, `keyframes` and a keyframe's `control_points`, a
+    /// binding's `values`, and an animation's `triggers` — a trigger carries no
+    /// identifier, deliberately. Everything else a puppet holds carries an
+    /// identifier and is addressed by [`PreservedMembers::owner`].
+    ///
+    /// **A positional path is what the canonical writer has to move.** Two of
+    /// these collections are reordered on save — a parameter's keypoints, which
+    /// permute a binding's `values`, and an animation's `triggers` — and
+    /// `save`'s `repath` is what carries the preserved material across with
+    /// them.
     pub path: Vec<String>,
     /// `(name, the value's canonical JSON text)`, ordered by name. The text is
     /// never reparsed through our own number formatter, because values we by
@@ -438,6 +446,32 @@ pub struct Parameter {
     /// Ordered by position, within the declared range, with exactly one neutral
     /// (`VAL-4`, `VAL-15`).
     pub keypoints: Vec<Keypoint>,
+    /// The rigger's presentation order, which is **not** the order of the
+    /// collection: `parameters` stays in identifier order like every other
+    /// collection, or a canonical sort would erase the arrangement and a
+    /// position would start deciding something ([I3](../../../docs/invariants.md),
+    /// `ORD-1`).
+    ///
+    /// Equal and absent values are both legal, ties break by identifier, and a
+    /// parameter without one sorts after those with one — so a third-party file
+    /// presents in a defined order (`docs/format.md`, *Canonical
+    /// serialisation*).
+    ///
+    /// Presentation only: nothing resolves through it and it changes nothing
+    /// the puppet evaluates to.
+    pub order: Option<i64>,
+    /// Whether Live offers this parameter as a mapping target.
+    ///
+    /// **Absent when true**, so absent means *offered*, which is the direction
+    /// that fails safely: an older or third-party puppet hides nothing
+    /// (`docs/format.md`, *Canonical serialisation*).
+    ///
+    /// **Not a validation rule** (`MAP-1`). A reader finding it disagreeing
+    /// with the puppet's channel mappings does not refuse the file: the
+    /// effective value is this flag **or** the presence of a mapping, and the
+    /// derived `true` is never written back (`MAP-2`, `MAP-3`). It is never
+    /// inferred from whether a track drives the parameter (`MAP-4`).
+    pub mappable: bool,
 }
 
 /// One dimension of a parameter.
@@ -563,6 +597,66 @@ pub struct Animation {
     /// At most one track per parameter (`VAL-27`). A list rather than a map
     /// keyed by parameter, so the duplicate is expressible and can be rejected.
     pub tracks: Vec<Track>,
+    /// What happens at the animation's last keyframe.
+    ///
+    /// **Always written**, because `docs/format.md` states no default for it
+    /// and a field with no stated default is always written. An animation
+    /// declaring none has nothing to fall back on and is invalid — it is not
+    /// optional here, and a file that omits it is refused at decode rather than
+    /// given a value nobody chose.
+    pub end_behaviour: EndBehaviour,
+    /// The scene events this animation waits for.
+    ///
+    /// Canonically ordered by event name, and one animation naming one event
+    /// twice is invalid (`docs/format.md`, *A trigger*). Empty is the ordinary
+    /// case and is absent in the stored form.
+    pub triggers: Vec<Trigger>,
+}
+
+/// What an animation does at its last keyframe.
+///
+/// **Not a type field**: looping is not a different kind of animation, it is
+/// one of the answers to the question of what happens at the end (`END-4`,
+/// `docs/format.md`, *How an animation ends*).
+///
+/// **Open**, per *An unfamiliar value in a field this build knows* — see
+/// [`AxisPolarity::Unfamiliar`] for what that variant means and when it is
+/// legal. An animation whose end behaviour is unfamiliar **never starts**:
+/// treating it as loop, hold or release is the guess the rule forbids.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum EndBehaviour {
+    /// Restarts at the last keyframe.
+    Loop,
+    /// Keeps contributing its final values until stopped.
+    Hold,
+    /// Stops contributing, blending out over each track's own
+    /// [`Track::blend_duration`].
+    Release,
+    /// A behaviour this build has never heard of, carrying the token verbatim.
+    Unfamiliar(String),
+}
+
+/// One scene event an animation waits for.
+///
+/// It carries **one thing**: the name of the event. No target, because the
+/// animation that owns it is the target; no command, because the command is
+/// always *start*; no condition, delay or expression, because a trigger that
+/// had one would turn a puppet into a program
+/// ([I1](../../../docs/invariants.md), `LOST-4`). A field beyond the event name
+/// is unmarked data like any other.
+///
+/// **No identifier, deliberately**: nothing refers to a trigger, so an
+/// identifier would be a value nothing resolves and
+/// [I3](../../../docs/invariants.md) would bind for no purpose.
+///
+/// The name is outward, like a channel's — the set of names is open at every
+/// version, so a name this build does not recognise never fires and is **never
+/// a validation failure** (`LOST-3`). It is not an enumerated field and has no
+/// unfamiliar-value question.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Trigger {
+    /// The scene event this trigger waits for.
+    pub event: String,
 }
 
 /// The part of an animation that drives exactly one parameter.
@@ -579,10 +673,82 @@ pub struct Track {
 }
 
 /// One authored value of a track at one time.
+///
+/// A keyframe stores an **absolute** value, the way a keypoint does, and never
+/// a contribution (`docs/format.md`, *An animation and its tracks*).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyframe {
     pub time: f64,
     /// One coordinate per axis of the parameter.
+    pub value: Vec<f64>,
+    /// How the segment **this keyframe opens** interpolates — the segment
+    /// between it and the next keyframe.
+    ///
+    /// The mode belongs to a segment, not to a track, and it is stored on the
+    /// **earlier** keyframe of its segment. A track's **last** keyframe opens
+    /// no segment and carries none: a mode there names a segment that does not
+    /// exist and is invalid. [`Interpolation::Linear`] is the absent form, so
+    /// an all-linear track stores no mode anywhere (`INTERP-2`,
+    /// `docs/format.md`, *How a segment interpolates*).
+    pub interpolation: Interpolation,
+    /// The two control points of a [`Interpolation::Bezier`] segment, on the
+    /// keyframe that opens it.
+    ///
+    /// Shaped like keyframes, so a control point's arity follows the
+    /// parameter's axes the way a keyframe's does. `None` on every other mode;
+    /// `None` **with** `Bezier` is a defect, because the cubic has no control
+    /// points to pass through.
+    ///
+    /// Each control time lies in the **closed** interval of its segment and
+    /// each control value is finite, which the validator checks because Cubism
+    /// guarantees it and a stranger’s writer need not. The endpoints count:
+    /// a control point coincident with a keyframe is the only way to express
+    /// the degenerate curve `INTERP-5` sweeps, and `docs/format.md` does not
+    /// settle the endpoints either way.
+    pub control_points: Option<[ControlPoint; 2]>,
+}
+
+/// How one segment of a track interpolates.
+///
+/// Cubism’s own modes, because importing animation that already exists is a
+/// case this project serves. **Per segment, not per track**, because the corpus
+/// mixes modes within one track and a format that cannot say so cannot import
+/// one.
+///
+/// **Open**, per *An unfamiliar value in a field this build knows* — see
+/// [`AxisPolarity::Unfamiliar`]. Where the mode is unfamiliar the **whole
+/// track** contributes nothing, not the segment alone: a track contributing
+/// across part of its timeline and vanishing across the rest pops at the
+/// boundary, which looks like a bug rather than a missing feature.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub enum Interpolation {
+    /// A straight line between the two keyframes. **The absent form** — a
+    /// segment storing nothing interpolates linearly, and the writer stores
+    /// nothing for it.
+    #[default]
+    Linear,
+    /// Holds the earlier value until the later keyframe.
+    Stepped,
+    /// Takes the later value immediately.
+    InverseStepped,
+    /// A cubic through [`Keyframe::control_points`].
+    Bezier,
+    /// A mode this build has never heard of, carrying the token verbatim.
+    ///
+    /// **Invalid at [`crate::FormatVersion::CURRENT`]** and loadable in a file
+    /// declaring a later minor version, on the same gate every enumerated field
+    /// carries.
+    Unfamiliar(String),
+}
+
+/// One control point of a Bézier segment.
+///
+/// A time and a value per axis — a keyframe’s shape, so that a reader meets
+/// one shape rather than two.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ControlPoint {
+    pub time: f64,
+    /// One coordinate per axis of the parameter, like a keyframe’s.
     pub value: Vec<f64>,
 }
 
@@ -743,6 +909,8 @@ mod tests {
                 },
             ],
             parameters: vec![Parameter {
+                order: None,
+                mappable: true,
                 id: Id(8),
                 name: "parameter".to_owned(),
                 axes: vec![Axis {
@@ -764,6 +932,8 @@ mod tests {
                 stale: false,
             }],
             animations: vec![Animation {
+                end_behaviour: crate::puppet::EndBehaviour::Loop,
+                triggers: Vec::new(),
                 id: Id(11),
                 name: "animation".to_owned(),
                 tracks: vec![Track {
@@ -771,6 +941,8 @@ mod tests {
                     parameter: Id(8),
                     blend_duration: 0.0,
                     keyframes: vec![Keyframe {
+                        interpolation: crate::puppet::Interpolation::Linear,
+                        control_points: None,
                         time: 0.0,
                         value: vec![0.0],
                     }],

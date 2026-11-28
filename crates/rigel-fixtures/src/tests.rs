@@ -541,6 +541,16 @@ fn the_unmarked_material_is_byte_identical_across_the_version_gate() {
             "rigged:future-minor-polarity-unfamiliar",
             "\"polarity\":\"radial\"",
         ),
+        (
+            "rigged:interpolation-value-unfamiliar",
+            "rigged:future-minor-interpolation-unfamiliar",
+            "\"interpolation\":\"ease_elastic\"",
+        ),
+        (
+            "rigged:end-behaviour-value-unfamiliar",
+            "rigged:future-minor-end-behaviour-unfamiliar",
+            "\"end_behaviour\":\"ping_pong\"",
+        ),
     ] {
         let pick = |name: &str| {
             let bytes = entry(&fixture(name).bytes, "puppet.json").unwrap();
@@ -613,4 +623,657 @@ fn the_payloads_are_cropped_to_the_crop_rectangle() {
         };
         assert_eq!((width, height), expected, "texture {id} is not cropped");
     }
+}
+
+// ---------------- the animation shape: modes, endings, triggers and order
+
+/// Every track of every animation in a fixture, with its parent animation.
+fn tracks_of(puppet: &Value) -> Vec<(&Value, &Value)> {
+    puppet
+        .get("animations")
+        .and_then(Value::as_array)
+        .map(|animations| {
+            animations
+                .iter()
+                .flat_map(|animation| {
+                    animation["tracks"]
+                        .as_array()
+                        .expect("an animation has tracks")
+                        .iter()
+                        .map(move |track| (animation, track))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn rigged_carries_the_end_behaviour_and_no_other_field_of_the_animation_round() {
+    // `rigged` is the control every variant below is read against. Only
+    // `end_behaviour` is always written; the rest are absent in their default
+    // form, and a `rigged` that quietly acquired one would make
+    // INTERP-2, ORD-1 and MAP-1 test nothing.
+    let puppet = &parsed("rigged");
+    let animations = array(puppet, "animations");
+    for animation in animations {
+        assert_eq!(
+            animation["end_behaviour"].as_str(),
+            Some(END_LOOP),
+            "an animation carries no end behaviour"
+        );
+        assert!(
+            animation.get("triggers").is_none(),
+            "rigged carries a trigger"
+        );
+    }
+    for (_, track) in tracks_of(puppet) {
+        for keyframe in track["keyframes"].as_array().unwrap() {
+            assert!(
+                keyframe.get("interpolation").is_none(),
+                "rigged stores an interpolation mode, but every segment in it is linear"
+            );
+            assert!(keyframe.get("control_points").is_none());
+        }
+    }
+    for parameter in array(puppet, "parameters") {
+        assert!(parameter.get("order").is_none(), "rigged stores an order");
+        assert!(
+            parameter.get("mappable").is_none(),
+            "rigged stores `mappable`, which is absent when true"
+        );
+    }
+}
+
+#[test]
+fn the_mixed_interpolation_fixture_carries_one_segment_per_mode() {
+    let puppet = &parsed("rigged:mixed-interpolation");
+    let mut modes: Vec<Option<&str>> = Vec::new();
+    let mut all_linear_track_seen = false;
+    for (_, track) in tracks_of(puppet) {
+        let keyframes = track["keyframes"].as_array().unwrap();
+        // The last keyframe opens no segment, so it carries no mode.
+        assert!(
+            keyframes.last().unwrap().get("interpolation").is_none(),
+            "a track's last keyframe carries a mode"
+        );
+        if track["id"].as_u64() == Some(TR_HEAD) {
+            modes = keyframes
+                .iter()
+                .map(|k| k.get("interpolation").and_then(Value::as_str))
+                .collect();
+        } else if keyframes.iter().all(|k| k.get("interpolation").is_none()) {
+            all_linear_track_seen = true;
+        }
+    }
+    assert_eq!(
+        modes,
+        vec![
+            Some(INTERP_STEPPED),
+            Some(INTERP_INVERSE_STEPPED),
+            None, // linear is the absent form
+            Some(INTERP_BEZIER),
+            Some(INTERP_BEZIER),
+            None, // the last keyframe
+        ]
+    );
+    assert!(
+        all_linear_track_seen,
+        "the fixture carries no all-linear track, so INTERP-2's other half is untested"
+    );
+
+    // The expectations ride as extension data, because outside `x` they would
+    // be unmarked core data and invalid.
+    let animation = array(puppet, "animations")
+        .iter()
+        .find(|a| a["id"].as_u64() == Some(A_IDLE))
+        .unwrap();
+    let expectations = &animation["x"]["com.rigel2d.fixture-expectations"];
+    assert_eq!(expectations["version"], "1.0");
+    assert_eq!(expectations["data"]["track"].as_u64(), Some(TR_HEAD));
+    let samples = expectations["data"]["samples"].as_array().unwrap();
+    assert_eq!(samples.len(), 6);
+    // Every sample time lies inside the track's extent, or it is an expectation
+    // about nothing.
+    let keyframes: Vec<f64> = array(puppet, "animations")
+        .iter()
+        .flat_map(|a| a["tracks"].as_array().unwrap())
+        .find(|t| t["id"].as_u64() == Some(TR_HEAD))
+        .unwrap()["keyframes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k["time"].as_f64().unwrap())
+        .collect();
+    let (first, last) = (keyframes[0], *keyframes.last().unwrap());
+    for sample in samples {
+        let time = sample["time"].as_f64().unwrap();
+        assert!(
+            (first..=last).contains(&time),
+            "the expectation at {time} is outside the track"
+        );
+        assert!(sample["value"].as_f64().unwrap().is_finite());
+    }
+}
+
+#[test]
+fn every_bezier_segment_in_an_accepted_fixture_is_well_formed() {
+    // docs/format.md: a Bézier segment's control times lie inside the segment
+    // and every control value is finite. The defect fixtures break exactly one
+    // of those; an *accepted* fixture that broke one would be rejected for a
+    // reason its catalogue note does not name, and nothing else would notice.
+    for fixture in corpus() {
+        if fixture.expect != Expect::Accepted {
+            continue;
+        }
+        let Some(puppet) = puppet_json(&fixture.bytes) else {
+            continue;
+        };
+        for (_, track) in tracks_of(&puppet) {
+            let keyframes = track["keyframes"].as_array().unwrap();
+            for (index, keyframe) in keyframes.iter().enumerate() {
+                if keyframe.get("interpolation").and_then(Value::as_str) != Some(INTERP_BEZIER) {
+                    continue;
+                }
+                let start = keyframe["time"].as_f64().unwrap();
+                let end = keyframes[index + 1]["time"].as_f64().unwrap();
+                let controls = keyframe["control_points"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("{} has a Bézier with no controls", fixture.name));
+                assert_eq!(controls.len(), 2, "{} is not a cubic", fixture.name);
+                for control in controls {
+                    let time = control["time"].as_f64().unwrap();
+                    assert!(
+                        (start..=end).contains(&time),
+                        "{}: a control time {time} is outside [{start}, {end}]",
+                        fixture.name
+                    );
+                    for value in control["value"].as_array().unwrap() {
+                        assert!(
+                            value.as_f64().is_some_and(f64::is_finite),
+                            "{}: a control value is not finite",
+                            fixture.name
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_endings_fixture_carries_one_animation_per_end_behaviour() {
+    let puppet = &parsed("rigged:endings");
+    let behaviours: BTreeSet<&str> = array(puppet, "animations")
+        .iter()
+        .map(|a| a["end_behaviour"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        behaviours,
+        [END_HOLD, END_LOOP, END_RELEASE]
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+    );
+    // "each with a known last keyframe, duration and blend"
+    for (_, track) in tracks_of(puppet) {
+        assert!(track["blend_duration"].as_f64().is_some_and(f64::is_finite));
+        assert!(track["keyframes"].as_array().unwrap().len() >= 2);
+    }
+    // The releasing animation blends out at two different rates, which is the
+    // half of END-3 that only a fixture can carry.
+    let releasing = array(puppet, "animations")
+        .iter()
+        .find(|a| a["end_behaviour"] == END_RELEASE)
+        .unwrap();
+    let rates: BTreeSet<String> = releasing["tracks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["blend_duration"].to_string())
+        .collect();
+    assert_eq!(
+        rates.len(),
+        2,
+        "the releasing tracks share a blend duration"
+    );
+}
+
+#[test]
+fn a_trigger_carries_an_event_name_and_nothing_else() {
+    // docs/format.md: no identifier, no target, no command. The rejected
+    // fixture is the one place a trigger carries more, and it is named for it.
+    //
+    // `x` is the one further key a trigger may carry, because `x` is permitted
+    // on any object and the material under it is inert by construction. It is
+    // also the one key that must not be reached for to widen this rule: a
+    // trigger growing a condition or a target is what the assertion exists to
+    // catch, so `x` is admitted only on the fixture named for carrying it.
+    for fixture in corpus() {
+        let Some(puppet) = puppet_json(&fixture.bytes) else {
+            continue;
+        };
+        let Some(animations) = puppet.get("animations").and_then(Value::as_array) else {
+            continue;
+        };
+        for animation in animations {
+            let Some(triggers) = animation.get("triggers").and_then(Value::as_array) else {
+                continue;
+            };
+            for trigger in triggers {
+                let keys: Vec<&str> = trigger
+                    .as_object()
+                    .unwrap()
+                    .keys()
+                    .map(String::as_str)
+                    .collect();
+                if fixture.name == "rigged:trigger-extra-field" {
+                    assert!(keys.len() > 1, "the extra-field fixture carries no extra");
+                    continue;
+                }
+                let marked = fixture.name == "rigged:ext-on-trigger" && keys == ["event", "x"];
+                assert!(
+                    keys == ["event"] || marked,
+                    "{} carries a trigger with more than an event name: {keys:?}",
+                    fixture.name
+                );
+                assert!(trigger["event"].is_string());
+            }
+        }
+    }
+}
+
+#[test]
+fn the_triggered_fixture_carries_a_raised_a_lost_and_an_unraised_event() {
+    let puppet = &parsed("rigged:triggered");
+    let events: Vec<&str> = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("triggers"))
+        .flat_map(|t| t.as_array().unwrap())
+        .map(|t| t["event"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        events,
+        vec![EVENT_ON_LOAD, "plugin_ribbon_snapped", EVENT_SOURCE_LOST]
+    );
+    // Canonically, triggers are ordered by event name.
+    let mut sorted = events.clone();
+    sorted.sort_unstable();
+    assert_eq!(sorted, events, "the triggers are not in canonical order");
+    // And `rigged:triggers-unsorted` is the fixture that is deliberately not.
+    let unsorted = &parsed("rigged:triggers-unsorted");
+    let events: Vec<&str> = array(unsorted, "animations")
+        .iter()
+        .filter_map(|a| a.get("triggers"))
+        .flat_map(|t| t.as_array().unwrap())
+        .map(|t| t["event"].as_str().unwrap())
+        .collect();
+    let mut sorted = events.clone();
+    sorted.sort_unstable();
+    assert_ne!(sorted, events, "the unsorted fixture is in canonical order");
+}
+
+#[test]
+fn the_ordered_parameters_fixture_presents_unlike_identifier_order() {
+    let puppet = &parsed("rigged:ordered-parameters");
+    let parameters = array(puppet, "parameters");
+    // The collection itself stays in identifier order — the arrangement is a
+    // field, never the order of the collection (I3).
+    let ids: Vec<u64> = parameters
+        .iter()
+        .map(|p| p["id"].as_u64().unwrap())
+        .collect();
+    let mut sorted = ids.clone();
+    sorted.sort_unstable();
+    assert_eq!(ids, sorted, "`parameters` is not in identifier order");
+
+    // The stored order differs from it, or the fixture tests nothing. Absent
+    // sorts last, ties break by identifier.
+    let mut presented: Vec<(Option<i64>, u64)> = parameters
+        .iter()
+        .map(|p| {
+            (
+                p.get("order").and_then(Value::as_i64),
+                p["id"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    presented.sort_by_key(|(order, id)| (order.is_none(), *order, *id));
+    let presented_ids: Vec<u64> = presented.into_iter().map(|(_, id)| id).collect();
+    assert_ne!(
+        presented_ids, ids,
+        "the rigger's order is identifier order, so ORD-1 asserts nothing"
+    );
+    assert!(
+        parameters.iter().any(|p| p.get("order").is_none()),
+        "no parameter carries no order, so the absent case is untested"
+    );
+
+    // One parameter not mappable and fed by a channel mapping (MAP-2, MAP-3),
+    // and one not mappable and fed by nothing (MAP-1).
+    let mapped: BTreeSet<u64> = array(puppet, "channel_mappings")
+        .iter()
+        .map(|m| m["parameter"].as_u64().unwrap())
+        .collect();
+    let hidden: Vec<u64> = parameters
+        .iter()
+        .filter(|p| p.get("mappable") == Some(&Value::Bool(false)))
+        .map(|p| p["id"].as_u64().unwrap())
+        .collect();
+    assert!(hidden.iter().any(|id| mapped.contains(id)));
+    assert!(hidden.iter().any(|id| !mapped.contains(id)));
+
+    // And the mapped one is animated too, which is MAP-4's "both mapped and
+    // animated keeps the flag it was given".
+    let animated: BTreeSet<u64> = tracks_of(puppet)
+        .iter()
+        .map(|(_, t)| t["parameter"].as_u64().unwrap())
+        .collect();
+    assert!(
+        hidden
+            .iter()
+            .any(|id| mapped.contains(id) && animated.contains(id))
+    );
+}
+
+#[test]
+fn the_trigger_limit_fixture_is_one_over_the_declared_figure() {
+    let puppet = &parsed("rigged:triggers-over-limit");
+    let longest = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("triggers").and_then(Value::as_array))
+        .map(Vec::len)
+        .max()
+        .expect("the fixture carries triggers");
+    assert_eq!(
+        longest,
+        PROVISIONAL_TRIGGERS_PER_ANIMATION + 1,
+        "the just-over fixture is not just over"
+    );
+    // Distinct names, or it would be refused as a duplicate event instead.
+    let events: BTreeSet<&str> = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("triggers").and_then(Value::as_array))
+        .flatten()
+        .map(|t| t["event"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        events.len(),
+        longest,
+        "the fixture also duplicates an event"
+    );
+}
+
+/// The coordinate-list fixture is one over its figure, and clear of every
+/// neighbouring limit — the per-track and aggregate keyframe counts above all,
+/// since it is a keyframe it lengthens.
+#[test]
+fn the_coordinate_limit_fixture_is_one_over_the_declared_figure() {
+    let puppet = &parsed("rigged:coordinates-over-limit");
+    let lists: Vec<usize> = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("tracks").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|t| t.get("keyframes").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|k| k.get("value").and_then(Value::as_array))
+        .map(Vec::len)
+        .collect();
+    assert_eq!(
+        lists.iter().copied().max(),
+        Some(PROVISIONAL_COORDINATE_COUNT + 1),
+        "the just-over fixture is not just over"
+    );
+    assert_eq!(
+        lists.iter().filter(|held| **held > 2).count(),
+        1,
+        "exactly one coordinate list is over, so the fixture names one defect"
+    );
+    // A keyframe is what it lengthens, so both keyframe counts have to stay
+    // far inside their own limits or the fixture is refused for the wrong
+    // rule — the mistake that cost `rigged:keyframes-over-aggregate` two
+    // rounds.
+    let per_track: Vec<usize> = array(puppet, "animations")
+        .iter()
+        .filter_map(|a| a.get("tracks").and_then(Value::as_array))
+        .flatten()
+        .filter_map(|t| t.get("keyframes").and_then(Value::as_array))
+        .map(Vec::len)
+        .collect();
+    let longest = per_track.iter().copied().max().unwrap_or_default();
+    let total: usize = per_track.iter().sum();
+    assert!(
+        longest < KEYFRAMES_PER_TRACK,
+        "a track carries {longest} keyframes and the fixture would be refused per track"
+    );
+    assert!(
+        total < AGGREGATE_KEYFRAME_LIMIT,
+        "the fixture carries {total} keyframes and would be refused for the aggregate"
+    );
+}
+
+/// A keyframe carrying control points on a segment that is **not** Bézier is
+/// still refused for a non-finite control value.
+///
+/// The fixture exists because the check was gated on the mode while the reader
+/// reads `control_points` whatever the mode says, so the number reached a
+/// writer with no way to spell it. This holds the fixture to the shape that
+/// makes it that defect and no other.
+///
+/// Asserted over the **text**, because the fixture's whole point is a number
+/// `serde_json` refuses to parse — the same reason
+/// `rigged:positive-infinity` carries one.
+#[test]
+fn the_non_bezier_control_value_fixture_declares_no_mode() {
+    let bytes = entry(
+        &fixture("rigged:control-value-nonfinite-without-bezier").bytes,
+        "puppet.json",
+    )
+    .expect("the fixture carries a puppet.json");
+    let text = String::from_utf8(bytes).expect("UTF-8");
+    assert_eq!(
+        text.matches("control_points").count(),
+        1,
+        "one keyframe carries control points, so the fixture names one defect"
+    );
+    assert!(
+        text.contains("1e400"),
+        "the overflowing control value is gone, so the fixture tests nothing"
+    );
+    assert!(
+        !text.contains("interpolation"),
+        "a mode is declared somewhere, so the defect is not the one the name says"
+    );
+}
+
+#[test]
+fn the_aggregate_keyframe_fixture_is_one_over_and_clear_of_every_neighbouring_limit() {
+    // The fixture that took three attempts. Two earlier figures for this limit
+    // could never fire, because a file just over either was refused by the
+    // payload limit or by the parse-tree limit first — and a fixture refused
+    // for a rule its catalogue note does not name tests the wrong thing while
+    // looking green. So this asserts both halves: that it is exactly one over
+    // the aggregate, and that nothing else is anywhere near firing.
+    let fixture = fixture("rigged:keyframes-over-aggregate");
+    let text = entry(&fixture.bytes, "puppet.json").expect("the fixture carries a puppet.json");
+    let puppet: Value = serde_json::from_slice(&text).expect("it parses");
+
+    let per_track: Vec<usize> = array(&puppet, "animations")
+        .iter()
+        .flat_map(|a| a["tracks"].as_array().unwrap())
+        .map(|t| t["keyframes"].as_array().unwrap().len())
+        .collect();
+
+    assert_eq!(
+        per_track.iter().sum::<usize>(),
+        AGGREGATE_KEYFRAME_LIMIT + 1,
+        "the just-over fixture is not just over"
+    );
+
+    // Every neighbouring count, with room to spare. `docs/format.md` *Load
+    // limits* carries the ceilings these are read against.
+    assert!(
+        *per_track.iter().max().unwrap() <= KEYFRAMES_PER_TRACK / 2,
+        "a track is close enough to the per-track limit that an inclusive \
+         reading of it would refuse this fixture first"
+    );
+    assert!(
+        array(&puppet, "animations").len() * 8 <= 128,
+        "too many animations"
+    );
+    assert!(
+        array(&puppet, "parameters").len() <= 600,
+        "too many parameters"
+    );
+    for animation in array(&puppet, "animations") {
+        assert!(animation["tracks"].as_array().unwrap().len() <= 600);
+        // An animation carries at most one track per parameter.
+        let driven: BTreeSet<u64> = animation["tracks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["parameter"].as_u64().unwrap())
+            .collect();
+        assert_eq!(
+            driven.len(),
+            animation["tracks"].as_array().unwrap().len(),
+            "an animation carries two tracks for one parameter"
+        );
+    }
+
+    // The payload text, against `DecompressedPayloadBytes` at 64 MiB. The
+    // parse tree is what actually binds and cannot be measured from here
+    // without the reader — `docs/format.md` carries that arithmetic — but the
+    // text is the half this crate can hold itself to.
+    assert!(
+        text.len() * 4 < 64 * 1024 * 1024,
+        "the payload is within a factor of four of its limit, which is less \
+         margin than this fixture was built with"
+    );
+
+    // And it stays committable.
+    assert!(
+        fixture.bytes.len() < 2 * 1024 * 1024,
+        "the committed fixture has grown past two megabytes"
+    );
+}
+
+/// Each fixture hanging marked extension data on one entity of the animation
+/// shape is its base fixture plus exactly that, and nothing else.
+///
+/// The assertion is differential: reach the entity the fixture is named for,
+/// take the `x` block off it, require that block to hold the one namespace and
+/// to be marked — a namespace key, a declared version and a human-readable
+/// name — and then require what is left to equal the base fixture's document.
+/// Without the differential half, a variant that quietly changed a second
+/// thing would exercise a shape nobody described, and the acceptance test
+/// driven off the catalogue would still pass.
+#[test]
+fn the_marked_material_fixtures_are_their_base_plus_one_namespace() {
+    fn by_id(items: &mut Value, id: u64) -> &mut Value {
+        items
+            .as_array_mut()
+            .expect("a collection")
+            .iter_mut()
+            .find(|item| item["id"].as_u64() == Some(id))
+            .unwrap_or_else(|| panic!("no entity {id}"))
+    }
+
+    type Reach = fn(&mut Value) -> &mut Value;
+    let on_trigger: Reach = |doc| &mut by_id(&mut doc["animations"], A_IDLE)["triggers"][1];
+    let on_keyframe: Reach = |doc| {
+        &mut by_id(
+            &mut by_id(&mut doc["animations"], A_IDLE)["tracks"],
+            TR_HEAD,
+        )["keyframes"][0]
+    };
+    let on_control_point: Reach = |doc| {
+        &mut by_id(
+            &mut by_id(&mut doc["animations"], A_IDLE)["tracks"],
+            TR_HEAD,
+        )["keyframes"][3]["control_points"][0]
+    };
+    let on_parameter: Reach = |doc| by_id(&mut doc["parameters"], P_HEAD_TURN);
+
+    for (name, base, reach, what) in [
+        (
+            "rigged:ext-on-trigger",
+            "rigged:triggered",
+            on_trigger,
+            "a trigger",
+        ),
+        (
+            "rigged:ext-on-keyframe",
+            "rigged:mixed-interpolation",
+            on_keyframe,
+            "a keyframe",
+        ),
+        (
+            "rigged:ext-on-control-point",
+            "rigged:mixed-interpolation",
+            on_control_point,
+            "a control point",
+        ),
+        (
+            "rigged:ext-on-parameter",
+            "rigged:ordered-parameters",
+            on_parameter,
+            "a parameter",
+        ),
+    ] {
+        let mut doc = parsed(name);
+        let entity = reach(&mut doc);
+        let block = entity
+            .as_object_mut()
+            .expect("an object")
+            .remove("x")
+            .unwrap_or_else(|| panic!("{name} carries no marked material on {what}"));
+        let block = block.as_object().expect("`x` is an object");
+        assert_eq!(
+            block.keys().map(String::as_str).collect::<Vec<&str>>(),
+            vec!["com.alt.notes"],
+            "{name} carries more than the one namespace on {what}"
+        );
+        let entry = &block["com.alt.notes"];
+        for part in ["version", "name", "data"] {
+            assert!(
+                entry.get(part).is_some(),
+                "{name}: the material on {what} declares no {part}, so it is not marked"
+            );
+        }
+        assert_eq!(
+            doc,
+            parsed(base),
+            "{name} differs from {base} in more than the marked material on {what}"
+        );
+    }
+}
+
+/// The entity each of those fixtures is named for is the one a reader reaches
+/// by position, or by a field this build also reads — which is what makes them
+/// worth having beyond the animation `rigged:mixed-interpolation` already
+/// carries material on.
+#[test]
+fn the_marked_material_sits_beside_what_the_build_reads() {
+    let keyframe = &parsed("rigged:ext-on-keyframe")["animations"][0]["tracks"];
+    let keyframe = &keyframe
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["id"].as_u64() == Some(TR_HEAD))
+        .expect("the head track")["keyframes"][0];
+    assert!(
+        keyframe.get("interpolation").is_some(),
+        "the annotated keyframe opens no segment, so the material sits beside no core field"
+    );
+
+    let parameter = parsed("rigged:ext-on-parameter")["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"].as_u64() == Some(P_HEAD_TURN))
+        .expect("the head-turn parameter")
+        .clone();
+    assert!(
+        parameter.get("order").is_some(),
+        "the annotated parameter carries no order, so a reordering would disturb nothing"
+    );
 }

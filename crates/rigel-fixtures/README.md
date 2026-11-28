@@ -53,11 +53,35 @@ parser rather than from the finiteness rule, so it cannot name an offending iden
 `VAL-12` asks. `rigged:positive-infinity` and `rigged:negative-infinity` use `1e400`, which is
 strict JSON and overflows on parse, so those two can.
 
-## The load limits are not here
+## `rigged` is the control fixture
 
-`rigged:near-limit` sits one node under `PROVISIONAL_NODE_LIMIT`, a figure this builder invented.
-`LIM-4` ties every load limit to four times the corresponding `stress` workload dimension, and
-that workload is S3's. The just-over fixture per declared limit that `LIM-1`, `LIM-2` and `LIM-7`
-want is therefore deferred: the limits do not exist yet, and a fixture built against a guessed
-figure would have to be rebuilt anyway. When the figures land, they go in one table here and the
-fixtures regenerate.
+Most criteria read a variant against `rigged` as a baseline: one defect, nothing else changed.
+**Adding a field to `rigged` silently disarms any criterion that compares against it**, because
+the baseline and the variant then differ by more than the defect, and nothing fails. A change to
+`rigged` is a change to every criterion that reads it, and wants that checked before it is made.
+
+## What the aggregate fixture costs
+
+`rigged:keyframes-over-aggregate` is large by necessity, since an aggregate limit can only be
+exceeded by building most of what it admits. Measured, it carries about 145 MB and about five
+seconds into every acceptance run, and the fixtures suite peaks near 900 MB. That is the price of
+the criterion and not a defect in it, but a machine with little memory will meet it here first.
+
+## The load limits
+
+**Most of them are no longer here.** S2 landed `crates/rigel-format/src/limits.rs`, which is the
+one place a load limit is declared, and it carries a figure for every kind. A fixture built here
+against a limit reads that figure rather than inventing one.
+
+The figures this crate still spells out for itself are the `PROVISIONAL_*` constants in
+`src/puppet.rs`, each carrying on its own doc comment why it is here and what pins it:
+
+- `PROVISIONAL_TRIGGERS_PER_ANIMATION` and `PROVISIONAL_COORDINATE_COUNT` are **in step** with
+  `limits.rs`. Each names a collection whose limit landed in S2b, each has its just-over fixture
+  — `rigged:triggers-over-limit`, `rigged:coordinates-over-limit` — and a unit test here pins the
+  fixture to the constant, so the constant and the row in `limits.rs` can only drift if both are
+  edited. `limits.rs` names the constant in its own note for the same reason.
+- `PROVISIONAL_NODE_LIMIT` is **stale**. It is 256; `limits.rs` sets `NodeCount` at 2160, so
+  `rigged:near-limit` is nowhere near the node limit and no longer tests what its name says.
+  Regenerating it means two thousand nodes in the committed corpus, which is a decision rather
+  than an edit. Reported in `docs/wip/s2b-animation-shape.md`'s handoff.

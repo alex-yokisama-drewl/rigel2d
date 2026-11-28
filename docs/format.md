@@ -191,14 +191,21 @@ whitespace, a fixed number format, UTF-8.
 
 **Ordering is part of the canonical form.** `nodes` is in depth-first preorder, and order among
 siblings is draw order — the one thing order is allowed to decide. Every other collection is
-ordered by identifier, keypoints by position along their axis and keyframes by time.
+ordered by identifier, with these exceptions: keypoints by position along their axis, keyframes
+by time, and an animation's triggers by event name, because a trigger has no identifier.
+
+**A segment's two control points are not in this list**, and the distinction matters: they are
+not *sorted* by anything. The pair is the handle leaving the earlier keyframe and the handle
+arriving at the later one, so their order is what each one **means** and a writer stores them as
+authored. Sorting them — by time, or by anything else — would silently exchange two different
+things.
 
 **A parameter's presentation order is a stored field, not the order of the collection.** The
 rigger arranges the parameters and Live presents them that way
 ([requirements/authoring.md](requirements/authoring.md)), but `parameters` stays in identifier
 order like every other collection — otherwise a canonical sort would erase the arrangement, and
-a position would start deciding something, which [I3](invariants.md) rules out. The field is an
-integer; equal and absent values are both legal, ties break by identifier, and a parameter
+a position would start deciding something, which [I3](invariants.md) rules out. The field is a signed
+integer, and a negative value is legal; equal and absent values are both legal, ties break by identifier, and a parameter
 without one sorts after those with one, so a third-party file presents in a defined order.
 
 **`mappable` is a boolean, absent when true.** Absent therefore means *offered*, which is the
@@ -414,10 +421,13 @@ position is the trap this project already has an entry for: inserting or deletin
 must carry each segment's mode — and any preserved material a build does not understand — with
 the right segment.
 
-**A Bézier segment's control times lie inside the segment, and every control value is finite.**
-Outside, the curve stops being a function of time: the solve has several roots and the iteration
-can leave the segment. Cubism guarantees this; a stranger's writer need not, so the validator
-checks it ([Validation](#validation-proposed)). How the curve is solved is in
+**A Bézier segment stores its control points on the segment's earlier keyframe, as
+`control_points`: two entries, each shaped like a keyframe (a time and a `value`).** Their times
+lie inside the segment, **endpoints included** — the closed interval, which is what makes the
+degenerate segment, with a control point on an endpoint, legal. Outside, the curve stops being a function of time: the solve has several
+roots and the iteration can leave the segment. Cubism guarantees this; a stranger's writer need
+not, so the validator checks it, along with every control value being finite
+([Validation](#validation-proposed)). How the curve is solved is in
 [evaluation.md](evaluation.md#a-tracks-value-at-a-time-proposed).
 
 ### How an animation ends **[proposed]**
@@ -434,7 +444,7 @@ breathing idle, a one-off emote and a state a puppet moves into and stays in.
 ### A trigger **[proposed]**
 
 **An animation carries a list of triggers, and a trigger carries one thing: the name of the scene
-event it waits for.** It names no target, because the animation that owns it is the target, and
+event it waits for, stored as `{"event": "<name>"}`.** It names no target, because the animation that owns it is the target, and
 no command, because the command is always *start*. *On load* and *source lost* are the
 events a use has been named for; the set of names is open, because a plugin may one day raise
 its own.
@@ -457,7 +467,8 @@ at run time, and a trigger has no field for any of them.
 it is reached only through the animation that owns it, and deleting that animation takes its
 triggers with it — so an identifier would be a value nothing resolves and
 [I3](invariants.md) would have to bind for no purpose. Canonically, an animation's triggers are
-ordered by event name, and **one animation naming one event twice is invalid**: the second says
+ordered by event name — established by the writer, like every other ordered collection, so a
+puppet assembled in memory saves canonically rather than depending on how it was read — and **one animation naming one event twice is invalid**: the second says
 nothing the first did not, and this format refuses meaningless duplication wherever a reader
 would have to decide what it meant.
 
@@ -538,8 +549,21 @@ rules it cannot:
 - **every parameter carrying at most one base driver** — a channel mapping, a physics output, or
   none. Two is the validation failure [evaluation.md](evaluation.md) relies on;
 - a track's keyframes ordered in time, with values within the parameter's range;
-- **a Bézier segment's control times inside the segment, and every control value finite.** The
-  reader checks it because Cubism guarantees it and a stranger's writer need not;
+- **a Bézier segment's control times inside the segment, endpoints included.** The reader checks it because Cubism
+  guarantees it and a stranger's writer need not. This rule is gated on the mode, deliberately: a
+  control time means nothing without a segment to lie inside;
+- **every control point's value finite, whatever mode its keyframe declares, and wherever the
+  keyframe sits in its track.** Stated apart from the rule above because it is **not** gated
+  on the mode, and a keyframe with no `interpolation` member, or last in its track, is checked
+  all the same. [security.md](concerns/security.md) carries what happened when it was folded
+  into the gated check;
+- **a Bézier segment declares its control points**, and a segment of any other mode may carry
+  them: the reader accepts them and the writer writes them back unchanged, since a stranger's
+  file or a rigger's mode change can leave them behind and dropping them would alter the file;
+- **an interpolation mode on a track's last keyframe is invalid**: it opens no segment, so it
+  names nothing;
+- **an animation declares its `end_behaviour`**; no default is stated, so an absence is invalid;
+- **one animation names one scene event once**, as [a trigger](#a-trigger-proposed) says;
 - binding value counts matching their mesh, or marked stale;
 - every number finite;
 - **the arity of a keypoint's coordinates and a keyframe's values against the parameter's axes —
@@ -578,20 +602,70 @@ one. A payload's bytes and the structure parsed out of them are therefore limite
 stops a hostile file and a budget describes what is tuned for
 ([requirements/puppet.md](requirements/puppet.md#a-limit-stops-a-hostile-file-a-budget-describes-what-is-tuned-for-decided)).
 `KeyframesPerTrack` is **65536**: one keyframe per frame is about eighteen minutes at 60 fps,
-where the earlier figure of 4096 is reached at 68 seconds, which the minute-plus animations
-this format must carry already exceed. **A total keyframe limit for the whole puppet is new**,
-at **16,777,216**. Per-track limits multiply — the animation, track and keyframe figures
-together permit billions of keyframes, bounded only by the parse-tree cap — so the
-aggregate is the one that decides whether a load can exhaust memory.
+which admits the minute-plus animations this format must carry.
+**A total keyframe limit for the whole puppet is new**,
+at **262,144**. Per-track limits multiply — the animation, track and keyframe figures together
+permit billions of keyframes — so an aggregate is needed, and this is the figure that decides
+whether a load can exhaust memory.
 
-The figure is set from memory rather than from authoring, and the arithmetic is stated so a
-reader can redo it: a keyframe costs on the order of **24 bytes** resident — a time, a value, a
-segment mode, and alignment — so the limit admits about 400 MB of keyframes. That is far beyond
-any authored puppet, survivable on the machine
-[platform.md](requirements/platform.md) names, and inside the whole-load memory limit alongside
-the payload and the textures. A puppet anywhere near it misses the frame budget long before it
-threatens the limit, which is the intended ordering: the budget is what a rig is tuned against,
-and the limit is only what stops a hostile file.
+**The figure is set by what a keyframe costs once parsed, not by what it costs resident**, and
+that distinction is the whole of why it is this small. Resident, a keyframe is on the order of
+**24 bytes** — a time, a value, a segment mode, and alignment. In the parse tree the reader
+**charges** on the order of **458 bytes** for one: an object and an array each charged twice their own size, two member
+names held once in order and once for duplicate detection, and every number kept as its own heap
+string, because preserving a stranger's numbers verbatim means never passing them through
+anybody's float formatter. By that charge the tree costs about **nineteen times** residency, and it
+is the tree that fills first.
+
+**The charge is an accounting estimate, not a measurement of live memory.** The live cost of a
+keyframe's tree measures nearer **556 bytes**, so the `ParseTreeBytes` budget under-counts what
+is really held by roughly a fifth. The 262,144 figure stands, because its margin below the
+ceiling still holds with the under-count; the point of stating it is that a reader retuning the
+charge should retune it toward the measurement.
+
+**Each ceiling below is in the unit it is enforced in, and the rows do not share one.** The
+payload ceiling counts text bytes; the parse-tree ceiling counts **charge**, which is an estimate
+of live memory and not a measurement of it. The parse-tree row was found by running files
+through the reader rather than by dividing. So a file at that ceiling holds nearer 326 MB live
+than the 256 MiB it is charged. Do not read the under-count above as an error in that row and
+revise it downward: the two are different quantities, and conflating them sets the aggregate
+figure wrong.
+
+**Three ceilings sit above any figure here, and only the lowest one matters.** A reader setting
+or revising this limit has to check it against all of them, not only the first: a figure set
+against one ceiling can sit above the next and never fire, and a file just over it is then
+refused for the wrong rule, so it cannot have the fixture
+[requirements/puppet-acceptance.md](requirements/puppet-acceptance.md)'s `LIM-1` requires of
+every declared limit. [decisions.md](decisions.md) carries the figures this lesson was learned on.
+
+| Ceiling | Unit | Admits, in keyframes | Moves with number spelling? |
+|---|---|---|---|
+| `DecompressedPayloadBytes`, 64 MiB | text bytes | about 2.9 million | **Yes** — barely half that at full double precision |
+| `ParseTreeBytes`, 256 MiB | charged | **about 586,000**, measured | No — structure is some 418 of the 458 bytes |
+| This limit | keyframes | 262,144 | No |
+
+**So the parse tree is the real constraint**, binding roughly five times tighter than the
+payload limit, and tighter than residency by about nineteen times in charge and about
+twenty-three by live cost. The figure sits below it with more than
+double the margin deliberately: the per-keyframe charge above is an estimate that may be retuned
+as the reader changes, and a limit set close under it would quietly stop firing when that
+happened, with every completeness check still green.
+
+**What it refuses is a workload nobody authors.** It admits a single track baked at one keyframe
+per frame for over an hour at 60 fps, or four tracks at the full `KeyframesPerTrack` figure,
+against a stress workload that carries some thirty thousand keyframes in all. What it turns away
+is one animation driving two hundred tracks at that density for the eighteen minutes
+`KeyframesPerTrack` permits, which [platform.md](requirements/platform.md) already names as the
+reason the stress workload carries one animation at extreme density and the rest at corpus
+density. The per-track and aggregate figures therefore disagree about what a single animation may
+hold, and **the aggregate wins**: it is the one bounding what is actually held.
+
+**`CoordinateCount` bounds a keypoint's `position`, a keyframe's `value` and a control point's
+`value`, at 1024, `Provisional`.** Its figure is chosen so as **not** to answer the keypoint and
+keyframe arity question [Validation](#validation-proposed) marks `[open]`: it sits three orders
+of magnitude clear of anything that question could decide, so it refuses only a file no arity
+rule would admit. It is not slack to be tightened toward the stress workload — tightening it
+would quietly assume an answer to the arity question.
 
 **Whether a texture has a limit on its pixel *area* is `[open]`.** Each side is capped, and
 nothing caps the product, so a texture at the maximum on both sides is a gigabyte of pixels once

@@ -313,6 +313,168 @@
       "note": "one parameter fed by a channel mapping and a physics output at once"
     },
     {
+      "expect": "accepted",
+      "file": "rigged.mixed-interpolation.rigel2d",
+      "name": "rigged:mixed-interpolation",
+      "note": "one track carrying every interpolation mode, a symmetric Bézier and a degenerate one, with the sample expectations committed as extension data"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.endings.rigel2d",
+      "name": "rigged:endings",
+      "note": "one animation per end behaviour, the releasing one blending out at two rates"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.triggered.rigel2d",
+      "name": "rigged:triggered",
+      "note": "an animation waiting on the load event, the source-lost event and one nothing raises"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.trigger-expression-shaped-event.rigel2d",
+      "name": "rigged:trigger-expression-shaped-event",
+      "note": "an event name shaped like a condition, which is a name like any other"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ordered-parameters.rigel2d",
+      "name": "rigged:ordered-parameters",
+      "note": "a rigger's parameter order unlike identifier order, with `mappable: false` on a mapped parameter and on an unmapped one"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-trigger.rigel2d",
+      "name": "rigged:ext-on-trigger",
+      "note": "marked extension data on a trigger, which the writer addresses by its position in a list it orders"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-keyframe.rigel2d",
+      "name": "rigged:ext-on-keyframe",
+      "note": "marked extension data on a keyframe that also carries an interpolation mode, so the preserved material sits beside a core field the build reads"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-control-point.rigel2d",
+      "name": "rigged:ext-on-control-point",
+      "note": "marked extension data on a control point of the symmetric Bézier segment, the deepest position-addressed place the format has"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.ext-on-parameter.rigel2d",
+      "name": "rigged:ext-on-parameter",
+      "note": "marked extension data on a parameter carrying an order, which is owner-keyed and sits beside a field a reordering edits"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.interpolation-linear-explicit.rigel2d",
+      "name": "rigged:interpolation-linear-explicit",
+      "note": "a segment spelling out `linear`, which is the absent form the writer canonicalises to"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.mappable-true-explicit.rigel2d",
+      "name": "rigged:mappable-true-explicit",
+      "note": "a parameter spelling out `mappable: true`, which is absent when true"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.triggers-unsorted.rigel2d",
+      "name": "rigged:triggers-unsorted",
+      "note": "an animation's triggers in an order the canonical writer would not emit"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.interpolation-value-unfamiliar.rigel2d",
+      "name": "rigged:interpolation-value-unfamiliar",
+      "note": "an interpolation mode the format does not define, at the current version"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.future-minor-interpolation-unfamiliar.rigel2d",
+      "name": "rigged:future-minor-interpolation-unfamiliar",
+      "note": "an interpolation mode the format does not define, on a segment in the middle of a track, in a later-version file"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.end-behaviour-value-unfamiliar.rigel2d",
+      "name": "rigged:end-behaviour-value-unfamiliar",
+      "note": "an end behaviour the format does not define, at the current version"
+    },
+    {
+      "expect": "accepted",
+      "file": "rigged.future-minor-end-behaviour-unfamiliar.rigel2d",
+      "name": "rigged:future-minor-end-behaviour-unfamiliar",
+      "note": "an end behaviour the format does not define, in a later-version file"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.end-behaviour-absent.rigel2d",
+      "name": "rigged:end-behaviour-absent",
+      "note": "an animation declaring no end behaviour, for which no default is stated"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.interpolation-on-last-keyframe.rigel2d",
+      "name": "rigged:interpolation-on-last-keyframe",
+      "note": "an interpolation mode on a track's last keyframe, which opens no segment"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.trigger-extra-field.rigel2d",
+      "name": "rigged:trigger-extra-field",
+      "note": "a trigger carrying a condition beside its event name, which is unmarked data"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.duplicate-trigger-event.rigel2d",
+      "name": "rigged:duplicate-trigger-event",
+      "note": "one animation naming one scene event twice"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.bezier-without-control-points.rigel2d",
+      "name": "rigged:bezier-without-control-points",
+      "note": "a segment declaring Bézier and carrying no control points"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.bezier-control-time-outside-segment.rigel2d",
+      "name": "rigged:bezier-control-time-outside-segment",
+      "note": "a Bézier control time past the later keyframe of its segment"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.bezier-control-value-nonfinite.rigel2d",
+      "name": "rigged:bezier-control-value-nonfinite",
+      "note": "a Bézier control value that overflows to infinity"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.control-value-nonfinite-without-bezier.rigel2d",
+      "name": "rigged:control-value-nonfinite-without-bezier",
+      "note": "a non-finite control value on a keyframe that declares no Bézier segment"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.coordinates-over-limit.rigel2d",
+      "name": "rigged:coordinates-over-limit",
+      "note": "a keyframe carrying one coordinate more than the declared limit on a stored coordinate list"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.triggers-over-limit.rigel2d",
+      "name": "rigged:triggers-over-limit",
+      "note": "an animation carrying one trigger more than the declared limit on `triggers`"
+    },
+    {
+      "expect": "rejected",
+      "file": "rigged.keyframes-over-aggregate.rigel2d",
+      "name": "rigged:keyframes-over-aggregate",
+      "note": "one keyframe more than the whole-puppet aggregate limit, with every per-track and per-animation count inside its own"
+    },
+    {
       "expect": "rejected",
       "file": "rigged.nan.rigel2d",
       "name": "rigged:nan",

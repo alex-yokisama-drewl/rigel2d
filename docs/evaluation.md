@@ -154,7 +154,8 @@ for the curve parameter. The iteration count is **fixed**, never convergence-bas
 bit-exact claim would otherwise depend on the arithmetic. **A fixed count is not enough**: a
 Newton step divides by a derivative that can be zero. The requirement is a finite result inside
 the segment for every input, degenerate control points included — bisection, or Newton with a
-bisection fallback. The reader has already checked that control times lie inside the segment and
+bisection fallback. The reader has already checked that control times lie inside the segment,
+endpoints included, and
 that control values are finite ([format.md](format.md#validation-proposed)), which is what keeps
 the curve a function of time.
 

@@ -43,6 +43,32 @@ reader would reach for next belongs here above all others.>
 
 ## Entries
 
+## 2026-11-28 — The aggregate keyframe limit is set from the parse tree, not from residency
+
+**Decided:** the puppet-wide keyframe limit is 262,144, set against the `ParseTreeBytes` ceiling
+as measured on the reader. The figure and its arithmetic are in
+[format.md](format.md#load-limits-proposed).
+**Because:** a keyframe costs about twenty times more in the parse tree than it does resident,
+and the tree fills first. A limit set from what a keyframe costs resident sits above the tree's
+ceiling and can never fire; a file just over it is refused by the parse-tree limit, so the limit
+cannot have the just-over fixture the acceptance criteria require of every limit.
+**Rejected:** 16,777,216, which was derived from residency alone and is some six times what the
+payload limit admits. And 1,048,576, which was checked against the payload limit but not against
+the parse tree, and so exceeded what the tree admits by about a factor of two. Both were
+unreachable for the same reason: each was set against one ceiling without checking the next one
+down.
+**Consequences:** the figure is tied to a per-keyframe charge that is an estimate and may be
+retuned, so it sits well under the tree's ceiling on purpose, and a newcomer will read it as
+needlessly small. Retuning the charge means re-checking this figure against every ceiling below
+it.
+
+**The per-track figure was raised in the same round, and failed the same way.**
+`KeyframesPerTrack` was 4096, justified as far past any hand-made animation. It is reached at 68
+seconds of one keyframe per frame at 60 fps, so a one-minute baked animation — which this format
+must carry — already exceeded it. Raised to 65536, about eighteen minutes. The justification was
+the defect rather than the arithmetic: *far past anything anyone would author* was asserted about
+a workload nobody had measured, and script-generated motion is an ordinary way to make a puppet.
+
 ## 2026-11-28 — A track adds to its parameter, and a keyframe holds a pose (supersedes part of "One parameter has one driver")
 
 **Decided:** every playing animation track adds its contribution to the parameter it drives, in

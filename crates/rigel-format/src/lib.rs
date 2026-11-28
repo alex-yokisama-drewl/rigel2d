@@ -51,10 +51,10 @@ pub use load::{
 };
 pub use puppet::{
     Animation, Axis, AxisPolarity, Binding, BindingKind, BindingValues, ChainDeformer,
-    ChannelMapping, CompositionMode, ExtensionEntry, Extensions, Id, Joint, Keyframe, Keypoint,
-    Mesh, MeshGroup, Node, NodeBody, OpaqueNode, OutputSource, Parameter, Part, PhysicsNode,
-    Preserved, PreservedMembers, Provenance, Puppet, ResponseCurve, TextureFlip, TextureRecord,
-    Track, Transform,
+    ChannelMapping, CompositionMode, ControlPoint, EndBehaviour, ExtensionEntry, Extensions, Id,
+    Interpolation, Joint, Keyframe, Keypoint, Mesh, MeshGroup, Node, NodeBody, OpaqueNode,
+    OutputSource, Parameter, Part, PhysicsNode, Preserved, PreservedMembers, Provenance, Puppet,
+    ResponseCurve, TextureFlip, TextureRecord, Track, Transform, Trigger,
 };
 pub use save::{SaveError, SaveOutcome, SaveStep, save, save_as, save_with_injected_failure};
 pub use validate::{

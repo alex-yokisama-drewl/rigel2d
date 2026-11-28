@@ -62,11 +62,6 @@ fn lim_1_every_load_limit_is_declared_in_one_place() {
     }
 }
 
-/// LIM-3 — a declared size within the limit expanding far beyond it fails the
-/// load, and fails it as a limit rather than as anything else.
-///
-/// *Checked before allocating* means the expansion was never produced: the limit
-/// is enforced against bytes **actually decompressed**, and the entry's
 /// A payload inside every byte limit whose **parsed tree** is not.
 ///
 /// **Written at task 10, from a review finding, not from the criteria** — the
@@ -121,6 +116,11 @@ fn a_payload_whose_parsed_tree_exceeds_the_budget_is_refused_before_it_is_built(
     }
 }
 
+/// LIM-3 — a declared size within the limit expanding far beyond it fails the
+/// load, and fails it as a limit rather than as anything else.
+///
+/// *Checked before allocating* means the expansion was never produced: the limit
+/// is enforced against bytes **actually decompressed**, and the entry's
 /// declaration — which is attacker-controlled — is used only to refuse early. A
 /// loader that trusts the header has a decompression bomb.
 ///

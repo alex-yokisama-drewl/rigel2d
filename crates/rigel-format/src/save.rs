@@ -342,10 +342,16 @@ fn backup_path(path: &Path, held: FormatVersion) -> PathBuf {
 /// `docs/format.md`'s *Canonical serialisation* states.
 ///
 /// `nodes` depth-first preorder with siblings in draw order; every collection
-/// carrying identifiers ordered by identifier; keypoints by position, **with
-/// each binding's values permuted alongside them**, because the stored form
-/// indexes a binding's values positionally by keypoint and reordering one
+/// carrying identifiers ordered by identifier; an animation's triggers by
+/// event name, since a trigger carries no identifier; keypoints by position,
+/// **with each binding's values permuted alongside them**, because the stored
+/// form indexes a binding's values positionally by keypoint and reordering one
 /// without the other is a change of meaning rather than a reorder (`ID-3`).
+///
+/// **Every collection's canonical order is established here and nowhere else.**
+/// [`crate::decode`] sorts nothing: a `Puppet` built or edited in memory — a
+/// trigger added in Studio — has never been near the decoder, and an order it
+/// could only inherit from a read would make one puppet have two spellings.
 fn canonicalise(puppet: &Puppet) -> Puppet {
     let mut out = puppet.clone();
 
@@ -353,8 +359,25 @@ fn canonicalise(puppet: &Puppet) -> Puppet {
     out.parameters.sort_by_key(|parameter| parameter.id);
     out.bindings.sort_by_key(|binding| binding.id);
     out.animations.sort_by_key(|animation| animation.id);
+    // Triggers by event name, and the preserved material sitting on them with
+    // them — a trigger has no identifier, so its preserved path names a
+    // position, exactly as a binding's values do below.
+    let mut triggers_moved: Vec<(Id, Vec<usize>)> = Vec::new();
     for animation in &mut out.animations {
         animation.tracks.sort_by_key(|track| track.id);
+
+        let order = trigger_permutation(&animation.triggers);
+        if order.iter().enumerate().all(|(at, from)| at == *from) {
+            continue;
+        }
+        animation.triggers = order
+            .iter()
+            .map(|from| animation.triggers[*from].clone())
+            .collect();
+        triggers_moved.push((animation.id, order));
+    }
+    for (animation, order) in &triggers_moved {
+        repath(&mut out.preserved, *animation, "triggers", order);
     }
     out.channel_mappings.sort_by_key(|mapping| mapping.id);
 
@@ -377,7 +400,7 @@ fn canonicalise(puppet: &Puppet) -> Puppet {
                 continue;
             }
             binding.values = permute(&binding.values, order);
-            repath(&mut out.preserved, binding.id, order);
+            repath(&mut out.preserved, binding.id, "values", order);
         }
     }
 
@@ -442,13 +465,30 @@ fn permute(values: &BindingValues, order: &[usize]) -> BindingValues {
     }
 }
 
-/// Moves a binding's preserved members with the values they sit on.
+/// The indices of an animation's triggers in event-name order.
 ///
-/// A later-version file's unknown member on one of a transform binding's values
-/// is located at `["values", "<position>"]`, which is the one preserved path a
-/// keypoint reorder invalidates — everything else is keyed on an identifier and
-/// survives a reorder untouched.
-fn repath(preserved: &mut Preserved, binding: Id, order: &[usize]) {
+/// A trigger carries no identifier — nothing refers to one — so the name is
+/// what orders them (`docs/format.md`, *A trigger*). Stable, so two triggers
+/// naming one event keep the order they were in; that pair is invalid and
+/// [`crate::Rule::TriggerEventsUnique`] is what says so.
+fn trigger_permutation(triggers: &[crate::puppet::Trigger]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..triggers.len()).collect();
+    order.sort_by(|a, b| triggers[*a].event.cmp(&triggers[*b].event));
+    order
+}
+
+/// Moves preserved members with the entries they sit on, when a collection
+/// addressed by position is reordered.
+///
+/// Two collections are in that position. A later-version file's unknown member
+/// on one of a transform binding's values is located at
+/// `["values", "<position>"]`, and one on a trigger at
+/// `["triggers", "<position>"]`. Everything else a puppet holds is keyed on an
+/// identifier and survives a reorder untouched.
+///
+/// `head` is the first step of the path, and `order[at]` is where the entry now
+/// at `at` came *from*.
+fn repath(preserved: &mut Preserved, owner: Id, head: &str, order: &[usize]) {
     // `order[at]` is where the value at `at` came *from*, so the inverse is
     // what rewrites an old position into a new one.
     let mut moved_to: BTreeMap<String, usize> = BTreeMap::new();
@@ -456,7 +496,7 @@ fn repath(preserved: &mut Preserved, binding: Id, order: &[usize]) {
         moved_to.insert(from.to_string(), at);
     }
     for row in &mut preserved.members {
-        if row.owner != binding || row.path.len() != 2 || row.path[0] != "values" {
+        if row.owner != owner || row.path.len() != 2 || row.path[0] != head {
             continue;
         }
         if let Some(at) = moved_to.get(&row.path[1]) {
@@ -650,6 +690,12 @@ impl Object {
         self.put(key, Json::Number(value.to_string()));
     }
 
+    /// A whole number that may be negative — a parameter's order is the one
+    /// the format defines.
+    fn signed(&mut self, key: &str, value: i64) {
+        self.put(key, Json::Number(value.to_string()));
+    }
+
     fn text(&mut self, key: &str, value: &str) {
         self.put(key, Json::String(value.to_owned()));
     }
@@ -674,9 +720,14 @@ impl Object {
 /// other, because a writer that disagrees with the specification's own corpus
 /// about how to spell a number produces a file that churns for no reason.
 ///
-/// Only ever reached for a finite value: [`crate::validate`] runs first and
-/// [`crate::Rule::NumbersFinite`] refuses every number this build interprets
-/// that is not one.
+/// Only ever reached for a finite value: [`crate::validate`] runs first, and
+/// between them [`crate::Rule::NumbersFinite`] and
+/// [`crate::Rule::BezierControlValueFinite`] refuse every number this build
+/// interprets that is not one. **Two rules and not one**, because a Bézier
+/// control point is deliberately outside the `NumbersFinite` walk so that one
+/// defect names one rule — which also means a change to either rule's reach is
+/// a change to this comment. Preserved material is not interpreted and is
+/// written back as the bytes it arrived as, so it never comes through here.
 fn number(value: f64) -> Json {
     Json::Number(if value.is_finite() {
         decimal(value)
@@ -734,6 +785,30 @@ fn output_source(source: &OutputSource) -> &str {
         OutputSource::X => "x",
         OutputSource::Y => "y",
         OutputSource::Unfamiliar(token) => token,
+    }
+}
+
+fn end_behaviour(behaviour: &crate::puppet::EndBehaviour) -> &str {
+    use crate::puppet::EndBehaviour;
+    match behaviour {
+        EndBehaviour::Loop => "loop",
+        EndBehaviour::Hold => "hold",
+        EndBehaviour::Release => "release",
+        EndBehaviour::Unfamiliar(token) => token,
+    }
+}
+
+/// The mode of the segment a keyframe opens, or `None` where the writer stores
+/// nothing: **linear is the absent form**, so an all-linear track stores no
+/// mode anywhere.
+fn interpolation(mode: &crate::puppet::Interpolation) -> Option<&str> {
+    use crate::puppet::Interpolation;
+    match mode {
+        Interpolation::Linear => None,
+        Interpolation::Stepped => Some("stepped"),
+        Interpolation::InverseStepped => Some("inverse_stepped"),
+        Interpolation::Bezier => Some("bezier"),
+        Interpolation::Unfamiliar(token) => Some(token),
     }
 }
 
@@ -1134,6 +1209,17 @@ impl Writer<'_> {
                     .collect(),
             ),
         );
+        // The rigger's arrangement, which is a stored field rather than the
+        // order of the collection. Absent is legal and sorts last.
+        if let Some(order) = parameter.order {
+            out.signed("order", order);
+        }
+        // Absent when true, so absent means *offered* — the direction that
+        // fails safely. The derived `true` a channel mapping implies is never
+        // written back (`MAP-3`).
+        if !parameter.mappable {
+            out.put("mappable", Json::Bool(false));
+        }
         self.preserve(&mut out, parameter.id, &[]);
         out.into_json()
     }
@@ -1194,6 +1280,31 @@ impl Writer<'_> {
                     .collect(),
             ),
         );
+        // Always written: `docs/format.md` states no default for it, and a
+        // field with no stated default is written whatever it holds.
+        out.text("end_behaviour", end_behaviour(&animation.end_behaviour));
+        // Canonically ordered by event name — established by `canonicalise`,
+        // which this writer runs behind, not assumed of what it was handed —
+        // and absent when empty.
+        if !animation.triggers.is_empty() {
+            out.put(
+                "triggers",
+                Json::Array(
+                    animation
+                        .triggers
+                        .iter()
+                        .enumerate()
+                        .map(|(at, trigger)| {
+                            let mut held = Object::new();
+                            held.text("event", &trigger.event);
+                            let step = at.to_string();
+                            self.preserve(&mut held, animation.id, &["triggers", step.as_str()]);
+                            held.into_json()
+                        })
+                        .collect(),
+                ),
+            );
+        }
         self.preserve(&mut out, animation.id, &[]);
         out.into_json()
     }
@@ -1224,6 +1335,49 @@ impl Writer<'_> {
                             ),
                         );
                         let step = at.to_string();
+                        // The mode of the segment this keyframe opens. Linear
+                        // is the absent form and the last keyframe opens no
+                        // segment, so neither stores anything.
+                        if let Some(mode) = interpolation(&keyframe.interpolation) {
+                            held.text("interpolation", mode);
+                        }
+                        if let Some(controls) = &keyframe.control_points {
+                            held.put(
+                                "control_points",
+                                Json::Array(
+                                    controls
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(which, control)| {
+                                            let mut point = Object::new();
+                                            point.number("time", control.time);
+                                            point.put(
+                                                "value",
+                                                Json::Array(
+                                                    control
+                                                        .value
+                                                        .iter()
+                                                        .map(|coordinate| number(*coordinate))
+                                                        .collect(),
+                                                ),
+                                            );
+                                            let slot = which.to_string();
+                                            self.preserve(
+                                                &mut point,
+                                                track.id,
+                                                &[
+                                                    "keyframes",
+                                                    step.as_str(),
+                                                    "control_points",
+                                                    slot.as_str(),
+                                                ],
+                                            );
+                                            point.into_json()
+                                        })
+                                        .collect(),
+                                ),
+                            );
+                        }
                         self.preserve(&mut held, track.id, &["keyframes", step.as_str()]);
                         held.into_json()
                     })
@@ -1505,6 +1659,8 @@ mod tests {
     fn keypoints_sort_and_take_their_binding_values_with_them() {
         let mut puppet = subject();
         puppet.parameters.push(Parameter {
+            order: None,
+            mappable: true,
             id: Id(20),
             name: String::from("p"),
             axes: vec![Axis {
@@ -1585,6 +1741,176 @@ mod tests {
             manifest(FormatVersion::CURRENT),
             br#"{"format":"rigel2d-puppet","version":{"major":1,"minor":1}}"#
         );
+    }
+
+    /// An animation's triggers are put in event-name order **by the writer**,
+    /// and the preserved material sitting on one goes with it.
+    ///
+    /// `docs/format.md`, *A trigger*: canonically ordered by event name. The
+    /// decoder reads them in file order like every other collection, so a
+    /// `Puppet` built in memory — Studio's first *add a trigger* — reaches here
+    /// in whatever order it was built in, and this is the only thing standing
+    /// between that and one puppet having two spellings.
+    ///
+    /// A trigger has no identifier, deliberately, so its preserved path names a
+    /// **position**; sorting without moving that material would put a
+    /// stranger's unknown member on a different trigger.
+    #[test]
+    fn an_animations_triggers_are_sorted_by_event_name_with_what_sits_on_them() {
+        use crate::puppet::{PreservedMembers, Trigger};
+
+        let mut puppet = subject();
+        puppet.animations.push(crate::puppet::Animation {
+            id: Id(40),
+            name: String::from("idle"),
+            end_behaviour: crate::puppet::EndBehaviour::Hold,
+            triggers: vec![
+                Trigger {
+                    event: String::from("source_lost"),
+                },
+                Trigger {
+                    event: String::from("plugin_ribbon_snapped"),
+                },
+                Trigger {
+                    event: String::from("on_load"),
+                },
+            ],
+            tracks: Vec::new(),
+        });
+        // A later version's unknown member, on the trigger at position 1.
+        puppet.preserved.members.push(PreservedMembers {
+            owner: Id(40),
+            path: vec![String::from("triggers"), String::from("1")],
+            members: vec![(String::from("fade"), b"0.25".to_vec())],
+        });
+
+        let canonical = canonicalise(&puppet);
+        let events: Vec<&str> = canonical.animations[0]
+            .triggers
+            .iter()
+            .map(|trigger| trigger.event.as_str())
+            .collect();
+        assert_eq!(
+            events,
+            ["on_load", "plugin_ribbon_snapped", "source_lost"],
+            "the writer did not establish the canonical order"
+        );
+        assert_eq!(
+            canonical.preserved.members[0].path,
+            ["triggers", "1"],
+            "the preserved member did not follow plugin_ribbon_snapped to its new seat"
+        );
+
+        // And the bytes say it too, with the member back on its own trigger.
+        // The writer runs behind `canonicalise`, never instead of it — the one
+        // save entry point above calls the two in that order.
+        let text = String::from_utf8(
+            Writer { puppet: &canonical }
+                .document()
+                .to_canonical_bytes(),
+        )
+        .expect("UTF-8");
+        let at = |event: &str| text.find(event).expect("every event is written");
+        assert!(at("on_load") < at("plugin_ribbon_snapped"));
+        assert!(at("plugin_ribbon_snapped") < at("source_lost"));
+        assert!(
+            text.contains(r#"{"event":"plugin_ribbon_snapped","fade":0.25}"#),
+            "the unknown member sits on the wrong trigger: {text}"
+        );
+    }
+
+    /// The absent forms the new fields take, and the one that is always
+    /// written.
+    ///
+    /// Linear is the absent interpolation, `mappable` is absent when true, an
+    /// absent `order` is legal, and an empty `triggers` is not written — while
+    /// `end_behaviour` is written whatever it holds, because `docs/format.md`
+    /// states no default for it.
+    #[test]
+    fn the_new_fields_are_absent_in_their_default_form_except_the_ending() {
+        let text = |puppet: &Puppet| {
+            String::from_utf8(Writer { puppet }.document().to_canonical_bytes()).expect("UTF-8")
+        };
+
+        // `subject()` carries no parameters and no animations, so the fields
+        // need something to sit on before their absence says anything.
+        let mut animated = subject();
+        animated.parameters.push(Parameter {
+            order: None,
+            mappable: true,
+            id: Id(20),
+            name: String::from("head_turn"),
+            axes: vec![Axis {
+                range: [-1.0, 1.0],
+                polarity: AxisPolarity::Bilateral,
+            }],
+            keypoints: vec![Keypoint {
+                id: Id(21),
+                position: vec![0.0],
+                neutral: true,
+            }],
+        });
+        animated.animations.push(crate::puppet::Animation {
+            id: Id(40),
+            name: String::from("idle"),
+            end_behaviour: crate::puppet::EndBehaviour::Loop,
+            triggers: Vec::new(),
+            tracks: vec![Track {
+                id: Id(41),
+                parameter: Id(20),
+                blend_duration: 0.0,
+                keyframes: vec![
+                    crate::puppet::Keyframe {
+                        interpolation: crate::puppet::Interpolation::Linear,
+                        control_points: None,
+                        time: 0.0,
+                        value: vec![0.0],
+                    },
+                    crate::puppet::Keyframe {
+                        interpolation: crate::puppet::Interpolation::Linear,
+                        control_points: None,
+                        time: 1.0,
+                        value: vec![1.0],
+                    },
+                ],
+            }],
+        });
+
+        let plain = text(&animated);
+        for absent in [
+            "interpolation",
+            "control_points",
+            "triggers",
+            "mappable",
+            "order",
+        ] {
+            assert!(!plain.contains(absent), "{absent} was written: {plain}");
+        }
+        assert!(
+            plain.contains(r#""end_behaviour":"loop""#),
+            "a field with no stated default is always written: {plain}"
+        );
+
+        // And each one appears the moment it holds anything else.
+        let mut set = animated.clone();
+        set.parameters[0].order = Some(-3);
+        set.parameters[0].mappable = false;
+        set.animations[0].end_behaviour = crate::puppet::EndBehaviour::Release;
+        set.animations[0].triggers = vec![crate::puppet::Trigger {
+            event: String::from("source_lost"),
+        }];
+        set.animations[0].tracks[0].keyframes[0].interpolation =
+            crate::puppet::Interpolation::Stepped;
+        let written = text(&set);
+        for present in [
+            r#""order":-3"#,
+            r#""mappable":false"#,
+            r#""end_behaviour":"release""#,
+            r#""event":"source_lost""#,
+            r#""interpolation":"stepped""#,
+        ] {
+            assert!(written.contains(present), "{present} is missing: {written}");
+        }
     }
 
     /// Empty is absent, because the corpus's smallest valid puppet writes no
