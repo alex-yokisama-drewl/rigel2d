@@ -116,8 +116,8 @@ the corpus median; the stress sits above the largest rig measured on every dimen
 | Physics nodes | 12 | 40 | Tree entries too, and **additional to the Nodes row rather than part of it**. Load limits derived from a node count must use the sum |
 | Animations | 8 | 32 | The one row comfortably above the corpus at both ends |
 | Tracks per animation | 54 | 200 | Measured 2026-11-28 — [2026-11-28-animation-dimensions.md](../research/2026-11-28-animation-dimensions.md). **Per-frame animation cost is this row**, one curve evaluation per playing track |
-| Keyframes per track | 3 | 100 | **Heavily skewed; the median is not the shape.** Most tracks sit at the floor and a thin tail carries the rest, so a generator using a flat 3 emits about half the keyframe data a real animation holds |
-| Keyframes per animation | 284 | 1000 | **Not the product of the two rows above**, which understates it by about 40%. This is the row a load limit binds |
+| Keyframes per track | 3 | 100 | **A workload to tune against, not a ceiling** — see below. Heavily skewed: most tracks sit at the floor and a thin tail carries the rest, so a generator using a flat 3 emits about half the keyframe data a real animation holds |
+| Keyframes per animation | 284 | 1000 | **A workload to tune against, not a ceiling.** Also **not the product of the two rows above**, which understates it by about 40% |
 | Source artwork | 25 Mpx | 75 Mpx | |
 | GPU-resident texture bytes | 100 MB | 300 MB | |
 
@@ -141,6 +141,13 @@ measured keyframes per animation, since most tracks sit at the floor while a few
 of magnitude more. A generator should draw from the distribution the research file records
 rather than emitting a flat figure, and a load limit should bind total keyframes per animation
 directly.
+
+**The two keyframe rows do not bound what a puppet may contain.** They describe the workload the
+budgets are measured against, and the corpus they come from — hand-authored Cubism rigs — cannot
+speak for script-generated animation, which is an ordinary way to make a puppet. A sine-wave
+motion baked at one keyframe per frame over a long loop reaches several times the stress figure
+here, and must load. What a file may actually carry is bounded by memory rather than by what a
+rigger typically does, and is settled in [puppet.md](puppet.md) rather than here.
 
 **Tracks per animation is a property of the rig rather than of the animation**, in this corpus:
 a Cubism motion is exported against the model's whole parameter list, so most rigs ship clips
